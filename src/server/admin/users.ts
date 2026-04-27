@@ -8,6 +8,9 @@ type PaginationInput = {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
+const DEFAULT_SEARCH_LIMIT = 20;
+const MAX_SEARCH_LIMIT = 50;
+const GUEST_EMAIL_SUFFIX = '@guest.yumcut';
 
 function clampPageSize(pageSize?: number) {
   const base = typeof pageSize === 'number' && Number.isFinite(pageSize) ? Math.floor(pageSize) : DEFAULT_PAGE_SIZE;
@@ -17,6 +20,52 @@ function clampPageSize(pageSize?: number) {
 function normalizePage(page?: number) {
   const base = typeof page === 'number' && Number.isFinite(page) ? Math.floor(page) : 1;
   return Math.max(base, 1);
+}
+
+function clampSearchLimit(limit?: number) {
+  const base = typeof limit === 'number' && Number.isFinite(limit) ? Math.floor(limit) : DEFAULT_SEARCH_LIMIT;
+  return Math.min(Math.max(base, 1), MAX_SEARCH_LIMIT);
+}
+
+function normalizeUserSearchQuery(value: string) {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+type AdminUserRow = {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+  createdAt: Date;
+  tokenBalance: number;
+  isAdmin: boolean;
+};
+
+export type AdminUserListItem = {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+  createdAt: string;
+  tokenBalance: number;
+  isAdmin: boolean;
+};
+
+const ADMIN_USER_LIST_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  image: true,
+  createdAt: true,
+  tokenBalance: true,
+  isAdmin: true,
+} as const;
+
+function serializeAdminUsers(items: AdminUserRow[]): AdminUserListItem[] {
+  return items.map((u) => ({
+    ...u,
+    createdAt: u.createdAt.toISOString(),
+  }));
 }
 
 export async function listUsers(pagination: PaginationInput = {}) {
@@ -29,29 +78,63 @@ export async function listUsers(pagination: PaginationInput = {}) {
       orderBy: { createdAt: 'desc' },
       skip,
       take,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        image: true,
-        createdAt: true,
-        tokenBalance: true,
-        isAdmin: true,
-      },
+      select: ADMIN_USER_LIST_SELECT,
     }),
     prisma.user.count(),
   ]);
 
   return {
-    items: items.map((u) => ({
-      ...u,
-      createdAt: u.createdAt.toISOString(),
-    })),
+    items: serializeAdminUsers(items as AdminUserRow[]),
     page,
     pageSize: take,
     total,
     totalPages: Math.max(Math.ceil(total / take), 1),
   };
+}
+
+export type SearchUsersInput = {
+  query: string;
+  limit?: number;
+  includeGuestUsers?: boolean;
+  includeDeleted?: boolean;
+};
+
+export async function searchUsersByEmailOrName(input: SearchUsersInput): Promise<AdminUserListItem[]> {
+  const query = normalizeUserSearchQuery(input.query || '');
+  if (query.length < 2) return [];
+
+  const take = clampSearchLimit(input.limit);
+  const includeGuestUsers = input.includeGuestUsers !== false;
+  const includeDeleted = input.includeDeleted === true;
+
+  const andFilters: Array<Record<string, unknown>> = [
+    {
+      OR: [
+        { email: { contains: query } },
+        { name: { contains: query } },
+      ],
+    },
+  ];
+
+  if (!includeDeleted) {
+    andFilters.push({ deleted: false });
+  }
+
+  if (!includeGuestUsers) {
+    andFilters.push({
+      email: { not: { endsWith: GUEST_EMAIL_SUFFIX } },
+    });
+  }
+
+  const where = andFilters.length === 1 ? andFilters[0] : { AND: andFilters };
+  const items = await prisma.user.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take,
+    select: ADMIN_USER_LIST_SELECT,
+  });
+
+  return serializeAdminUsers(items as AdminUserRow[]);
 }
 
 export interface AdminUserDetailResult {

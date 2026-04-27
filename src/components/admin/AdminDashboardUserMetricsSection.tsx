@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { AdminDailyNewUsersBarChart } from '@/components/admin/AdminDailyNewUsersBarChart';
 import { AdminUserCardMobile } from '@/components/admin/AdminUserCardMobile';
 import { formatDateTimeAdmin } from '@/lib/date';
+import { useAdminUserSearch } from '@/components/admin/useAdminUserSearch';
 
 type AdminDashboardSnapshotView = {
   counts: {
@@ -37,6 +39,12 @@ export function AdminDashboardUserMetricsSection({
     () => (includeGuestUsers ? withGuests : withoutGuests),
     [includeGuestUsers, withGuests, withoutGuests],
   );
+  const userSearch = useAdminUserSearch({
+    includeGuestUsers,
+    includeDeleted: false,
+    limit: 20,
+  });
+  const visibleUsers = userSearch.isActiveQuery ? userSearch.results : snapshot.recentUsers;
   const { counts } = snapshot;
 
   return (
@@ -96,11 +104,32 @@ export function AdminDashboardUserMetricsSection({
             </Button>
           </CardHeader>
           <CardContent className="space-y-3 overflow-hidden">
+            <Input
+              value={userSearch.query}
+              onChange={(event) => userSearch.setQuery(event.target.value)}
+              placeholder="Search by email or name"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="Search users"
+            />
+            {userSearch.isTooShort ? (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Type at least {userSearch.minChars} characters to search.
+              </p>
+            ) : null}
+            {userSearch.error ? (
+              <p className="text-xs text-rose-600 dark:text-rose-300">{userSearch.error}</p>
+            ) : null}
+            {userSearch.isActiveQuery && userSearch.isLoading ? (
+              <p className="text-xs text-gray-500 dark:text-gray-400">Searching users...</p>
+            ) : null}
             <div className="sm:hidden max-h-[45vh] overflow-auto pr-3 space-y-2">
-              {snapshot.recentUsers.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-300">No users yet.</p>
+              {visibleUsers.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-300">
+                  {userSearch.isActiveQuery ? 'No users found.' : 'No users yet.'}
+                </p>
               ) : (
-                snapshot.recentUsers.map((user) => (
+                visibleUsers.map((user) => (
                   <AdminUserCardMobile
                     key={user.id}
                     id={user.id}
@@ -112,11 +141,13 @@ export function AdminDashboardUserMetricsSection({
               )}
             </div>
             <div className="hidden sm:block">
-              {snapshot.recentUsers.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-300">No users yet.</p>
+              {visibleUsers.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-300">
+                  {userSearch.isActiveQuery ? 'No users found.' : 'No users yet.'}
+                </p>
               ) : (
                 <div className="max-h-[45vh] w-full min-w-0 overflow-auto pr-1 space-y-3">
-                  {snapshot.recentUsers.map((user) => (
+                  {visibleUsers.map((user) => (
                     <Link
                       key={user.id}
                       href={`/admin/users/${user.id}`}
