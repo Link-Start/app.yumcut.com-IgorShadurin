@@ -29,7 +29,7 @@ export default async function AdminHomePage() {
     getAdminVoiceProviderSettings(),
     getAdminImageEditorSettings(),
     getProjectCreationSettings(),
-    listTransactions({ page: 1, pageSize: 5 }),
+    listTransactions({ page: 1, pageSize: 10 }),
   ]);
   const snapshot = snapshotWithoutGuests;
   const queueStatuses = ['pending', 'retry', 'processing', 'scheduled', 'failed'] as const;
@@ -50,7 +50,31 @@ export default async function AdminHomePage() {
         </div>
       </div>
 
-      <AdminDashboardUserMetricsSection withoutGuests={snapshotWithoutGuests} withGuests={snapshotWithGuests}>
+      <AdminDashboardUserMetricsSection
+        withoutGuests={snapshotWithoutGuests}
+        withGuests={snapshotWithGuests}
+        leftCard={(
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between min-w-0">
+              <CardTitle className="truncate">Recent transactions</CardTitle>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/admin/transactions">View all</Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3 overflow-hidden">
+              {recentTransactions.items.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-300">No token activity recorded.</p>
+              ) : (
+                <div className="max-h-[45vh] w-full min-w-0 overflow-auto pr-1 space-y-3">
+                  {recentTransactions.items.map((transaction) => (
+                    <AdminTransactionCard key={transaction.id} transaction={transaction} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      >
         <Card>
           <CardHeader className="flex flex-row items-center justify-between min-w-0">
             <CardTitle className="truncate">Recent projects</CardTitle>
@@ -99,25 +123,6 @@ export default async function AdminHomePage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between min-w-0">
-            <CardTitle className="truncate">Recent transactions</CardTitle>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/admin/transactions">View all</Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3 overflow-hidden">
-            {recentTransactions.items.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-300">No token activity recorded.</p>
-            ) : (
-              <div className="max-h-[45vh] w-full min-w-0 overflow-auto pr-1 space-y-3">
-                {recentTransactions.items.map((transaction) => (
-                  <AdminTransactionCard key={transaction.id} transaction={transaction} />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </AdminDashboardUserMetricsSection>
 
       <Card>

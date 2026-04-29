@@ -96,7 +96,7 @@ export async function getAdminDashboardSnapshot(options?: AdminDashboardSnapshot
       where: recentUsersFilter,
       orderBy: { createdAt: 'desc' },
       select: { id: true, email: true, name: true, createdAt: true, deleted: true },
-      take: 10,
+      take: 5,
     }),
     prisma.user.findMany({
       where: {

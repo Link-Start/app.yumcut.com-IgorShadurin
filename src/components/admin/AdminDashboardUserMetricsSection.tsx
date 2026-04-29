@@ -27,12 +27,14 @@ type AdminDashboardSnapshotView = {
 type AdminDashboardUserMetricsSectionProps = {
   withoutGuests: AdminDashboardSnapshotView;
   withGuests: AdminDashboardSnapshotView;
+  leftCard?: ReactNode;
   children: ReactNode;
 };
 
 export function AdminDashboardUserMetricsSection({
   withoutGuests,
   withGuests,
+  leftCard,
   children,
 }: AdminDashboardUserMetricsSectionProps) {
   const [includeGuestUsers, setIncludeGuestUsers] = useState(false);
@@ -47,6 +49,83 @@ export function AdminDashboardUserMetricsSection({
   });
   const visibleUsers = userSearch.isActiveQuery ? userSearch.results : snapshot.recentUsers;
   const { counts } = snapshot;
+  const usersCard = (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between min-w-0">
+        <CardTitle className="truncate">Recent users</CardTitle>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/admin/users">View all</Link>
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-3 overflow-hidden">
+        <Input
+          value={userSearch.query}
+          onChange={(event) => userSearch.setQuery(event.target.value)}
+          placeholder="Search by email or name"
+          autoComplete="off"
+          spellCheck={false}
+          aria-label="Search users"
+        />
+        {userSearch.isTooShort ? (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Type at least {userSearch.minChars} characters to search.
+          </p>
+        ) : null}
+        {userSearch.error ? (
+          <p className="text-xs text-rose-600 dark:text-rose-300">{userSearch.error}</p>
+        ) : null}
+        {userSearch.isActiveQuery && userSearch.isLoading ? (
+          <p className="text-xs text-gray-500 dark:text-gray-400">Searching users...</p>
+        ) : null}
+        <div className="sm:hidden max-h-[45vh] overflow-auto pr-3 space-y-2">
+          {visibleUsers.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-300">
+              {userSearch.isActiveQuery ? 'No users found.' : 'No users yet.'}
+            </p>
+          ) : (
+            visibleUsers.map((user) => (
+              <AdminUserCardMobile
+                key={user.id}
+                id={user.id}
+                name={user.name}
+                email={user.email}
+                createdAtLabel={formatDateTimeAdmin(user.createdAt)}
+                deleted={user.deleted}
+              />
+            ))
+          )}
+        </div>
+        <div className="hidden sm:block">
+          {visibleUsers.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-300">
+              {userSearch.isActiveQuery ? 'No users found.' : 'No users yet.'}
+            </p>
+          ) : (
+            <div className="max-h-[45vh] w-full min-w-0 overflow-auto pr-1 space-y-3">
+              {visibleUsers.map((user) => (
+                <Link
+                  key={user.id}
+                  href={`/admin/users/${user.id}`}
+                  className="block w-full min-w-0 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700 dark:hover:bg-gray-900"
+                >
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <div className="min-w-0 flex flex-1 items-start gap-2">
+                      {user.deleted ? (
+                        <UserX className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" aria-label="Deleted user" />
+                      ) : null}
+                      <div className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-gray-100">{user.name || user.email}</div>
+                    </div>
+                    <div className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{formatDateTimeAdmin(user.createdAt)}</div>
+                  </div>
+                  <div className="truncate text-xs text-gray-500 dark:text-gray-400 break-words">{user.email}</div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <>
@@ -97,84 +176,11 @@ export function AdminDashboardUserMetricsSection({
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between min-w-0">
-            <CardTitle className="truncate">Recent users</CardTitle>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/admin/users">View all</Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3 overflow-hidden">
-            <Input
-              value={userSearch.query}
-              onChange={(event) => userSearch.setQuery(event.target.value)}
-              placeholder="Search by email or name"
-              autoComplete="off"
-              spellCheck={false}
-              aria-label="Search users"
-            />
-            {userSearch.isTooShort ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Type at least {userSearch.minChars} characters to search.
-              </p>
-            ) : null}
-            {userSearch.error ? (
-              <p className="text-xs text-rose-600 dark:text-rose-300">{userSearch.error}</p>
-            ) : null}
-            {userSearch.isActiveQuery && userSearch.isLoading ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400">Searching users...</p>
-            ) : null}
-            <div className="sm:hidden max-h-[45vh] overflow-auto pr-3 space-y-2">
-              {visibleUsers.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-300">
-                  {userSearch.isActiveQuery ? 'No users found.' : 'No users yet.'}
-                </p>
-              ) : (
-                visibleUsers.map((user) => (
-                  <AdminUserCardMobile
-                    key={user.id}
-                    id={user.id}
-                    name={user.name}
-                    email={user.email}
-                    createdAtLabel={formatDateTimeAdmin(user.createdAt)}
-                    deleted={user.deleted}
-                  />
-                ))
-              )}
-            </div>
-            <div className="hidden sm:block">
-              {visibleUsers.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-300">
-                  {userSearch.isActiveQuery ? 'No users found.' : 'No users yet.'}
-                </p>
-              ) : (
-                <div className="max-h-[45vh] w-full min-w-0 overflow-auto pr-1 space-y-3">
-                  {visibleUsers.map((user) => (
-                    <Link
-                      key={user.id}
-                      href={`/admin/users/${user.id}`}
-                      className="block w-full min-w-0 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700 dark:hover:bg-gray-900"
-                    >
-                      <div className="flex items-center justify-between gap-2 min-w-0">
-                        <div className="min-w-0 flex flex-1 items-start gap-2">
-                          {user.deleted ? (
-                            <UserX className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" aria-label="Deleted user" />
-                          ) : null}
-                          <div className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-gray-100">{user.name || user.email}</div>
-                        </div>
-                        <div className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{formatDateTimeAdmin(user.createdAt)}</div>
-                      </div>
-                      <div className="truncate text-xs text-gray-500 dark:text-gray-400 break-words">{user.email}</div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {leftCard ?? usersCard}
 
         <div className="space-y-4">
           {children}
+          {leftCard ? usersCard : null}
         </div>
       </div>
     </>
