@@ -143,7 +143,6 @@ export function ScriptEditor({ projectId, variants, primaryLanguage, fallbackTex
   const [requestText, setRequestText] = useState('');
   const [propagateTranslations, setPropagateTranslations] = useState(true);
   const { balance: tokenBalance, summary: tokenSummary, loading: tokensLoading } = useTokenSummary();
-  if (approved) return null;
 
   const languageOrder = useMemo(() => {
     const order = new Set<string>();
@@ -272,6 +271,8 @@ export function ScriptEditor({ projectId, variants, primaryLanguage, fallbackTex
       })),
     [scriptEntries],
   );
+
+  if (approved) return null;
 
   return (
     <div className="space-y-3">
