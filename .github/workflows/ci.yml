@@ -14,7 +14,7 @@ jobs:
 
     env:
       TEST_STORAGE_BASE_URL: http://localhost:3333
-      STORAGE_REPO: git@github.com:IgorShadurin/yumcut-storage.git
+      STORAGE_REPO: https://github.com/IgorShadurin/yumcut-storage.git
       ALLOW_NO_OAUTH: "1"
       ALLOW_NO_REVIEW_AUTH: "1"
       SKIP_PRERENDER: "1"
@@ -52,27 +52,8 @@ jobs:
           cat /tmp/upload_public.pem >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Configure SSH for storage repo
-        env:
-          STORAGE_DEPLOY_KEY: ${{ secrets.STORAGE_DEPLOY_KEY }}
-        run: |
-          if [ -z "$STORAGE_DEPLOY_KEY" ]; then
-            echo "STORAGE_DEPLOY_KEY is required to clone yumcut-storage" >&2
-            exit 1
-          fi
-          mkdir -p ~/.ssh
-          echo "$STORAGE_DEPLOY_KEY" > ~/.ssh/id_ed25519_storage
-          chmod 600 ~/.ssh/id_ed25519_storage
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-          {
-            echo "Host github.com"
-            echo "  HostName github.com"
-            echo "  IdentityFile ~/.ssh/id_ed25519_storage"
-            echo "  IdentitiesOnly yes"
-          } >> ~/.ssh/config
-
       - name: Clone storage repository
-        run: git clone "$STORAGE_REPO" ../yumcut-storage
+        run: git clone --depth 1 "$STORAGE_REPO" ../yumcut-storage
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

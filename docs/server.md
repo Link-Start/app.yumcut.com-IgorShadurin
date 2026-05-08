@@ -276,7 +276,7 @@ Still as `deploy`:
 ```bash
 git clone git@github.com:IgorShadurin/app.yumcut.com.git /var/www/app.yumcut.com
 git clone git@github.com:IgorShadurin/app.yumcut.com.git /var/www/yumcut-daemon
-git clone git@github.com:IgorShadurin/yumcut-storage.git /var/www/static.yumcut.com
+git clone https://github.com/IgorShadurin/yumcut-storage.git /var/www/static.yumcut.com
 git clone git@github.com:IgorShadurin/yumcut-shorts-tools.git /var/www/yumcut-shorts-tools
 git clone git@github.com:IgorShadurin/video-slides.git /var/www/video-slides
 git clone git@github.com:IgorShadurin/yumcut-captions-video-maker.git /var/www/yumcut-captions-video-maker
