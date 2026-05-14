@@ -873,7 +873,7 @@ export function CharacterProfilePage({
                   </Tooltip>
                 </div>
                 <Button
-                  className="brainrot-cta-gradient cursor-pointer rounded-2xl border-0 px-5 py-2.5 text-sm font-semibold text-black shadow-lg outline-none transition hover:-translate-y-0.5 hover:text-black hover:shadow-xl focus-visible:outline-none disabled:hover:translate-y-0"
+                  className="brainrot-cta-gradient cursor-pointer rounded-2xl border-0 px-5 py-2.5 text-sm font-semibold text-black shadow-lg outline-none transition hover:text-black hover:shadow-xl focus-visible:outline-none"
                   onClick={onCreate}
                   disabled={!canAttemptCreation || startingProvider !== null || status === 'loading'}
                 >
