@@ -141,6 +141,8 @@ export interface MobileProjectDetailDTO {
   status: ProjectStatus;
   createdAt: string;
   finalVideoUrl: string | null;
+  rawVideoPath?: string | null;
+  rawVideoUrl?: string | null;
   languages: string[];
   languageVariants?: ProjectLanguageVariantDTO[];
 }

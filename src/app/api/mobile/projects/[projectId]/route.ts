@@ -26,6 +26,8 @@ async function buildDetail(projectId: string, userId: string): Promise<MobilePro
           languageCode: true,
           publicUrl: true,
           path: true,
+          isFinal: true,
+          variant: true,
         },
       },
     },
@@ -37,15 +39,21 @@ async function buildDetail(projectId: string, userId: string): Promise<MobilePro
   const videos = project.videos ?? [];
   const languageVariants = languages.map((languageCode, index) => {
     const isPrimary = index === 0;
-    const match = videos.find((v) => (v.languageCode ?? languages[0]) === languageCode)
-      ?? (isPrimary ? videos.find((v) => !v.languageCode) : undefined);
+    const match = videos.find((v) => v.isFinal && (v.languageCode ?? languages[0]) === languageCode)
+      ?? (isPrimary ? videos.find((v) => v.isFinal && !v.languageCode) : undefined);
     const finalVideoPath = match ? match.publicUrl || normalizeMediaUrl(match.path) : null;
     const finalVideoUrl = match ? match.publicUrl || null : null;
+    const rawMatch = videos.find((v) => v.variant === 'raw' && (v.languageCode ?? languages[0]) === languageCode)
+      ?? (isPrimary ? videos.find((v) => v.variant === 'raw' && !v.languageCode) : undefined);
+    const rawVideoPath = rawMatch ? rawMatch.publicUrl || normalizeMediaUrl(rawMatch.path) : null;
+    const rawVideoUrl = rawMatch ? rawMatch.publicUrl || null : null;
     return {
       languageCode,
       isPrimary,
       finalVideoPath,
       finalVideoUrl,
+      rawVideoPath,
+      rawVideoUrl,
     };
   });
 
@@ -56,6 +64,8 @@ async function buildDetail(projectId: string, userId: string): Promise<MobilePro
     ?? normalizeMediaUrl(project.finalVideoPath ?? null)
     ?? primaryVariant?.finalVideoPath
     ?? null;
+  const rawVideoPath = primaryVariant?.rawVideoPath ?? null;
+  const rawVideoUrl = primaryVariant?.rawVideoUrl ?? rawVideoPath;
 
   return {
     id: project.id,
@@ -65,6 +75,8 @@ async function buildDetail(projectId: string, userId: string): Promise<MobilePro
     createdAt: project.createdAt.toISOString(),
     languages,
     finalVideoUrl,
+    rawVideoPath,
+    rawVideoUrl,
     languageVariants,
   };
 }
