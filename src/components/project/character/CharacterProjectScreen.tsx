@@ -211,7 +211,7 @@ export function CharacterProjectScreen({ project, primaryLanguage, finalVideoUrl
 
         <CardContent className="space-y-4 pt-4">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm dark:border-gray-800 dark:bg-gray-950">
+            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white transition-all duration-200 hover:shadow-sm dark:border-gray-800 dark:bg-gray-950">
               <div className="relative aspect-[9/16] w-full">
                 {hasFinalVideo ? (
                   <>
@@ -219,7 +219,7 @@ export function CharacterProjectScreen({ project, primaryLanguage, finalVideoUrl
                       <a
                         href={videoDownloadUrl}
                         aria-label={t.downloadVideo}
-                        className="absolute right-2 top-2 z-20 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-black/45 text-white shadow-lg backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-black/65 focus:outline-none focus:ring-2 focus:ring-white/80"
+                        className="absolute right-2 top-2 z-20 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-black/45 text-white shadow-lg backdrop-blur-md transition hover:bg-black/65 focus:outline-none focus:ring-2 focus:ring-white/80"
                       >
                         <Download className="h-4 w-4" />
                       </a>
