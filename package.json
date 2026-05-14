@@ -35,7 +35,8 @@
     "projects:dummy": "tsx scripts/seed-dummy-projects.ts",
     "tests:prepare": "npm ci --prefix tests/daemon/dummy-scripts/DAEMON_SCRIPT_WORKSPACE && npm ci --prefix tests/daemon/dummy-scripts/DAEMON_SCRIPT_WORKSPACE_V2 && npm ci --prefix tests/daemon/dummy-scripts/DAEMON_SCRIPT_CAPTION",
     "voices:download-previews": "tsx scripts/utils/download-voice-previews.ts",
-    "db:check": "tsx scripts/check-db-connection.ts"
+    "db:check": "tsx scripts/check-db-connection.ts",
+    "tools:convert-video-preview": "tsx scripts/convert-video-preview.ts"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",
