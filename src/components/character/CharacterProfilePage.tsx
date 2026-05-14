@@ -1021,7 +1021,7 @@ export function CharacterProfilePage({
       </Dialog>
 
       <Dialog open={paywallOpen} onOpenChange={setPaywallOpen}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-[1040px]">
           <DialogHeader>
             <DialogTitle className="inline-flex items-center gap-2">
               <Crown className="h-5 w-5 text-amber-500" />
@@ -1031,7 +1031,7 @@ export function CharacterProfilePage({
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {copy.topUpDescription}
           </p>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {subscriptionPlans.map((plan) => {
               const isLoading = checkoutPlan === plan.planKey;
               const perLabel = copy.paywallPerPeriod(plan.interval);
@@ -1039,17 +1039,17 @@ export function CharacterProfilePage({
                 <div
                   key={plan.planKey}
                   className={[
-                    'rounded-xl border p-4',
+                    'min-w-0 rounded-xl border p-5',
                     plan.planKey === 'monthly'
                       ? 'border-blue-300 bg-blue-50/40 dark:border-blue-800 dark:bg-blue-950/20'
                       : 'border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900/40',
                   ].join(' ')}
                 >
-                  <div className="text-center">
-                    <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">${plan.priceUsd.toFixed(2)}</span>
-                    <span className="ml-1 text-sm text-gray-500 dark:text-gray-400">/{perLabel}</span>
+                  <div className="flex items-end justify-center gap-1 whitespace-nowrap">
+                    <span className="text-4xl font-bold leading-none text-gray-900 dark:text-gray-100">${plan.priceUsd.toFixed(2)}</span>
+                    <span className="pb-0.5 text-lg text-gray-500 dark:text-gray-400">/{perLabel}</span>
                   </div>
-                  <div className="mt-3 space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                  <div className="mt-5 space-y-2 text-lg text-gray-700 dark:text-gray-300">
                     {plan.ui.benefits.map((benefit, benefitIndex) => {
                       if (benefit.key === 'tokens_per_charge' && typeof benefit.tokens === 'number') {
                         return <p key={`${plan.planKey}-benefit-${benefitIndex}`}>{benefit.tokens.toLocaleString()} {copy.tokensPerCharge}</p>;
