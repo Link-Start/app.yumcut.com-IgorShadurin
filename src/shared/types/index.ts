@@ -175,6 +175,8 @@ export interface ProjectLanguageVariantDTO {
   finalVoiceoverUrl?: string | null;
   finalVideoPath?: string | null;
   finalVideoUrl?: string | null;
+  rawVideoPath?: string | null;
+  rawVideoUrl?: string | null;
 }
 
 export interface ProjectLanguageProgressStateDTO {

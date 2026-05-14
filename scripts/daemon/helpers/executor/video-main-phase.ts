@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import { ProjectStatus } from '@/shared/constants/status';
 import { DEFAULT_LANGUAGE } from '@/shared/constants/languages';
 import { log } from '../logger';
-import { getLanguageProgress, getTranscriptionSnapshot, setStatus, setFinalVideo, updateLanguageProgress, markLanguageFailure } from '../db';
+import { getLanguageProgress, getTranscriptionSnapshot, setStatus, setFinalVideo, setRawVideo, updateLanguageProgress, markLanguageFailure } from '../db';
 import { buildFinalVideo } from '../video';
 import { isDummyScriptWorkspace, writeDummyMainVideo, writeDummyMergedVideo } from '../dummy-fallbacks';
 import type { DaemonConfig } from '../config';
@@ -69,8 +69,10 @@ export async function handleVideoMainPhase({ projectId, cfg, jobPayload, daemonC
 
     const videoLogs: Record<string, string | null> = {};
     const finalVideoPaths: Record<string, string> = {};
+    const rawVideoPaths: Record<string, string> = {};
     const overlaysByLanguage: Record<string, unknown> = {};
     const workspaceByLanguage: Record<string, string> = {};
+    const shouldUploadRawVideo = cfg.projectExperience === 'character';
 
     for (const languageCode of pendingLanguages) {
       try {
@@ -129,6 +131,10 @@ export async function handleVideoMainPhase({ projectId, cfg, jobPayload, daemonC
         videoLogs[languageCode] = videoResult.logPath;
         overlaysByLanguage[languageCode] = videoResult.overlays;
         finalVideoPaths[languageCode] = videoResult.finalVideoPath;
+        if (shouldUploadRawVideo) {
+          await setRawVideo(projectId, mainVideoPath, languageCode);
+          rawVideoPaths[languageCode] = mainVideoPath;
+        }
         await setFinalVideo(projectId, videoResult.finalVideoPath, languageCode);
         try {
           await updateLanguageProgress(projectId, { languageCode, finalVideoDone: true });
@@ -164,6 +170,7 @@ export async function handleVideoMainPhase({ projectId, cfg, jobPayload, daemonC
         videoWorkspace: agentWorkspace,
         videoLogs,
         finalVideoPaths,
+        rawVideoPaths,
         effectName,
         includeDefaultMusic,
         addOverlay: includeOverlay,
@@ -180,6 +187,7 @@ export async function handleVideoMainPhase({ projectId, cfg, jobPayload, daemonC
         videoWorkspace: agentWorkspace,
         videoLogs,
         finalVideoPaths,
+        rawVideoPaths,
         effectName,
         includeDefaultMusic,
         addOverlay: includeOverlay,
@@ -204,8 +212,10 @@ export async function handleVideoMainPhase({ projectId, cfg, jobPayload, daemonC
       }
       const videoLogs: Record<string, string | null> = {};
       const finalVideoPaths: Record<string, string> = {};
+      const rawVideoPaths: Record<string, string> = {};
       const overlaysByLanguage: Record<string, unknown> = {};
       const workspaceByLanguage: Record<string, string> = {};
+      const shouldUploadRawVideo = cfg.projectExperience === 'character';
 
       for (const languageCode of activeFallbackLanguages) {
         const languageInfo = await ensureLanguageWorkspace(projectId, languageCode);
@@ -218,6 +228,10 @@ export async function handleVideoMainPhase({ projectId, cfg, jobPayload, daemonC
         finalVideoPaths[languageCode] = chosenPath;
         overlaysByLanguage[languageCode] = [];
         try {
+          if (shouldUploadRawVideo) {
+            await setRawVideo(projectId, fallbackMain, languageCode);
+            rawVideoPaths[languageCode] = fallbackMain;
+          }
           await setFinalVideo(projectId, chosenPath, languageCode);
         } catch (assetErr: any) {
           log.warn('Failed to register fallback final video', {
@@ -247,6 +261,7 @@ export async function handleVideoMainPhase({ projectId, cfg, jobPayload, daemonC
         videoWorkspace: fallbackPrimaryWorkspace,
         videoLogs,
         finalVideoPaths,
+        rawVideoPaths,
         effectName,
         includeDefaultMusic: cfgIncludeDefaultMusic,
         addOverlay: cfgIncludeOverlay,

@@ -65,6 +65,7 @@ type VideoAsset = {
   path: string;
   publicUrl: string | null;
   isFinal: boolean;
+  variant?: string | null;
   languageCode?: string | null;
 };
 type ProjectStatusHistory = { id: string; projectId: string; status: string; message?: string | null; extra?: any; createdAt: Date };
@@ -771,6 +772,7 @@ export function makeVirtualPrisma() {
         path: data.path,
         publicUrl: data.publicUrl ?? null,
         isFinal: !!data.isFinal,
+        variant: (data as any).variant ?? null,
         languageCode: (data as any).languageCode ?? null,
       };
       db.videoAssets.set(id, rec);

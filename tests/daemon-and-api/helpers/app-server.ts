@@ -56,7 +56,7 @@ type ServerCall = { method: string; path: string };
 type AppServerState = {
   statuses: { projectId: string; status: string; message?: string | null; extra?: any }[];
   jobStatuses: { jobId: string; status: string; projectId?: string }[];
-  assets: { projectId: string; kind: 'audio' | 'image' | 'video'; isFinal?: boolean }[];
+  assets: { projectId: string; kind: 'audio' | 'image' | 'video'; isFinal?: boolean; variant?: string | null }[];
   scripts: { projectId: string; length: number }[];
 };
 type ServerInstance = { baseUrl: string; calls: ServerCall[]; state: AppServerState; close: () => Promise<void> };
@@ -250,7 +250,7 @@ export async function startAppApiServer(opts: { daemonPassword: string, userId?:
         try {
           const parsed = JSON.parse(body.toString('utf8'));
           if (parsed && typeof parsed.type === 'string') {
-            state.assets.push({ projectId, kind: parsed.type, isFinal: !!parsed.isFinal });
+            state.assets.push({ projectId, kind: parsed.type, isFinal: !!parsed.isFinal, variant: typeof parsed.variant === 'string' ? parsed.variant : null });
           }
         } catch {}
         const request = new NextRequest(new Request(new URL(url.pathname, baseUrl), { method: 'POST', headers: req.headers as any, body: body as any } as any));

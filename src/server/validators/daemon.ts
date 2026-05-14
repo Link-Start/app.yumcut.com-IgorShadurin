@@ -21,6 +21,7 @@ export const daemonAssetRegisterSchema = z
     isFinal: z.coerce.boolean().optional(),
     localPath: z.string().optional(),
     languageCode: LANGUAGE_ENUM.optional(),
+    variant: z.enum(['raw']).optional(),
   });
 
 export const daemonJobStatusSchema = z.object({

@@ -59,6 +59,40 @@ describe('project experience routing payload', () => {
   });
 
   it('returns character experience when payload marker is provided', async () => {
+    prismaMock.project.findFirst.mockResolvedValue({
+      id: 'p1',
+      userId: 'user-1',
+      title: 'Demo',
+      prompt: 'Prompt',
+      rawScript: null,
+      status: ProjectStatus.Done,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+      languages: ['en'],
+      scripts: [],
+      audios: [],
+      videos: [
+        {
+          id: 'video-final',
+          path: 'projects/p1/video/final.mp4',
+          publicUrl: 'https://cdn.test/final.mp4',
+          isFinal: true,
+          variant: null,
+          languageCode: 'en',
+        },
+        {
+          id: 'video-raw',
+          path: 'projects/p1/video/raw.mp4',
+          publicUrl: 'https://cdn.test/raw.mp4',
+          isFinal: false,
+          variant: 'raw',
+          languageCode: 'en',
+        },
+      ],
+      statusLog: [{ status: ProjectStatus.Done, extra: {} }],
+      selection: null,
+      template: null,
+    });
     prismaMock.job.findFirst.mockResolvedValue({
       payload: {
         durationSeconds: 60,
@@ -73,6 +107,10 @@ describe('project experience routing payload', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.creation?.projectExperience).toBe('character');
+    expect(body.languageVariants?.[0]).toEqual(expect.objectContaining({
+      finalVideoPath: 'https://cdn.test/final.mp4',
+      rawVideoPath: 'https://cdn.test/raw.mp4',
+    }));
   });
 });
 

@@ -72,6 +72,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       }),
       getAdminImageEditorSettings(),
     ]);
+    const projectExperience = normalizeProjectExperience((initialJob?.payload as any)?.projectExperience);
 
     const languages = normalizeLanguageList(
       (p as any)?.languages
@@ -92,7 +93,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       isFinal?: boolean | null;
       createdAt?: Date | string | null;
     }> | undefined;
-    const videos = (p as any).videos as Array<{ id: string; path: string; publicUrl?: string | null; isFinal?: boolean; languageCode?: string | null }> | undefined;
+    const videos = (p as any).videos as Array<{ id: string; path: string; publicUrl?: string | null; isFinal?: boolean; variant?: string | null; languageCode?: string | null }> | undefined;
     const primaryScriptRecord = scripts?.find((s) => s.languageCode === primaryLanguage) ?? scripts?.[0] ?? null;
 
     const languageVariants = languages.map((languageCode, index) => {
@@ -132,6 +133,14 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         ?? (isPrimary ? (videos ?? []).find((v) => v.isFinal && !v.languageCode) : undefined);
       const finalVideoPath = finalVideoRecord ? (finalVideoRecord.publicUrl || normalizeMediaUrl(finalVideoRecord.path)) : null;
       const finalVideoUrl = finalVideoRecord ? finalVideoRecord.publicUrl || null : null;
+      const rawVideoRecord = projectExperience === 'character'
+        ? (
+            (videos ?? []).find((v) => v.languageCode === languageCode && v.variant === 'raw')
+            ?? (isPrimary ? (videos ?? []).find((v) => v.variant === 'raw' && !v.languageCode) : undefined)
+          )
+        : null;
+      const rawVideoPath = rawVideoRecord ? (rawVideoRecord.publicUrl || normalizeMediaUrl(rawVideoRecord.path)) : null;
+      const rawVideoUrl = rawVideoRecord ? rawVideoRecord.publicUrl || null : null;
 
       return {
         languageCode,
@@ -142,6 +151,8 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         finalVoiceoverUrl,
         finalVideoPath,
         finalVideoUrl,
+        rawVideoPath,
+        rawVideoUrl,
       };
     });
 
@@ -306,7 +317,6 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         ...(initialJob?.payload as any).characterSelection,
       };
     }
-    const projectExperience = normalizeProjectExperience((initialJob?.payload as any)?.projectExperience);
     const payloadVideoGeneration = (initialJob?.payload as any)?.videoGeneration;
     const creation: any = initialJob?.payload ? {
       durationSeconds: (initialJob.payload as any).durationSeconds ?? null,

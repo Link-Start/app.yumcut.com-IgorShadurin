@@ -9,6 +9,8 @@ type CharacterProjectCopy = {
   projectActions: string;
   delete: string;
   downloadVideo: string;
+  download: string;
+  downloadRaw: string;
   selectedCharacter: string;
   character: string;
   mode: string;
@@ -174,6 +176,8 @@ const COPY: Record<AppLanguageCode, CharacterProjectCopy> = {
     projectActions: 'Project actions',
     delete: 'Delete',
     downloadVideo: 'Download video',
+    download: 'Download',
+    downloadRaw: 'Download Raw',
     selectedCharacter: 'Selected character',
     character: 'Character',
     mode: 'Mode',
@@ -218,6 +222,8 @@ const COPY: Record<AppLanguageCode, CharacterProjectCopy> = {
     projectActions: 'Действия проекта',
     delete: 'Удалить',
     downloadVideo: 'Скачать видео',
+    download: 'Скачать',
+    downloadRaw: 'Скачать Raw',
     selectedCharacter: 'Выбранный персонаж',
     character: 'Персонаж',
     mode: 'Режим',

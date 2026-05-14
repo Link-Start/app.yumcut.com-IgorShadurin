@@ -81,6 +81,7 @@ export type ApiServer = {
       path: string;
       url: string;
       isFinal?: boolean;
+      variant?: string;
       localPath?: string;
     }[];
     finalAudios: Record<string, Record<string, { id: string; path: string; url: string; localPath?: string | null }>>;
@@ -345,9 +346,10 @@ routes.set('POST /api/daemon/projects/:id/status', withAuth(opts.password, async
     const pathStr = String(body?.path || '');
     const urlStr = String(body?.url || '');
     const isFinal = body?.isFinal === true;
+    const variant = typeof body?.variant === 'string' ? body.variant : undefined;
     const localPath = typeof body?.localPath === 'string' ? body.localPath : undefined;
     const id = `asset_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    state.assets.push({ id, projectId, kind, path: pathStr, url: urlStr, isFinal, localPath } as any);
+    state.assets.push({ id, projectId, kind, path: pathStr, url: urlStr, isFinal, variant, localPath } as any);
     if (kind === 'audio') return sendJson(res, 200, { kind: 'audio', id, path: pathStr, url: urlStr });
     if (kind === 'image') return sendJson(res, 200, { kind: 'image', id, path: pathStr, url: urlStr });
     if (kind === 'video') return sendJson(res, 200, { kind: 'video', id, path: pathStr, url: urlStr, isFinal });

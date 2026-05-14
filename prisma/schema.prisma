@@ -252,12 +252,14 @@ model VideoAsset {
   path         String
   publicUrl    String?  @db.VarChar(512)
   isFinal      Boolean  @default(false)
+  variant      String?  @db.VarChar(16)
   languageCode String?  @db.VarChar(16)
   createdAt    DateTime @default(now())
   project      Project  @relation(fields: [projectId], references: [id])
 
   @@index([projectId])
   @@index([projectId, languageCode])
+  @@index([projectId, variant])
 }
 
 model Job {

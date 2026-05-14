@@ -188,6 +188,7 @@ async function uploadAsset(
   filePath: string,
   isFinal = false,
   languageCode?: string,
+  variant?: 'raw',
 ) {
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
   // Ensure the file exists before streaming
@@ -300,6 +301,7 @@ async function uploadAsset(
     isFinal?: boolean;
     localPath?: string;
     languageCode?: string;
+    variant?: 'raw';
   } = {
     type: kind,
     path: storageResponse.path,
@@ -309,6 +311,9 @@ async function uploadAsset(
   };
   if (languageCode) {
     payload.languageCode = languageCode;
+  }
+  if (kind === 'video' && variant) {
+    payload.variant = variant;
   }
   const registerEndpoint = `/api/daemon/projects/${projectId}/assets`;
   const registerRequestUrl = buildUrl(cfg.apiBaseUrl, registerEndpoint);
@@ -580,6 +585,10 @@ export async function registerGeneratedCharacter(projectId: string, payload: { p
 
 export async function setFinalVideo(projectId: string, filePath: string, languageCode?: string | null) {
   await uploadAsset(projectId, 'video', filePath, true, languageCode ?? undefined);
+}
+
+export async function setRawVideo(projectId: string, filePath: string, languageCode?: string | null) {
+  await uploadAsset(projectId, 'video', filePath, false, languageCode ?? undefined, 'raw');
 }
 
 export type JobRow = {

@@ -83,7 +83,8 @@ export function CharacterProjectScreen({ project, primaryLanguage, finalVideoUrl
   const text = (project.prompt?.trim() || project.rawScript?.trim() || '').trim();
   const showPromptSection = text.length > 0;
   const hasFinalVideo = typeof finalVideoUrl === 'string' && finalVideoUrl.trim().length > 0;
-  const videoDownloadUrl = `/api/projects/${encodeURIComponent(project.id)}/video/download`;
+  const videoDownloadUrl = `/api/projects/${encodeURIComponent(project.id)}/video/download?language=${encodeURIComponent(primaryLanguage)}`;
+  const rawVideoDownloadUrl = `${videoDownloadUrl}&variant=raw`;
   const languageVariants = project.languageVariants ?? [];
   const primaryVariant =
     languageVariants.find((variant) => variant.languageCode === primaryLanguage)
@@ -107,6 +108,7 @@ export function CharacterProjectScreen({ project, primaryLanguage, finalVideoUrl
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [copiedGeneratedText, setCopiedGeneratedText] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [errorDetailsOpen, setErrorDetailsOpen] = useState(false);
   const router = useRouter();
@@ -134,6 +136,7 @@ export function CharacterProjectScreen({ project, primaryLanguage, finalVideoUrl
     : null;
   const metadataTitleClass = 'inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400';
   const metadataValueClass = 'text-xl font-semibold text-gray-900 dark:text-gray-100';
+  const hasRawVideo = Boolean(primaryVariant?.rawVideoUrl || primaryVariant?.rawVideoPath);
 
   useEffect(() => {
     let audio: HTMLAudioElement | null = null;
@@ -228,15 +231,47 @@ export function CharacterProjectScreen({ project, primaryLanguage, finalVideoUrl
               <div className="relative aspect-[9/16] w-full">
                 {hasFinalVideo ? (
                   <>
-                    <Tooltip content={t.downloadVideo} side="left" align="start">
-                      <a
-                        href={videoDownloadUrl}
-                        aria-label={t.downloadVideo}
-                        className="absolute right-2 top-2 z-20 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-black/45 text-white shadow-lg backdrop-blur-md transition hover:bg-black/65 focus:outline-none focus:ring-2 focus:ring-white/80"
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
-                    </Tooltip>
+                    <Popover open={downloadMenuOpen} onOpenChange={setDownloadMenuOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label={t.downloadVideo}
+                          title={t.downloadVideo}
+                          className="absolute right-2 top-2 z-20 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-black/45 text-white shadow-lg backdrop-blur-md transition hover:bg-black/65 focus:outline-none focus:ring-2 focus:ring-white/80"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-[min(190px,calc(100vw-1rem))] p-1">
+                        <a
+                          href={videoDownloadUrl}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800"
+                          onClick={() => setDownloadMenuOpen(false)}
+                        >
+                          <Download className="h-4 w-4" />
+                          <span>{t.download}</span>
+                        </a>
+                        {hasRawVideo ? (
+                          <a
+                            href={rawVideoDownloadUrl}
+                            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => setDownloadMenuOpen(false)}
+                          >
+                            <Download className="h-4 w-4" />
+                            <span>{t.downloadRaw}</span>
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-400"
+                          >
+                            <Download className="h-4 w-4" />
+                            <span>{t.downloadRaw}</span>
+                          </button>
+                        )}
+                      </PopoverContent>
+                    </Popover>
                     <video
                       src={finalVideoUrl!}
                       poster={previewImageUrl ?? undefined}
