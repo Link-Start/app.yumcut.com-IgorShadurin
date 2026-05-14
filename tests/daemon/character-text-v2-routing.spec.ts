@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { promises as fs } from 'fs';
+import path from 'path';
+import os from 'os';
+import { buildDaemonEnvContent } from './helpers/env';
 
 const generateScriptMock = vi.hoisted(() => vi.fn());
 const refineScriptMock = vi.hoisted(() => vi.fn());
@@ -80,6 +84,22 @@ vi.mock('../../scripts/daemon/helpers/template-original', () => ({
 }));
 
 describe('script phase character v2 routing', () => {
+  let tmpRoot: string;
+
+  beforeAll(async () => {
+    tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'daemon-character-routing-'));
+    const projectsWorkspace = path.join(tmpRoot, 'projects');
+    await fs.mkdir(projectsWorkspace, { recursive: true });
+    const envPath = path.join(tmpRoot, '.daemon.env');
+    await fs.writeFile(envPath, buildDaemonEnvContent({
+      apiBaseUrl: 'http://127.0.0.1:4010',
+      storageBaseUrl: 'http://127.0.0.1:5010',
+      password: 'secret',
+      projectsWorkspace,
+    }), 'utf8');
+    process.env.DAEMON_ENV_FILE = envPath;
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     setStatusMock.mockResolvedValue(undefined);
@@ -87,6 +107,10 @@ describe('script phase character v2 routing', () => {
     markLanguageFailureMock.mockResolvedValue(undefined);
     generateScriptMock.mockResolvedValue({ text: 'legacy text', command: 'legacy-cmd' });
     generateCharacterScriptV2Mock.mockResolvedValue({ text: 'character text', command: 'v2-cmd' });
+  });
+
+  afterAll(async () => {
+    await fs.rm(tmpRoot, { recursive: true, force: true }).catch(() => {});
   });
 
   it('uses v2 text generator for character projects', async () => {
