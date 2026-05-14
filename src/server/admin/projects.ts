@@ -240,7 +240,7 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
     characterTitle = char?.title || null;
     variationTitle = variation?.title || null;
     if ((variation as any)?.imagePath) {
-      characterImageUrl = (variation as any).imagePath.startsWith('/') ? (variation as any).imagePath : `/${(variation as any).imagePath}`;
+      characterImageUrl = normalizeMediaUrl((variation as any).imagePath);
     }
     selectionStatus = 'ready';
   } else if (p.selection?.userCharacterId) {

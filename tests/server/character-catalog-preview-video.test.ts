@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { normalizePreviewVideoUrl, resolveCatalogPreviewVideo } from '@/server/character-catalog';
 
+const storageBase = (process.env.NEXT_PUBLIC_STORAGE_BASE_URL || process.env.STORAGE_PUBLIC_URL || '').replace(/\/+$/, '');
+const mediaUrl = (path: string) => `${storageBase || ''}/api/media/${path}`;
+
 describe('character catalog preview video helpers', () => {
-  it('normalizes stored relative public video paths to root-relative URLs', () => {
+  it('normalizes stored character video paths to storage media URLs', () => {
     expect(normalizePreviewVideoUrl('characters/brainrot/arcadopus/preview/preview.mp4'))
-      .toBe('/characters/brainrot/arcadopus/preview/preview.mp4');
+      .toBe(mediaUrl('characters/brainrot/arcadopus/preview/preview.mp4'));
     expect(normalizePreviewVideoUrl('public/characters/brainrot/arcadopus/preview/preview.mp4'))
-      .toBe('/characters/brainrot/arcadopus/preview/preview.mp4');
+      .toBe(mediaUrl('characters/brainrot/arcadopus/preview/preview.mp4'));
   });
 
   it('uses uploaded database video before static catalog overrides', () => {
@@ -15,11 +18,11 @@ describe('character catalog preview video helpers', () => {
       dbUrl: 'characters/brainrot/matteo/preview/preview.mp4',
       dbHasAudio: false,
       override: {
-        previewVideoUrl: '/characters/brainrot/matteo/static-preview.mp4',
+        previewVideoUrl: mediaUrl('characters/brainrot/matteo/static-preview.mp4'),
         previewVideoHasAudio: true,
       },
     })).toEqual({
-      previewVideoUrl: '/characters/brainrot/matteo/preview/preview.mp4',
+      previewVideoUrl: mediaUrl('characters/brainrot/matteo/preview/preview.mp4'),
       previewVideoHasAudio: false,
     });
   });
@@ -29,11 +32,11 @@ describe('character catalog preview video helpers', () => {
       dbUrl: null,
       dbHasAudio: true,
       override: {
-        previewVideoUrl: '/characters/brainrot/matteo/static-preview.mp4',
+        previewVideoUrl: mediaUrl('characters/brainrot/matteo/static-preview.mp4'),
         previewVideoHasAudio: false,
       },
     })).toEqual({
-      previewVideoUrl: '/characters/brainrot/matteo/static-preview.mp4',
+      previewVideoUrl: mediaUrl('characters/brainrot/matteo/static-preview.mp4'),
       previewVideoHasAudio: false,
     });
   });

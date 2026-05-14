@@ -147,9 +147,7 @@ export async function resolveCharacterSelectionSnapshot(opts: {
     if (!variation) return null;
     if (!variation.character?.isCatalogPublic) return null;
     if (stored.characterId && variation.characterId !== stored.characterId) return null;
-    const imageUrl = variation.imagePath
-      ? (variation.imagePath.startsWith('/') ? variation.imagePath : `/${variation.imagePath}`)
-      : null;
+    const imageUrl = normalizeMediaUrl(variation.imagePath ?? null);
     return withCharacterSelectionLabels({
       source: 'global',
       type: 'global',

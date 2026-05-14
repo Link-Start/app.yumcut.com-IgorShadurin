@@ -12,6 +12,7 @@ import {
   type MainPageGroup,
   type MainPageGroupCharacter,
 } from '@/components/character/main-page-groups';
+import { normalizeMediaUrl } from '@/server/storage';
 
 type RawCharacter = MainPageGroupCharacter;
 type RawGroup = MainPageGroup;
@@ -36,20 +37,12 @@ function normalizeImagePath(input: string | null | undefined): string | null {
   return value || null;
 }
 
-function normalizePublicImageUrl(input: string | null | undefined): string {
-  if (!input) return '/characters/me-2.png';
-  const value = input.trim();
-  if (!value) return '/characters/me-2.png';
-  return value.startsWith('/') ? value : `/${value}`;
+export function normalizeCatalogAssetUrl(input: string | null | undefined): string | null {
+  return normalizeMediaUrl(input);
 }
 
 export function normalizePreviewVideoUrl(input: string | null | undefined): string | null {
-  if (!input) return null;
-  let value = input.trim();
-  if (/^https?:\/\//i.test(value) || value.startsWith('//')) return value;
-  if (value.startsWith('public/')) value = value.slice('public/'.length);
-  if (value && !value.startsWith('/')) value = `/${value}`;
-  return value.length > 0 ? value : null;
+  return normalizeCatalogAssetUrl(input);
 }
 
 export function resolveCatalogPreviewVideo(input: {
@@ -98,7 +91,7 @@ function pickPrimaryVariationImagePath(
   variations: Array<{ imagePath: string | null }>
 ): string {
   const first = variations.find((entry) => !!entry.imagePath)?.imagePath ?? null;
-  return normalizePublicImageUrl(first);
+  return normalizeCatalogAssetUrl(first) ?? '';
 }
 
 let seedInFlight: Promise<void> | null = null;

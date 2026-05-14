@@ -1,7 +1,10 @@
-import path from 'path';
-import { promises as fs } from 'fs';
 import { prisma } from '@/server/db';
 import { ADMIN_CHARACTER_IMPORT_VALIDATION_LIMITS } from '@/shared/validators/admin-character-import';
+import {
+  deleteStoredCatalogCharacterMedia,
+  normalizeMediaUrl,
+  uploadCharacterAssetToStorage,
+} from '@/server/storage';
 
 export type AdminCharacterCategoryDTO = {
   id: string;
@@ -208,23 +211,11 @@ export function buildCharacterPriorityReindexPlan(input: CharacterPriorityReinde
 }
 
 function normalizeImageUrl(imagePath: string | null | undefined): string | null {
-  if (!imagePath) return null;
-  const value = imagePath.trim();
-  if (!value) return null;
-  if (/^https?:\/\//i.test(value)) return value;
-  if (value.startsWith('/')) return value;
-  if (value.startsWith('public/')) return `/${value.slice('public/'.length)}`;
-  return `/${value}`;
+  return normalizeMediaUrl(imagePath);
 }
 
 function normalizeVideoUrl(videoPath: string | null | undefined): string | null {
-  if (!videoPath) return null;
-  const value = videoPath.trim();
-  if (!value) return null;
-  if (/^https?:\/\//i.test(value)) return value;
-  if (value.startsWith('/')) return value;
-  if (value.startsWith('public/')) return `/${value.slice('public/'.length)}`;
-  return `/${value}`;
+  return normalizeMediaUrl(videoPath);
 }
 
 export function slugify(input: string): string {
@@ -233,34 +224,6 @@ export function slugify(input: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-}
-
-function getCharactersPublicRoot(): string {
-  const override = process.env.CHARACTER_IMPORT_PUBLIC_ROOT?.trim();
-  if (override && override.length > 0) return path.resolve(override);
-  return path.resolve('public/characters');
-}
-
-function makeDbImagePath(categorySlug: string, characterSlug: string, fileName: string): string {
-  return `characters/${categorySlug}/${characterSlug}/original/${fileName}`;
-}
-
-function makeDbVideoPath(categorySlug: string, characterSlug: string, fileName: string): string {
-  return `characters/${categorySlug}/${characterSlug}/preview/${fileName}`;
-}
-
-function toPublicPath(input: string): string {
-  return input.startsWith('/') ? input : `/${input}`;
-}
-
-function publicUrlToAbsolutePath(input: string): string | null {
-  const value = input.trim();
-  if (!value || /^https?:\/\//i.test(value)) return null;
-  let normalized = value;
-  if (normalized.startsWith('public/')) normalized = normalized.slice('public/'.length);
-  if (normalized.startsWith('/')) normalized = normalized.slice(1);
-  if (!normalized.startsWith('characters/')) return null;
-  return path.join(path.resolve('public'), normalized);
 }
 
 type CharacterAssetSnapshot = {
@@ -280,8 +243,7 @@ function collectCharacterAssetPaths(characters: CharacterAssetSnapshot[]): strin
     ];
     for (const candidate of candidates) {
       if (!candidate) continue;
-      const abs = publicUrlToAbsolutePath(candidate);
-      if (abs) unique.add(abs);
+      unique.add(candidate);
     }
   }
   return Array.from(unique);
@@ -290,13 +252,7 @@ function collectCharacterAssetPaths(characters: CharacterAssetSnapshot[]): strin
 async function removeCharacterAssetFiles(characters: CharacterAssetSnapshot[]): Promise<void> {
   const paths = collectCharacterAssetPaths(characters);
   if (!paths.length) return;
-  await Promise.allSettled(paths.map((assetPath) => fs.rm(assetPath, { force: true })));
-}
-
-async function writeUploadedFile(targetPath: string, file: File): Promise<void> {
-  await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(targetPath, buffer);
+  await deleteStoredCatalogCharacterMedia(paths);
 }
 
 export async function listAdminCharacterCategories(): Promise<AdminCharacterCategoryDTO[]> {
@@ -870,28 +826,30 @@ export async function uploadAdminCharacterPreviewVideo(input: {
   const ext = input.extension.trim().toLowerCase().replace(/^\./, '');
   const fileName = `preview.${ext}`;
 
-  const root = getCharactersPublicRoot();
-  const targetPath = path.join(root, categorySlug, slug, 'preview', fileName);
-  await writeUploadedFile(targetPath, input.videoFile);
-
-  const dbPath = makeDbVideoPath(categorySlug, slug, fileName);
-  const previousVideoUrl = normalizeVideoUrl(character.previewVideoUrl);
-  await prisma.character.update({
-    where: { id: character.id },
-    data: {
-      previewVideoUrl: dbPath,
-      previewVideoHasAudio: input.hasAudio !== false,
-    },
+  const uploaded = await uploadCharacterAssetToStorage({
+    file: input.videoFile,
+    fileName: `${categorySlug}-${slug}-${fileName}`,
+    kind: 'video',
   });
-
-  if (previousVideoUrl) {
-    const previousAbsPath = publicUrlToAbsolutePath(previousVideoUrl);
-    if (previousAbsPath && previousAbsPath !== targetPath) {
-      await fs.rm(previousAbsPath, { force: true }).catch(() => {});
-    }
+  const previousVideoPath = character.previewVideoUrl;
+  try {
+    await prisma.character.update({
+      where: { id: character.id },
+      data: {
+        previewVideoUrl: uploaded.path,
+        previewVideoHasAudio: input.hasAudio !== false,
+      },
+    });
+  } catch (err) {
+    await deleteStoredCatalogCharacterMedia([uploaded.path]).catch(() => {});
+    throw err;
   }
 
-  return { previewVideoUrl: toPublicPath(dbPath) };
+  if (previousVideoPath && previousVideoPath !== uploaded.path) {
+    await deleteStoredCatalogCharacterMedia([previousVideoPath]).catch(() => {});
+  }
+
+  return { previewVideoUrl: uploaded.url };
 }
 
 export async function deleteAdminCharacterPreviewVideo(id: string): Promise<void> {
@@ -901,12 +859,8 @@ export async function deleteAdminCharacterPreviewVideo(id: string): Promise<void
   });
   if (!character) return;
 
-  const previousVideoUrl = normalizeVideoUrl(character.previewVideoUrl);
-  if (previousVideoUrl) {
-    const previousAbsPath = publicUrlToAbsolutePath(previousVideoUrl);
-    if (previousAbsPath) {
-      await fs.rm(previousAbsPath, { force: true }).catch(() => {});
-    }
+  if (character.previewVideoUrl) {
+    await deleteStoredCatalogCharacterMedia([character.previewVideoUrl]);
   }
 
   await prisma.character.update({
@@ -1104,15 +1058,18 @@ export async function importAdminCharacter(input: {
     return { status: 'skipped', reason: 'slug_exists' };
   }
 
-  const root = getCharactersPublicRoot();
-  const originalDir = path.join(root, category.slug, slug, 'original');
-  const preparedAbs = path.join(originalDir, 'prepared.webp');
-  const emptyAbs = path.join(originalDir, 'empty.webp');
-  await writeUploadedFile(preparedAbs, input.preparedFile);
-  await writeUploadedFile(emptyAbs, input.emptyFile);
-
-  const dbPreparedPath = makeDbImagePath(category.slug, slug, 'prepared.webp');
-  const dbEmptyPath = makeDbImagePath(category.slug, slug, 'empty.webp');
+  const [preparedUpload, emptyUpload] = await Promise.all([
+    uploadCharacterAssetToStorage({
+      file: input.preparedFile,
+      fileName: `${category.slug}-${slug}-prepared.webp`,
+      kind: 'character-image',
+    }),
+    uploadCharacterAssetToStorage({
+      file: input.emptyFile,
+      fileName: `${category.slug}-${slug}-empty.webp`,
+      kind: 'character-image',
+    }),
+  ]);
 
   const created = await prisma.$transaction(async (tx) => {
     const character = await tx.character.create({
@@ -1132,8 +1089,8 @@ export async function importAdminCharacter(input: {
         characterId: character.id,
         title: input.name.trim() || input.title.trim(),
         description: input.bio?.trim() || null,
-        imagePath: dbPreparedPath,
-        emptyImagePath: dbEmptyPath,
+        imagePath: preparedUpload.path,
+        emptyImagePath: emptyUpload.path,
         priority: character.priority,
       },
     });
@@ -1147,6 +1104,9 @@ export async function importAdminCharacter(input: {
     });
 
     return character;
+  }).catch(async (err) => {
+    await deleteStoredCatalogCharacterMedia([preparedUpload.path, emptyUpload.path]).catch(() => {});
+    throw err;
   });
 
   return { status: 'saved', characterId: created.id };

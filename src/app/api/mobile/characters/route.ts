@@ -7,17 +7,7 @@ import { normalizeMediaUrl } from '@/server/storage';
 import { requireMobileUserId } from '../shared/auth';
 
 function normalizeGlobalImagePath(imagePath: string | null | undefined) {
-  if (!imagePath) return null;
-  let working = imagePath.trim();
-  if (!working) return null;
-  if (working.startsWith('/')) working = working.slice(1);
-  if (working.startsWith('public/')) {
-    working = working.slice('public/'.length);
-  }
-  if (working.startsWith('characters/')) {
-    return `/${working}`;
-  }
-  return `/${working}`;
+  return normalizeMediaUrl(imagePath);
 }
 
 export const GET = withApiError(async function GET(req: NextRequest) {
@@ -62,7 +52,7 @@ export const GET = withApiError(async function GET(req: NextRequest) {
       title: variation.title,
       description: variation.description,
       prompt: variation.prompt,
-      imageUrl: normalizeGlobalImagePath(variation.imagePath) ?? '/characters/me-2.png',
+      imageUrl: normalizeGlobalImagePath(variation.imagePath) ?? '',
       status: 'ready' as const,
     })),
   }));

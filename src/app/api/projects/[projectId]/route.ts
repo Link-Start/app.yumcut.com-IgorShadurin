@@ -264,10 +264,10 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
     const varr = p.selection.characterVariationId ? await prisma.characterVariation.findUnique({ where: { id: p.selection.characterVariationId } }) : null;
     characterTitle = char?.title || null;
     characterSlug = char?.slug || null;
-    characterPreviewVideoUrl = (char as any)?.previewVideoUrl ?? null;
+    characterPreviewVideoUrl = normalizeMediaUrl((char as any)?.previewVideoUrl ?? null);
     variationTitle = varr?.title || null;
     if (varr?.imagePath) {
-      characterImageUrl = varr.imagePath.startsWith('/') ? varr.imagePath : `/${varr.imagePath}`;
+      characterImageUrl = normalizeMediaUrl(varr.imagePath);
     }
     selectionStatus = 'ready';
   } else if (p.selection?.userCharacterId) {

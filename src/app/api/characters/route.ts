@@ -6,13 +6,7 @@ import { getViewerFavoriteCreatedAtMap, sortByFavoriteRecencyFirst } from '@/ser
 import { normalizeMediaUrl } from '@/server/storage';
 
 function normalizeGlobalImagePath(imagePath: string | null | undefined) {
-  if (!imagePath) return null;
-  let working = imagePath.trim();
-  if (!working) return null;
-  if (working.startsWith('/')) working = working.slice(1);
-  if (working.startsWith('public/')) working = working.slice('public/'.length);
-  if (working.startsWith('content/')) working = `characters/${working.slice('content/'.length)}`;
-  return `/${working}`;
+  return normalizeMediaUrl(imagePath);
 }
 
 export const GET = withApiError(async function GET() {
@@ -56,7 +50,7 @@ export const GET = withApiError(async function GET() {
       title: variation.title,
       description: variation.description,
       prompt: variation.prompt,
-      imageUrl: normalizeGlobalImagePath(variation.imagePath) ?? '/characters/me-2.png',
+      imageUrl: normalizeGlobalImagePath(variation.imagePath) ?? '',
       status: 'ready' as const,
     })),
   }));

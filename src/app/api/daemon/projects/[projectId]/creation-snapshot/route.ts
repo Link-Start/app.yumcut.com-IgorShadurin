@@ -3,7 +3,6 @@ import { prisma } from '@/server/db';
 import { ok, forbidden, notFound } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { assertDaemonAuth } from '@/server/auth';
-import path from 'path';
 import { normalizeMediaUrl } from '@/server/storage';
 import { config } from '@/server/config';
 import { normalizeTemplateCustomData } from '@/shared/templates/custom-data';
@@ -87,22 +86,17 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
     if (selectionRecord.characterVariationId) {
       const variation = await prisma.characterVariation.findUnique({ where: { id: selectionRecord.characterVariationId }, select: { id: true, characterId: true, imagePath: true } });
       if (variation) {
-        const relative = variation.imagePath ? variation.imagePath.replace(/^\/+/, '') : null;
-        const publicPath = relative
-          ? relative.startsWith('public/')
-            ? `/${relative.replace(/^public\//, '')}`
-            : `/${relative}`
-          : null;
-        const absolute = publicPath
-          ? path.resolve(process.cwd(), publicPath.startsWith('/') ? path.join('public', publicPath.slice(1)) : publicPath)
-          : null;
+        const imageUrl = toAbsoluteUrl(
+          normalizeMediaUrl(variation.imagePath ?? null),
+          config.STORAGE_PUBLIC_URL ?? config.NEXTAUTH_URL,
+        );
         characterSelection = {
           type: 'global',
           characterId: variation.characterId,
           variationId: variation.id,
-          imagePath: publicPath,
-          imageUrl: toAbsoluteUrl(publicPath, config.NEXTAUTH_URL),
-          absoluteImagePath: absolute,
+          imagePath: variation.imagePath,
+          imageUrl,
+          absoluteImagePath: null,
         };
       }
     } else if (selectionRecord.userCharacterVariationId) {
