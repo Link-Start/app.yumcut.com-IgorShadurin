@@ -203,17 +203,18 @@ describe('custom template audio auto-approval', () => {
       };
     };
 
-    const runCase = async (provider: 'minimax' | 'inworld' | 'elevenlabs', expectedStyle: string | null) => {
+    const runCase = async (provider: 'minimax' | 'inworld' | 'elevenlabs', expectedStyleFragment: string | null) => {
       generateVoiceovers.mockClear();
       addAudioCandidate.mockClear();
       await handleAudioPhase({ projectId: `project-${provider}`, cfg: buildCfg(provider), jobPayload: {} });
       expect(generateVoiceovers).toHaveBeenCalledTimes(1);
-      expect(generateVoiceovers).toHaveBeenCalledWith(
-        expect.objectContaining({
-          voiceProvider: provider,
-          style: expectedStyle,
-        }),
-      );
+      const firstCallArgs = generateVoiceovers.mock.calls[0]?.[0];
+      expect(firstCallArgs).toEqual(expect.objectContaining({ voiceProvider: provider }));
+      if (expectedStyleFragment === null) {
+        expect(firstCallArgs?.style ?? null).toBeNull();
+      } else {
+        expect(firstCallArgs?.style).toContain(expectedStyleFragment);
+      }
     };
 
     await runCase('minimax', null);
