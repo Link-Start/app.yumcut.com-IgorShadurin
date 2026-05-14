@@ -4,6 +4,7 @@ import { ok, forbidden } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { jobTypeForStatus } from '@/shared/pipeline/job-types';
 import { assertDaemonAuth } from '@/server/auth';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
 
 type Params = { jobId: string };
 
@@ -16,10 +17,17 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     select: { id: true, type: true, status: true, projectId: true, project: { select: { status: true } } },
   });
   if (!job || job.status !== 'queued') return ok({ claimed: false });
-  const expected = jobTypeForStatus(job.project.status as any);
+  const initialJob = await prisma.job.findFirst({
+    where: { projectId: job.projectId },
+    orderBy: { createdAt: 'asc' },
+    select: { payload: true },
+  });
+  const projectExperience = normalizeProjectExperience((initialJob?.payload as any)?.projectExperience);
+  const expected = jobTypeForStatus(job.project.status as any, projectExperience);
   if (expected && expected !== job.type) {
     return ok({ claimed: false });
   }
+  if (!expected) return ok({ claimed: false });
   const now = new Date();
   const claimed = await prisma.$transaction(async (tx) => {
     const updateResult = await tx.job.updateMany({
@@ -35,6 +43,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
                 { currentDaemonId: null },
               ],
             },
+            { deleted: false },
             { jobs: { none: { status: 'running' } } },
           ],
         },

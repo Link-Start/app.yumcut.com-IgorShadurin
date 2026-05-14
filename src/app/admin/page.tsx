@@ -126,6 +126,18 @@ export default async function AdminHomePage() {
       </AdminDashboardUserMetricsSection>
 
       <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Characters</CardTitle>
+            <CardDescription>Import, preview, and manage catalog characters and categories.</CardDescription>
+          </div>
+          <Button asChild className="cursor-pointer">
+            <Link href="/admin/characters">Manage</Link>
+          </Button>
+        </CardHeader>
+      </Card>
+
+      <Card>
         <CardHeader>
           <CardTitle>Latest errors</CardTitle>
         </CardHeader>

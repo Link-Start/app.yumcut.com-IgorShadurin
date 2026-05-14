@@ -1,5 +1,5 @@
 import { ProjectStatus } from '@/shared/constants/status';
-import { getCreationSnapshot, setStatus } from './db';
+import { getCreationSnapshot, isProjectUnavailableError, setStatus } from './db';
 import { log } from './logger';
 import { getDaemonConfig } from './executor/context';
 import { handleScriptPhase } from './executor/script-phase';
@@ -10,7 +10,8 @@ import { handleCaptionsPhase } from './executor/captions-phase';
 import { handleImagesPhase } from './executor/images-phase';
 import { handleVideoPartsPhase } from './executor/video-parts-phase';
 import { handleVideoMainPhase } from './executor/video-main-phase';
-import { isHandledError } from './executor/error';
+import { createHandledError, getHandledJobResult, isHandledError } from './executor/error';
+import { isStatusAllowedForExperience } from '@/shared/pipeline/project-pipeline';
 
 export { __setDaemonConfigForTests } from './executor/context';
 
@@ -19,6 +20,15 @@ export async function executeForProject(projectId: string, status: ProjectStatus
   const creationGuidance = cfg.scriptCreationGuidanceEnabled ? (cfg.scriptCreationGuidance || '').trim() : '';
   const avoidanceGuidance = cfg.scriptAvoidanceGuidanceEnabled ? (cfg.scriptAvoidanceGuidance || '').trim() : '';
   const daemonConfig = getDaemonConfig();
+
+  if (!isStatusAllowedForExperience(status, cfg.projectExperience)) {
+    log.warn('Skipping status that is not available for project experience', {
+      projectId,
+      status,
+      projectExperience: cfg.projectExperience,
+    });
+    return;
+  }
 
   if (creationGuidance || avoidanceGuidance) {
     log.info('Using script guidance', {
@@ -104,6 +114,13 @@ export async function executeForProject(projectId: string, status: ProjectStatus
         return;
     }
   } catch (err: any) {
+    if (isProjectUnavailableError(err)) {
+      log.info('Project unavailable during execution; stopping task gracefully', {
+        projectId,
+        status,
+      });
+      throw createHandledError('Project unavailable', err, { jobResult: 'success' });
+    }
     if (!isHandledError(err)) {
       log.error('Executor crashed', { projectId, status, error: err?.message || String(err) });
       await setStatus(projectId, ProjectStatus.Error, 'Executor crashed');
@@ -147,7 +164,10 @@ export async function executeJob(job: { id: string; projectId: string; type: str
   try {
     await executeForProject(projectId, status, payload);
     return true;
-  } catch {
+  } catch (err) {
+    if (isHandledError(err)) {
+      return getHandledJobResult(err) === 'success';
+    }
     return false;
   }
 }

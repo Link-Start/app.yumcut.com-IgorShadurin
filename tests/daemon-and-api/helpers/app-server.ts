@@ -1,6 +1,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import { generateKeyPairSync } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { findFreePort } from './ports';
 import { vi } from 'vitest';
@@ -12,6 +13,43 @@ function getSharedPrisma() {
     g.__vtPrisma = makeVirtualPrisma();
   }
   return g.__vtPrisma;
+}
+
+function isUsableKeyConfig(value: string | undefined): boolean {
+  if (!value || value.trim().length === 0) return false;
+  const trimmed = value.trim();
+  if (trimmed.includes('-----BEGIN') && trimmed.includes('-----END')) {
+    return true;
+  }
+  const resolvedPath = path.resolve(trimmed);
+  try {
+    fs.accessSync(resolvedPath, fs.constants.R_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureUploadSigningKeys() {
+  if (isUsableKeyConfig(process.env.UPLOAD_SIGNING_PRIVATE_KEY) && isUsableKeyConfig(process.env.UPLOAD_SIGNING_PUBLIC_KEY)) {
+    return;
+  }
+  if (!process.env.UPLOAD_SIGNING_PRIVATE_KEY) {
+    try { process.env.UPLOAD_SIGNING_PRIVATE_KEY = fs.readFileSync('keys/upload_private.pem', 'utf8'); } catch {}
+  }
+  if (!process.env.UPLOAD_SIGNING_PUBLIC_KEY) {
+    try { process.env.UPLOAD_SIGNING_PUBLIC_KEY = fs.readFileSync('keys/upload_public.pem', 'utf8'); } catch {}
+  }
+  if (isUsableKeyConfig(process.env.UPLOAD_SIGNING_PRIVATE_KEY) && isUsableKeyConfig(process.env.UPLOAD_SIGNING_PUBLIC_KEY)) {
+    return;
+  }
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+  });
+  process.env.UPLOAD_SIGNING_PRIVATE_KEY = privateKey;
+  process.env.UPLOAD_SIGNING_PUBLIC_KEY = publicKey;
 }
 
 type ServerCall = { method: string; path: string };
@@ -34,12 +72,7 @@ export async function startAppApiServer(opts: { daemonPassword: string, userId?:
   const storageBase = opts.storagePublicUrl || process.env.TEST_STORAGE_BASE_URL || 'http://localhost:3333';
   process.env.STORAGE_PUBLIC_URL = storageBase;
   process.env.NEXT_PUBLIC_STORAGE_BASE_URL = storageBase;
-  if (!process.env.UPLOAD_SIGNING_PRIVATE_KEY) {
-    try { process.env.UPLOAD_SIGNING_PRIVATE_KEY = fs.readFileSync('keys/upload_private.pem', 'utf8'); } catch {}
-  }
-  if (!process.env.UPLOAD_SIGNING_PUBLIC_KEY) {
-    try { process.env.UPLOAD_SIGNING_PUBLIC_KEY = fs.readFileSync('keys/upload_public.pem', 'utf8'); } catch {}
-  }
+  ensureUploadSigningKeys();
 
   // Mock prisma + auth/tokens/telegram before importing routes
   const prisma = getSharedPrisma();

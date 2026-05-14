@@ -362,11 +362,14 @@ export function ProjectImageEditorSection({
                         style={size ? { aspectRatio: `${size.width} / ${size.height}` } : undefined}
                       >
                         {previewUrl ? (
-                          <img
-                            src={previewUrl}
-                            alt={image.imageName}
-                            className="h-full w-full object-contain"
-                          />
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={previewUrl}
+                              alt={image.imageName}
+                              className="h-full w-full object-contain"
+                            />
+                          </>
                         ) : (
                           <div className="text-xs text-muted-foreground">{tr('No preview available')}</div>
                         )}
@@ -666,11 +669,14 @@ export function ProjectImageEditorSection({
                         }}
                       >
                         {state?.pendingPreviewUrl ? (
-                          <img
-                            src={state.pendingPreviewUrl}
-                            alt={`${tr('Preview for')} ${image.imageName}`}
-                            className="h-full w-full object-contain"
-                          />
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={state.pendingPreviewUrl}
+                              alt={`${tr('Preview for')} ${image.imageName}`}
+                              className="h-full w-full object-contain"
+                            />
+                          </>
                         ) : (
                           <div className="p-6 text-sm text-muted-foreground">{tr('Preview is unavailable.')}</div>
                         )}

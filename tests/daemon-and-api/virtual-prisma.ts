@@ -324,6 +324,19 @@ export function makeVirtualPrisma() {
       db.projects.set(p.id, p);
       return p;
     },
+    async updateMany({ where, data }: any) {
+      let count = 0;
+      for (const [id, p] of Array.from(db.projects.entries())) {
+        if (where?.id && p.id !== where.id) continue;
+        if (where?.currentDaemonId !== undefined && p.currentDaemonId !== where.currentDaemonId) continue;
+        if (where?.deleted !== undefined && p.deleted !== where.deleted) continue;
+        Object.assign(p, data);
+        p.updatedAt = now();
+        db.projects.set(id, p);
+        count += 1;
+      }
+      return { count };
+    },
   };
 
   function matchesProjectClause(job: Job, clause: any): boolean {
@@ -387,7 +400,18 @@ export function makeVirtualPrisma() {
       if (orderBy?.createdAt === 'asc') rows.sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime());
       if (orderBy?.createdAt === 'desc') rows.sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime());
       if (typeof take === 'number') rows = rows.slice(0, take);
-      if (select) return rows.map(r => { const o:any={}; for (const k of Object.keys(select)) o[k]=(r as any)[k]; return o; });
+      if (select) return rows.map(r => {
+        const o:any = {};
+        for (const k of Object.keys(select)) {
+          if (k === 'project' && select.project) {
+            const projectRecord = db.projects.get(r.projectId);
+            o.project = projectRecord ? { status: projectRecord.status } : null;
+          } else {
+            o[k] = (r as any)[k];
+          }
+        }
+        return o;
+      });
       return rows;
     },
     async findFirst({ where, orderBy }: any) {
@@ -431,15 +455,19 @@ export function makeVirtualPrisma() {
       return j;
     },
     async updateMany({ where, data }: any) {
-      const j = db.jobs.get(where.id);
-      if (!j) return { count: 0 };
-      if (where.status && j.status !== where.status) return { count: 0 };
-      if (where.project && !matchesProjectClause(j, where.project)) {
-        return { count: 0 };
+      let count = 0;
+      for (const [id, record] of Array.from(db.jobs.entries())) {
+        if (where?.id && record.id !== where.id) continue;
+        if (where?.projectId && record.projectId !== where.projectId) continue;
+        if (where?.type && record.type !== where.type) continue;
+        if (typeof where?.status === 'string' && record.status !== where.status) continue;
+        if (where?.status?.in && !(where.status.in as string[]).includes(record.status)) continue;
+        if (where?.project && !matchesProjectClause(record, where.project)) continue;
+        Object.assign(record, data);
+        db.jobs.set(id, record);
+        count += 1;
       }
-      Object.assign(j, data);
-      db.jobs.set(j.id, j);
-      return { count: 1 };
+      return { count };
     },
     async deleteMany({ where }: any) {
       let count = 0;

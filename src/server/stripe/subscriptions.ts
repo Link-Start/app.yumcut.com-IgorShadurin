@@ -9,7 +9,9 @@ import {
   getStripePriceIdForProductId,
   getSubscriptionConfig,
   getSubscriptionConfigByStripePriceId,
-  SUBSCRIPTION_PRODUCTS_BY_PLAN_KEY,
+  getSubscriptionPlanByKey,
+  SUBSCRIPTION_PLAN_ORDER,
+  type SubscriptionPlanKey,
 } from '@/shared/constants/subscriptions';
 import {
   getUserSubscriptionStatus,
@@ -18,7 +20,7 @@ import {
 } from '@/server/subscriptions';
 import type { SubscriptionStatusDTO } from '@/shared/types';
 
-type StripePlanKey = 'weekly' | 'monthly';
+type StripePlanKey = SubscriptionPlanKey;
 
 type AppUserProfile = {
   id: string;
@@ -100,7 +102,7 @@ function buildStripePortalReturnUrl() {
 }
 
 function getPlanConfigByKey(planKey: StripePlanKey) {
-  return SUBSCRIPTION_PRODUCTS_BY_PLAN_KEY[planKey];
+  return getSubscriptionPlanByKey(planKey);
 }
 
 function requirePriceIdForPlan(planKey: StripePlanKey) {
@@ -420,11 +422,12 @@ async function resolveUserFromStripeSubscription(
 function getPlanFromInvoice(invoice: Stripe.Invoice) {
   for (const line of invoice.lines.data) {
     const priceId = extractPriceId(line.pricing?.price_details?.price);
-    const plan = getSubscriptionConfigByStripePriceId(priceId);
-    if (!plan || !priceId) continue;
+    const resolved = getSubscriptionConfigByStripePriceId(priceId);
+    if (!resolved || !priceId) continue;
 
     return {
-      plan,
+      plan: resolved.plan,
+      tokens: resolved.tokens,
       priceId,
       line,
     };
@@ -446,10 +449,11 @@ function getPlanFromInvoice(invoice: Stripe.Invoice) {
 function getPlanFromSubscription(subscription: Stripe.Subscription) {
   for (const item of subscription.items.data) {
     const priceId = extractPriceId(item.price);
-    const plan = getSubscriptionConfigByStripePriceId(priceId);
-    if (!plan || !priceId) continue;
+    const resolved = getSubscriptionConfigByStripePriceId(priceId);
+    if (!resolved || !priceId) continue;
     return {
-      plan,
+      plan: resolved.plan,
+      tokens: resolved.tokens,
       priceId,
     };
   }
@@ -553,6 +557,7 @@ async function processInvoicePaymentSucceeded(invoice: Stripe.Invoice, eventId: 
     purchaseDate,
     expiresDate,
     environment: toStripeEnvironment(invoice.livemode),
+    tokensOverride: planSelection.tokens,
     source,
     payload: {
       source: 'stripe_invoice',
@@ -666,6 +671,112 @@ async function processSubscriptionUpdated(
   await notifyStripeCancellation(subscription, eventId, 'cancel_at_period_end');
 }
 
+function pickSubscriptionItemForPlanSwitch(subscription: Stripe.Subscription) {
+  if (subscription.items.data.length === 0) return null;
+  const ranked = [...subscription.items.data].sort((left, right) => {
+    const leftKnown = Boolean(getSubscriptionConfigByStripePriceId(extractPriceId(left.price)));
+    const rightKnown = Boolean(getSubscriptionConfigByStripePriceId(extractPriceId(right.price)));
+    if (leftKnown !== rightKnown) return leftKnown ? -1 : 1;
+    return (right.created ?? 0) - (left.created ?? 0);
+  });
+  return ranked[0] ?? null;
+}
+
+async function findStripeSubscriptionForUser(userId: string) {
+  const stripe = getStripeClient();
+  const expectedSubscriptionId = await findLatestStripeSubscriptionId(userId);
+  if (expectedSubscriptionId) {
+    try {
+      return await stripe.subscriptions.retrieve(expectedSubscriptionId);
+    } catch (error) {
+      logStripeSubscriptionEvent('switch_direct_lookup_failed', {
+        userId,
+        subscriptionId: expectedSubscriptionId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const customerId =
+    (await findCustomerIdFromPurchaseHistory(userId)) ??
+    (await findCustomerIdFromLatestStripeSubscription(userId));
+  if (!customerId) return null;
+
+  const listed = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'all',
+    limit: 20,
+  });
+  const candidate = pickBestSubscriptionCandidate(listed.data, null, expectedSubscriptionId);
+  return candidate ?? null;
+}
+
+export async function switchStripeSubscriptionPlan(input: {
+  userId: string;
+  targetPlanKey: StripePlanKey;
+}) {
+  const stripe = getStripeClient();
+  const { plan: targetPlan, priceId: targetPriceId } = requirePriceIdForPlan(input.targetPlanKey);
+  const subscription = await findStripeSubscriptionForUser(input.userId);
+  if (!subscription) {
+    throw new Error('No active Stripe subscription found for this account.');
+  }
+
+  if (!isStripeSubscriptionActiveLike(subscription.status)) {
+    throw new Error(`Subscription is not active (status: ${subscription.status}).`);
+  }
+
+  const currentPlan = getPlanFromSubscription(subscription);
+  if (currentPlan?.priceId === targetPriceId) {
+    return {
+      action: 'already_on_plan' as const,
+      subscriptionId: subscription.id,
+      planKey: targetPlan.planKey,
+    };
+  }
+
+  const item = pickSubscriptionItemForPlanSwitch(subscription);
+  if (!item?.id) {
+    throw new Error('No Stripe subscription item found to update.');
+  }
+
+  const updated = await stripe.subscriptions.update(subscription.id, {
+    items: [
+      {
+        id: item.id,
+        price: targetPriceId,
+        quantity: item.quantity ?? 1,
+      },
+    ],
+    metadata: {
+      ...subscription.metadata,
+      userId: input.userId,
+      productId: targetPlan.productId,
+      planKey: targetPlan.planKey,
+    },
+    billing_cycle_anchor: 'unchanged',
+    proration_behavior: 'none',
+    payment_behavior: 'allow_incomplete',
+  });
+
+  logStripeSubscriptionEvent('subscription_plan_switched', {
+    userId: input.userId,
+    subscriptionId: updated.id,
+    targetPlanKey: targetPlan.planKey,
+    targetProductId: targetPlan.productId,
+    targetPriceId,
+    sourceSubscriptionId: subscription.id,
+    previousProductId: currentPlan?.plan.productId ?? null,
+    previousPriceId: currentPlan?.priceId ?? null,
+  });
+
+  return {
+    action: 'switched' as const,
+    subscriptionId: updated.id,
+    planKey: targetPlan.planKey,
+  };
+}
+
 export async function createStripeCheckoutSession(input: {
   userId: string;
   userEmail: string | null;
@@ -749,7 +860,7 @@ export async function createStripeBillingPortalSession(userId: string) {
 
 export async function getWebSubscriptionStatus(userId: string): Promise<SubscriptionStatusDTO> {
   const baseStatus = await getUserSubscriptionStatus(userId);
-  const plans = (['weekly', 'monthly'] as const).map((planKey) => {
+  const plans = SUBSCRIPTION_PLAN_ORDER.map((planKey) => {
     const plan = getPlanConfigByKey(planKey);
     return {
       planKey: plan.planKey,
@@ -758,6 +869,7 @@ export async function getWebSubscriptionStatus(userId: string): Promise<Subscrip
       interval: plan.interval,
       priceUsd: plan.priceUsd,
       tokens: plan.tokens,
+      benefits: plan.ui.benefits,
       configured: Boolean(getStripePriceIdForProductId(plan.productId)),
     };
   });

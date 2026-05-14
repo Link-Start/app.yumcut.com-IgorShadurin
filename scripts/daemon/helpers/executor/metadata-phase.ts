@@ -10,6 +10,7 @@ import type { CreationSnapshot } from './types';
 import { createHandledError } from './error';
 import { resolveProjectLanguagesFromSnapshot } from './project-utils';
 import { ensureProjectScaffold, ensureLanguageWorkspace, ensureLanguageLogDir } from '../language-workspace';
+import { nextPipelineStatus } from '@/shared/pipeline/project-pipeline';
 
 type MetadataPhaseArgs = {
   projectId: string;
@@ -145,7 +146,9 @@ export async function handleMetadataPhase({ projectId, cfg, daemonConfig }: Meta
       );
       currentLanguage = null;
       currentStep = 'set-status-metadata-generated';
-      await setStatus(projectId, ProjectStatus.ProcessImagesGeneration, 'Metadata generated', {
+      const nextStatus = nextPipelineStatus(ProjectStatus.ProcessCaptionsVideo, cfg.projectExperience)
+        ?? ProjectStatus.ProcessImagesGeneration;
+      await setStatus(projectId, nextStatus, 'Metadata generated', {
         metadataLogs,
         metadataLanguages: activeProgress.map((row) => row.languageCode),
         captionsEnabled: false,

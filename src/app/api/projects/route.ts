@@ -21,6 +21,10 @@ import { getAdminVoiceProviderSettings } from '@/server/admin/voice-providers';
 import { buildVoiceProviderSet } from '@/shared/constants/voice-providers';
 import { getProjectCreationSettings } from '@/server/admin/project-creation';
 import { sendProjectCreatedEmail } from '@/server/emails/project-lifecycle';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
+import { normalizeContentTone } from '@/shared/constants/content-tone';
+import { defaultCharacterVideoGeneration } from '@/shared/constants/video-generation';
+import { CHARACTER_PROJECT_CREATION_TOKENS } from '@/shared/constants/subscriptions';
 
 export const GET = withApiError(async function GET(req: NextRequest) {
   const auth = await authenticateApiRequest(req);
@@ -61,9 +65,74 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     const first = parsed.error.issues?.[0]?.message || 'Invalid project payload';
     return error('VALIDATION_ERROR', first, 400, parsed.error.flatten());
   }
-  const { prompt, rawScript, durationSeconds, characterSelection, useExactTextAsScript, templateId, voiceId, languages: requestedLanguages, languageVoices } = parsed.data;
+  const {
+    prompt,
+    rawScript,
+    durationSeconds,
+    characterSelection,
+    characterSlug,
+    useExactTextAsScript,
+    templateId,
+    voiceId,
+    languages: requestedLanguages,
+    languageVoices,
+    videoGeneration,
+    projectExperience,
+    contentTone,
+    includeDefaultMusic,
+    addOverlay,
+    includeCallToAction,
+    watermarkEnabled,
+    captionsEnabled,
+  } = parsed.data;
+  const normalizedProjectExperience = normalizeProjectExperience(projectExperience);
+  const isCharacterExperience = normalizedProjectExperience === 'character';
+  const requestedDurationSeconds = isCharacterExperience
+    ? 14
+    : (typeof durationSeconds === 'number' && durationSeconds > 0
+      ? durationSeconds
+      : TOKEN_COSTS.minimumProjectSeconds);
+  const effectiveVideoGeneration = videoGeneration
+    ?? (isCharacterExperience ? defaultCharacterVideoGeneration() : undefined);
+  const normalizedContentTone = normalizeContentTone(contentTone);
+  const normalizedCharacterSlug =
+    typeof characterSlug === 'string' && characterSlug.trim().length > 0
+      ? characterSlug.trim().toLowerCase()
+      : null;
+  if (normalizedCharacterSlug && characterSelection) {
+    return error('VALIDATION_ERROR', 'Use either character selection or character slug, not both', 400);
+  }
+  let characterDefaultVoiceId: string | null = null;
+  let slugBasedCharacterSelection: { characterId: string; variationId?: string } | null = null;
+  if (normalizedCharacterSlug) {
+    const catalogCharacter = await prisma.character.findFirst({
+      where: {
+        slug: normalizedCharacterSlug,
+        isCatalogPublic: true,
+      },
+      select: {
+        id: true,
+        defaultVoiceId: true,
+        variations: {
+          orderBy: [{ priority: 'desc' }, { id: 'asc' }],
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    if (!catalogCharacter) {
+      return error('VALIDATION_ERROR', 'Character is not available', 400);
+    }
+    characterDefaultVoiceId = catalogCharacter.defaultVoiceId ?? null;
+    slugBasedCharacterSelection = {
+      characterId: catalogCharacter.id,
+      ...(catalogCharacter.variations[0]?.id ? { variationId: catalogCharacter.variations[0].id } : {}),
+    };
+  }
   const dynamicCharacterRequested = (characterSelection as any)?.source === 'dynamic';
-  const normalizedCharacterSelection = dynamicCharacterRequested ? null : characterSelection;
+  const normalizedCharacterSelection = dynamicCharacterRequested
+    ? null
+    : (slugBasedCharacterSelection || characterSelection || null);
   const adminVoiceProviders = await getAdminVoiceProviderSettings();
   const allowedProviders = buildVoiceProviderSet(adminVoiceProviders.enabledProviders);
 
@@ -90,13 +159,15 @@ export const POST = withApiError(async function POST(req: NextRequest) {
   }
 
   const effectiveSeconds = Math.max(
-    typeof durationSeconds === 'number' && durationSeconds > 0 ? durationSeconds : TOKEN_COSTS.minimumProjectSeconds,
+    requestedDurationSeconds,
     TOKEN_COSTS.minimumProjectSeconds,
   );
   const baseTokenCost = calculateProjectTokenCost(effectiveSeconds);
 
   const basisText = (useExactTextAsScript && rawScript) ? rawScript : (prompt || rawScript || 'Untitled Project');
-  const title = deriveTitleFromText(basisText);
+  const title = normalizedProjectExperience === 'character'
+    ? deriveTitleFromText(basisText, 20)
+    : deriveTitleFromText(basisText);
 
   // Create project
   let ownerName: string | null = auth.sessionUser?.name ?? null;
@@ -199,7 +270,9 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     return error('VALIDATION_ERROR', first, 400, { issues: validation.issues });
   }
 
-  const tokenCost = baseTokenCost * Math.max(languagesList.length, 1);
+  const tokenCost = isCharacterExperience
+    ? CHARACTER_PROJECT_CREATION_TOKENS
+    : baseTokenCost * Math.max(languagesList.length, 1);
 
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({
@@ -213,6 +286,7 @@ export const POST = withApiError(async function POST(req: NextRequest) {
         languageVoiceProviders: Object.keys(projectLanguageVoiceProviders).length > 0 ? projectLanguageVoiceProviders : undefined,
         ...(templateIdToUse ? { template: { connect: { id: templateIdToUse } } } : {}),
         status: ProjectStatus.New,
+        contentTone: normalizedContentTone,
       },
     });
 
@@ -220,7 +294,9 @@ export const POST = withApiError(async function POST(req: NextRequest) {
       userId,
       amount: tokenCost,
       type: TOKEN_TRANSACTION_TYPES.projectCreation,
-      description: `Project creation (${effectiveSeconds}s)`,
+      description: isCharacterExperience
+        ? 'Project creation (character fixed cost)'
+        : `Project creation (${effectiveSeconds}s)`,
       initiator: makeUserInitiator(userId),
       metadata: {
         projectId: created.id,
@@ -240,7 +316,11 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     );
 
     if (normalizedCharacterSelection && !('source' in normalizedCharacterSelection)) {
-      const { characterId, userCharacterId, variationId } = normalizedCharacterSelection;
+      const { characterId, userCharacterId, variationId } = normalizedCharacterSelection as {
+        characterId?: string;
+        userCharacterId?: string;
+        variationId?: string;
+      };
       await tx.projectCharacterSelection.create({
         data: {
           projectId: created.id,
@@ -255,6 +335,9 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     const preferredVoiceId = (userSettings as any)?.preferredVoiceId as string | undefined;
     // Prefer an explicit voiceId from payload if provided and valid; fall back to user settings
     let selectedVoice: { externalId: string; voiceProvider: string | null } | null = explicitVoiceSelection;
+    if (!selectedVoice && characterDefaultVoiceId) {
+      selectedVoice = await resolveVoiceInfo(characterDefaultVoiceId, { allowedProviders });
+    }
     if (!selectedVoice && preferredVoiceId) {
       selectedVoice = await resolveVoiceInfo(preferredVoiceId, { allowedProviders });
     }
@@ -283,42 +366,66 @@ export const POST = withApiError(async function POST(req: NextRequest) {
         payload: {
           prompt: prompt || null,
           rawScript: rawScript || null,
-          durationSeconds: effectiveSeconds,
+          durationSeconds: requestedDurationSeconds,
           useExactTextAsScript: !!useExactTextAsScript,
           characterSelection: dynamicCharacterRequested
             ? { source: 'dynamic', status: 'processing' }
             : (normalizedCharacterSelection || null),
+          characterSlug: normalizedCharacterSlug ?? undefined,
           ...(dynamicCharacterRequested ? { dynamicCharacter: true } : {}),
-          includeDefaultMusic: userSettings?.includeDefaultMusic ?? true,
-          addOverlay: userSettings?.addOverlay ?? true,
-          includeCallToAction: (userSettings as any)?.includeCallToAction ?? true,
-          autoApproveScript: userSettings?.autoApproveScript ?? true,
-          autoApproveAudio: userSettings?.autoApproveAudio ?? true,
-          watermarkEnabled: (userSettings as any)?.watermarkEnabled ?? true,
-          captionsEnabled: (userSettings as any)?.captionsEnabled ?? true,
+          includeDefaultMusic: isCharacterExperience
+            ? (includeDefaultMusic ?? false)
+            : (userSettings?.includeDefaultMusic ?? true),
+          addOverlay: isCharacterExperience
+            ? (addOverlay ?? false)
+            : (userSettings?.addOverlay ?? true),
+          includeCallToAction: isCharacterExperience
+            ? (includeCallToAction ?? true)
+            : ((userSettings as any)?.includeCallToAction ?? true),
+          autoApproveScript: isCharacterExperience
+            ? true
+            : (userSettings?.autoApproveScript ?? true),
+          autoApproveAudio: isCharacterExperience
+            ? true
+            : (userSettings?.autoApproveAudio ?? true),
+          watermarkEnabled: isCharacterExperience
+            ? (watermarkEnabled ?? false)
+            : ((userSettings as any)?.watermarkEnabled ?? true),
+          captionsEnabled: isCharacterExperience
+            ? (captionsEnabled ?? true)
+            : ((userSettings as any)?.captionsEnabled ?? true),
           targetLanguage: primaryLanguage,
           primaryLanguage,
           languages: languagesList,
           languageVoices: Object.keys(projectLanguageVoiceAssignments).length > 0 ? projectLanguageVoiceAssignments : undefined,
           languageVoiceProviders: Object.keys(projectLanguageVoiceProviders).length > 0 ? projectLanguageVoiceProviders : undefined,
+          videoGeneration: effectiveVideoGeneration,
           initiatorUserId: userId,
-          scriptCreationGuidanceEnabled: !!(userSettings as any)?.scriptCreationGuidanceEnabled,
+          scriptCreationGuidanceEnabled: isCharacterExperience
+            ? false
+            : !!(userSettings as any)?.scriptCreationGuidanceEnabled,
           scriptCreationGuidance:
-            (userSettings as any)?.scriptCreationGuidanceEnabled
+            !isCharacterExperience && (userSettings as any)?.scriptCreationGuidanceEnabled
               ? ((userSettings as any)?.scriptCreationGuidance ?? '')
               : '',
-          scriptAvoidanceGuidanceEnabled: !!(userSettings as any)?.scriptAvoidanceGuidanceEnabled,
+          scriptAvoidanceGuidanceEnabled: isCharacterExperience
+            ? false
+            : !!(userSettings as any)?.scriptAvoidanceGuidanceEnabled,
           scriptAvoidanceGuidance:
-            (userSettings as any)?.scriptAvoidanceGuidanceEnabled
+            !isCharacterExperience && (userSettings as any)?.scriptAvoidanceGuidanceEnabled
               ? ((userSettings as any)?.scriptAvoidanceGuidance ?? '')
               : '',
-          audioStyleGuidanceEnabled: !!(userSettings as any)?.audioStyleGuidanceEnabled,
+          audioStyleGuidanceEnabled: isCharacterExperience
+            ? false
+            : !!(userSettings as any)?.audioStyleGuidanceEnabled,
           audioStyleGuidance:
-            (userSettings as any)?.audioStyleGuidanceEnabled
+            !isCharacterExperience && (userSettings as any)?.audioStyleGuidanceEnabled
               ? ((userSettings as any)?.audioStyleGuidance ?? '').slice(0, LIMITS.audioStyleGuidanceMax)
               : '',
           voiceId: selectedVoice?.externalId || null,
           voiceProvider: selectedVoice?.voiceProvider ?? null,
+          projectExperience: normalizedProjectExperience,
+          contentTone: normalizedContentTone,
         },
       },
     });
@@ -348,7 +455,6 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     userName: finalOwnerName,
     projectUrl,
   }).catch((err) => {
-    // eslint-disable-next-line no-console
     console.error('Failed to notify admins about new project', err);
   });
 
@@ -361,7 +467,6 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     projectTitle: project.title,
     projectEmailsEnabled,
   }).catch((err) => {
-    // eslint-disable-next-line no-console
     console.error('Failed to send project created email', err);
   });
 

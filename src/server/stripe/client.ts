@@ -28,6 +28,7 @@ export function isStripePricingConfigured() {
       hasConfigValue(config.STRIPE_WEBHOOK_SECRET) &&
       hasConfigValue(config.STRIPE_WEEKLY_PRICE_ID) &&
       hasConfigValue(config.STRIPE_MONTHLY_PRICE_ID) &&
+      hasConfigValue(config.STRIPE_MONTHLY_PRO_PRICE_ID) &&
       hasConfigValue(config.NEXTAUTH_URL),
   );
 }

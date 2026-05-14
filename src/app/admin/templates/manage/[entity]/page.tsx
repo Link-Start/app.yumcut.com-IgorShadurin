@@ -521,6 +521,7 @@ export default function ManageEntityPage({ params }: { params: Promise<{ entity:
                     {entity === 'templates' ? (
                       it.previewImageUrl ? (
                         <a href={`/admin/templates/manage/${entity}/${it.id}`} className="inline-block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={it.previewImageUrl}
                             alt={(it.title || 'Template') + ' preview'}

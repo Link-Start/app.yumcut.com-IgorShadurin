@@ -99,7 +99,7 @@ describe('processIosSubscriptionPurchase (signed transactions)', () => {
     expect(result.productId).toBe('yumcut_weekly_basic');
     expect(subscriptionCreate).toHaveBeenCalled();
     expect(grantTokens).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user-1' }),
+      expect.objectContaining({ userId: 'user-1', amount: 175 }),
       expect.anything(),
     );
     expect(grantSubscriptionWinbackBonusOnResubscribe).toHaveBeenCalledWith(
@@ -120,6 +120,31 @@ describe('processIosSubscriptionPurchase (signed transactions)', () => {
     await expect(
       processIosSubscriptionPurchase({ userId: 'user-1', signedTransactions: ['signed'] })
     ).rejects.toBeInstanceOf(SubscriptionError);
+  });
+
+  it.each([
+    ['legacy weekly', 'yumcut_weekly_basic', 175],
+    ['new weekly', 'yumcut_weekly_0526', 75],
+    ['monthly', 'yumcut_monthly_basic', 750],
+    ['monthly pro', 'yumcut_monthly_pro_0526', 1500],
+  ])('credits %s product with expected token amount', async (_label, productId, amount) => {
+    decodeSignedTransactionPayload.mockResolvedValueOnce({
+      productId,
+      transactionId: `tx-${productId}`,
+      originalTransactionId: `orig-${productId}`,
+      purchaseDate: Date.now(),
+      environment: 'Production',
+    });
+
+    await processIosSubscriptionPurchase({
+      userId: 'user-1',
+      signedTransactions: ['signed-payload'],
+    });
+
+    expect(grantTokens).toHaveBeenCalledWith(
+      expect.objectContaining({ amount }),
+      expect.anything(),
+    );
   });
 
   it('refreshes metadata when duplicate transaction carries new expiry', async () => {

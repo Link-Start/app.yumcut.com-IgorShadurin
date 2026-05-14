@@ -52,6 +52,31 @@ export async function mergeGuestIntoUser(options: {
     await tx.telegramLinkToken.updateMany({ where: { userId: guestUserId }, data: { userId: targetUserId } });
     await tx.mobileSession.deleteMany({ where: { userId: guestUserId } });
     await tx.guestProfile.deleteMany({ where: { userId: guestUserId } });
+    const guestFavorites = await tx.userFavoriteCharacter.findMany({
+      where: { userId: guestUserId },
+      select: { characterId: true },
+    });
+    if (guestFavorites.length > 0) {
+      const favoriteCharacterIds = (guestFavorites as Array<{ characterId: string }>).map((entry) => entry.characterId);
+      const targetFavorites = await tx.userFavoriteCharacter.findMany({
+        where: {
+          userId: targetUserId,
+          characterId: { in: favoriteCharacterIds },
+        },
+        select: { characterId: true },
+      });
+      const existingTargetCharacterIds = new Set((targetFavorites as Array<{ characterId: string }>).map((entry) => entry.characterId));
+      const rowsToCreate = favoriteCharacterIds
+        .filter((characterId) => !existingTargetCharacterIds.has(characterId))
+        .map((characterId) => ({
+          userId: targetUserId,
+          characterId,
+        }));
+      if (rowsToCreate.length > 0) {
+        await tx.userFavoriteCharacter.createMany({ data: rowsToCreate });
+      }
+      await tx.userFavoriteCharacter.deleteMany({ where: { userId: guestUserId } });
+    }
 
     const guestSettings = await tx.userSettings.findUnique({ where: { userId: guestUserId } });
     if (guestSettings) {

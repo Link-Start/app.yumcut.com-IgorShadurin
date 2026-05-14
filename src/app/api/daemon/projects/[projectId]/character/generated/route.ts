@@ -17,7 +17,10 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
   const description: string | null = typeof body?.description === 'string' ? body.description : null;
   if (!path && !url) return error('VALIDATION_ERROR', 'image path or url is required', 400);
 
-  const proj = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true, userId: true, currentDaemonId: true } });
+  const proj = await prisma.project.findFirst({
+    where: { id: projectId, deleted: false },
+    select: { id: true, userId: true, currentDaemonId: true },
+  });
   if (!proj) return notFound('Project not found');
   if (proj.currentDaemonId && proj.currentDaemonId !== daemonId) {
     return forbidden('Project locked by another daemon');

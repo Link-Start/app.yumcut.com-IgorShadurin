@@ -145,6 +145,7 @@ export async function resolveCharacterSelectionSnapshot(opts: {
       include: { character: true },
     });
     if (!variation) return null;
+    if (!variation.character?.isCatalogPublic) return null;
     if (stored.characterId && variation.characterId !== stored.characterId) return null;
     const imageUrl = variation.imagePath
       ? (variation.imagePath.startsWith('/') ? variation.imagePath : `/${variation.imagePath}`)

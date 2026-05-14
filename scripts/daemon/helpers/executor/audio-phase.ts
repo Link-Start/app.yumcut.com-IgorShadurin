@@ -14,6 +14,7 @@ import type { CreationSnapshot } from './types';
 import { createHandledError } from './error';
 import { ensureProjectScaffold, ensureLanguageWorkspace } from '../language-workspace';
 import { isCustomTemplateData } from '@/shared/templates/custom-data';
+import { normalizeContentTone } from '@/shared/constants/content-tone';
 
 type SupportedVoiceProvider = 'minimax' | 'elevenlabs' | 'inworld';
 const STYLE_SUPPORTED_PROVIDERS: ReadonlySet<SupportedVoiceProvider> = new Set(['elevenlabs']);
@@ -25,10 +26,21 @@ type AudioPhaseArgs = {
 };
 
 function extractAudioStylePrompt(snapshot: CreationSnapshot): string | null {
-  if (!snapshot.audioStyleGuidanceEnabled) return null;
-  if (typeof snapshot.audioStyleGuidance !== 'string') return null;
-  const trimmed = snapshot.audioStyleGuidance.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  const tone = normalizeContentTone(snapshot.contentTone);
+  const toneBasePrompt = (
+    tone === 'playful'
+      ? 'Playful, energetic delivery with crisp clarity and natural rhythm.'
+      : tone === 'angry'
+        ? 'Intense, assertive delivery with controlled anger and clear diction.'
+        : 'Neutral, balanced delivery with clear articulation.'
+  );
+
+  const manualPrompt = snapshot.audioStyleGuidanceEnabled && typeof snapshot.audioStyleGuidance === 'string'
+    ? snapshot.audioStyleGuidance.trim()
+    : '';
+
+  if (!manualPrompt) return toneBasePrompt;
+  return `${toneBasePrompt} ${manualPrompt}`.trim();
 }
 
 function providerSupportsAudioStyle(provider: SupportedVoiceProvider | null): boolean {

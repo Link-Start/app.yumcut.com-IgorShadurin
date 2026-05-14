@@ -1,0 +1,79 @@
+{
+  "category": "ibrainrot",
+  "generatedAt": "2026-05-08T13:02:58.627Z",
+  "source": "/Users/test/Downloads/characters/iBrainrot",
+  "variants": {
+    "card": {
+      "width": 270,
+      "height": 480,
+      "format": "webp",
+      "note": "Lightweight 9:16 card for category/character grids on web and mobile browser."
+    },
+    "profile": {
+      "width": 405,
+      "height": 720,
+      "format": "webp",
+      "note": "Medium 9:16 preview for profile pages and in-app character selection."
+    },
+    "app": {
+      "width": 810,
+      "height": 1440,
+      "format": "webp",
+      "note": "High-density 9:16 preview for iOS/Android apps and retina displays."
+    }
+  },
+  "characters": [
+    {
+      "id": "tralain",
+      "sourceDir": "tralain",
+      "originalPreparedUrl": "/characters/ibrainrot/tralain/original/prepared.png",
+      "originalEmptyUrl": "/characters/ibrainrot/tralain/original/empty.png",
+      "variants": {
+        "card": {
+          "url": "/characters/ibrainrot/tralain/preview/card.webp",
+          "width": 270,
+          "height": 480,
+          "format": "webp"
+        },
+        "profile": {
+          "url": "/characters/ibrainrot/tralain/preview/profile.webp",
+          "width": 405,
+          "height": 720,
+          "format": "webp"
+        },
+        "app": {
+          "url": "/characters/ibrainrot/tralain/preview/app.webp",
+          "width": 810,
+          "height": 1440,
+          "format": "webp"
+        }
+      }
+    },
+    {
+      "id": "tumim-tumin",
+      "sourceDir": "tumim-tumin",
+      "originalPreparedUrl": "/characters/ibrainrot/tumim-tumin/original/prepared.png",
+      "originalEmptyUrl": "/characters/ibrainrot/tumim-tumin/original/empty.png",
+      "variants": {
+        "card": {
+          "url": "/characters/ibrainrot/tumim-tumin/preview/card.webp",
+          "width": 270,
+          "height": 480,
+          "format": "webp"
+        },
+        "profile": {
+          "url": "/characters/ibrainrot/tumim-tumin/preview/profile.webp",
+          "width": 405,
+          "height": 720,
+          "format": "webp"
+        },
+        "app": {
+          "url": "/characters/ibrainrot/tumim-tumin/preview/app.webp",
+          "width": 810,
+          "height": 1440,
+          "format": "webp"
+        }
+      }
+    }
+  ]
+}

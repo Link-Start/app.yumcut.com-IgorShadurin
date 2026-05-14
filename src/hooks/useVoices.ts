@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Api } from '@/lib/api-client';
 import { DEFAULT_LANGUAGE, LANGUAGES, type TargetLanguageCode } from '@/shared/constants/languages';
 import { selectAutoVoiceForLanguage } from '@/shared/voices/select-auto-voice';
+import type { VoiceProviderAvailabilityRuleDTO } from '@/shared/voices/provider-availability-policy';
 
 export type VoiceOption = {
   id: string;
@@ -22,6 +23,7 @@ type AutoVoiceMap = Partial<Record<TargetLanguageCode, VoiceOption | null>>;
 
 export function useVoices() {
   const [voices, setVoices] = useState<VoiceOption[]>([]);
+  const [providerAvailabilityRules, setProviderAvailabilityRules] = useState<VoiceProviderAvailabilityRuleDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
 
@@ -48,6 +50,7 @@ export function useVoices() {
             return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
           });
         setVoices(mapped);
+        setProviderAvailabilityRules(Array.isArray(res.providerAvailabilityRules) ? res.providerAvailabilityRules : []);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -106,5 +109,5 @@ export function useVoices() {
     [autoVoices]
   );
 
-  return { voices, loading, error, defaultVoiceId, getByExternalId, autoVoices, getAutoVoice };
+  return { voices, providerAvailabilityRules, loading, error, defaultVoiceId, getByExternalId, autoVoices, getAutoVoice };
 }

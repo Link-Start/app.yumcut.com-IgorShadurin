@@ -184,7 +184,10 @@ export default function ManageEntityItemPage({ params }: { params: Promise<{ ent
           <CardHeader><CardTitle>Preview</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {form.previewImageUrl ? (
-              <img src={form.previewImageUrl} alt="Preview" className="max-w-full max-h-[500px] h-auto rounded border" />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.previewImageUrl} alt="Preview" className="max-w-full max-h-[500px] h-auto rounded border" />
+              </>
             ) : null}
             {form.previewVideoUrl ? (
               <video controls className="w-full max-h-[500px] h-auto rounded border" src={form.previewVideoUrl} />

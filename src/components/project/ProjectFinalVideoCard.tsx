@@ -208,7 +208,7 @@ export function ProjectFinalVideoCard({
     }
 
     return mapped;
-  }, [variants, fallbackUrl, primaryLanguage, failedSet, logsByLanguage]);
+  }, [variants, fallbackUrl, primaryLanguage, failedSet, logsByLanguage, errorsByLanguage]);
 
   const initialLanguage = useMemo(() => {
     const primaryEntry = videoVariants.find((entry) => entry.isPrimary);
@@ -306,13 +306,7 @@ export function ProjectFinalVideoCard({
     hasMultipleVideos,
     isDownloadingAll,
     safeProjectId,
-    t.allVideosSaved,
-    t.allVideosSavedDescription,
-    t.downloadFailed,
-    t.downloadFailedDescription,
-    t.downloadNotSupported,
-    t.downloadNotSupportedDescription,
-    t.noVideosYet,
+    t,
     videoVariants,
   ]);
 

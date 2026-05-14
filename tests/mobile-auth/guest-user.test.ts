@@ -51,6 +51,7 @@ const txFactories = () => ({
   telegramAccount: { updateMany: vi.fn() },
   telegramLinkToken: { updateMany: vi.fn() },
   mobileSession: { deleteMany: vi.fn() },
+  userFavoriteCharacter: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn(), deleteMany: vi.fn() },
   userSettings: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
 });
 
@@ -181,5 +182,25 @@ describe('mergeGuestIntoUser', () => {
       }),
     );
     expect(result).toEqual({ userId: 'target-user', mergedFromGuest: true });
+  });
+
+  it('moves guest favorites without duplicating target favorites', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ id: 'guest-user-4', isGuest: true, deleted: false, tokenBalance: 0 });
+
+    const tx = txFactories();
+    tx.user.findUnique.mockResolvedValue({ id: 'target-user', deleted: false, tokenBalance: 0 });
+    tx.userFavoriteCharacter.findMany
+      .mockResolvedValueOnce([{ characterId: 'char-1' }, { characterId: 'char-2' }])
+      .mockResolvedValueOnce([{ characterId: 'char-2' }]);
+    prismaMock.$transaction.mockImplementation(async (callback) => callback(tx));
+
+    await mergeGuestIntoUser({ guestUserId: 'guest-user-4', targetUserId: 'target-user' });
+
+    expect(tx.userFavoriteCharacter.createMany).toHaveBeenCalledWith({
+      data: [{ userId: 'target-user', characterId: 'char-1' }],
+    });
+    expect(tx.userFavoriteCharacter.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'guest-user-4' },
+    });
   });
 });

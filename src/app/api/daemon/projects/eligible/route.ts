@@ -5,6 +5,7 @@ import { withApiError } from '@/server/errors';
 import { assertDaemonAuth } from '@/server/auth';
 import { ProjectStatus } from '@/shared/constants/status';
 import { daemonEligibleProjectsQuerySchema } from '@/server/validators/daemon';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
 
 const actionable: ProjectStatus[] = [
   ProjectStatus.New,
@@ -38,13 +39,22 @@ export const GET = withApiError(async function GET(req: NextRequest) {
     select: { id: true, status: true, userId: true, createdAt: true, updatedAt: true },
   });
 
-  return ok({
-    projects: rows.map((row) => ({
+  const projects = [];
+  for (const row of rows) {
+    const initialJob = await prisma.job.findFirst({
+      where: { projectId: row.id },
+      orderBy: { createdAt: 'asc' },
+      select: { payload: true },
+    });
+    projects.push({
       id: row.id,
       status: row.status as ProjectStatus,
       userId: row.userId,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
-    })),
-  });
+      projectExperience: normalizeProjectExperience((initialJob?.payload as any)?.projectExperience),
+    });
+  }
+
+  return ok({ projects });
 }, 'Failed to load daemon projects');

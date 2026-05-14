@@ -381,6 +381,14 @@ export async function queueUserOnboardingEmails(input: ScheduleUserOnboardingEma
   return true;
 }
 
+export async function cancelPlannedEmailsForUser(
+  userId: string,
+  db: Pick<typeof prisma, 'plannedEmail'> = prisma,
+): Promise<number> {
+  const result = await db.plannedEmail.deleteMany({ where: { userId } });
+  return result.count;
+}
+
 export async function processPlannedEmails(options: ProcessPlannedEmailsOptions = {}): Promise<ProcessPlannedEmailsResult> {
   const limit = Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit as number)) : DEFAULT_PROCESS_LIMIT;
   const lockStaleMinutes = Number.isFinite(options.lockStaleMinutes)
@@ -428,7 +436,7 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
         kind: string;
         attempts: number;
         targetLanguage: string;
-        user: { preferredLanguage: string; name: string | null } | null;
+        user: { preferredLanguage: string; name: string | null; deleted: boolean } | null;
       }>;
     }
 
@@ -462,6 +470,7 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
           select: {
             preferredLanguage: true,
             name: true,
+            deleted: true,
           },
         },
       },
@@ -483,6 +492,14 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
   };
 
   for (const planned of claimed) {
+    if (!planned.user || planned.user.deleted) {
+      await prisma.plannedEmail.deleteMany({
+        where: { id: planned.id, lockId, status: 'pending' },
+      });
+      result.skipped += 1;
+      continue;
+    }
+
     const languageHint = parseLanguage(planned.user?.preferredLanguage)
       ?? parseLanguage(planned.targetLanguage)
       ?? DEFAULT_EMAIL_LANGUAGE;

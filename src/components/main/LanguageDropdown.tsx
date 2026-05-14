@@ -26,6 +26,7 @@ type Props = {
   resolveVoiceOption?: (voiceId: string | null) => VoiceOption | null;
   autoVoices?: Partial<Record<TargetLanguageCode, VoiceOption | null>>;
   voiceModalOpen?: boolean;
+  selectionStyle?: 'default' | 'character';
 };
 
 type LanguageDropdownCopy = {
@@ -120,6 +121,7 @@ export function LanguageDropdown({
   resolveVoiceOption,
   autoVoices,
   voiceModalOpen = false,
+  selectionStyle = 'default',
 }: Props) {
   const { language } = useAppLanguage();
   const copy = COPY[language];
@@ -192,6 +194,7 @@ export function LanguageDropdown({
 
   const selectionLabel = summarizeSelection(normalized, getUiLanguageLabel, copy.allLanguages);
   const isMultilingual = normalized.length > 1;
+  const isCharacterStyle = selectionStyle === 'character';
 
   return (
     <Popover open={open} onOpenChange={handlePopoverOpenChange}>
@@ -250,26 +253,29 @@ export function LanguageDropdown({
                     <button
                       type="button"
                       className={cn(
-                      'flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors',
-                      checked
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-200'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-800',
-                    )}
-                    onClick={() => handleSelect(lang.code)}
-                    aria-pressed={checked}
-                  >
+                        'flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors',
+                        checked
+                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-200'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-800',
+                        isCharacterStyle && checked ? 'max-w-[70%] border border-blue-300 dark:border-blue-700' : '',
+                      )}
+                      onClick={() => handleSelect(lang.code)}
+                      aria-pressed={checked}
+                    >
                       <span className="flex items-center gap-1 min-w-0">
                         <span>{getLanguageFlag(lang.code)}</span>
                         <span className="truncate">{languageLabel}</span>
                       </span>
-                      <span
-                        className={cn(
-                          'ml-auto flex h-4 w-4 items-center justify-center rounded-sm border border-gray-300 dark:border-gray-700 transition-colors',
-                          checked ? 'bg-blue-600 text-white border-blue-600' : 'bg-transparent text-transparent border-transparent',
-                        )}
-                      >
-                        <Check className="h-3 w-3" />
-                      </span>
+                      {!isCharacterStyle ? (
+                        <span
+                          className={cn(
+                            'ml-auto flex h-4 w-4 items-center justify-center rounded-sm border border-gray-300 dark:border-gray-700 transition-colors',
+                            checked ? 'bg-blue-600 text-white border-blue-600' : 'bg-transparent text-transparent border-transparent',
+                          )}
+                        >
+                          <Check className="h-3 w-3" />
+                        </span>
+                      ) : null}
                       <span className="sr-only">
                         {checked ? copy.deselectLanguage(languageLabel) : copy.selectLanguage(languageLabel)}
                       </span>

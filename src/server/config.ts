@@ -17,6 +17,9 @@ const EnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
   STRIPE_WEEKLY_PRICE_ID: z.string().min(1).optional(),
   STRIPE_MONTHLY_PRICE_ID: z.string().min(1).optional(),
+  STRIPE_MONTHLY_PRO_PRICE_ID: z.string().min(1).optional(),
+  STRIPE_LEGACY_WEEKLY_PRICE_ID: z.string().min(1).optional(),
+  STRIPE_LEGACY_MONTHLY_PRICE_ID: z.string().min(1).optional(),
   STRIPE_BILLING_SUCCESS_PATH: z.string().min(1).default('/account?billing=success'),
   STRIPE_BILLING_CANCEL_PATH: z.string().min(1).default('/account?billing=cancelled'),
   STRIPE_BILLING_PORTAL_RETURN_PATH: z.string().min(1).default('/account'),
@@ -101,7 +104,7 @@ export function loadConfig(): AppConfig {
   const parsed = EnvSchema.safeParse(process.env);
   if (!parsed.success) {
     // We don't throw to allow partial dev workflows; specific features will check on use.
-    // eslint-disable-next-line no-console
+     
     console.warn('Config validation warnings:', parsed.error.flatten().fieldErrors);
     // Coerce minimal config so app can import this module.
     return process.env as unknown as AppConfig;

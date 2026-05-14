@@ -2,12 +2,13 @@ import { NextRequest } from 'next/server';
 import { withApiError } from '@/server/errors';
 import { error, ok, unauthorized } from '@/server/http';
 import { getAuthSession } from '@/server/auth';
-import { createStripeCheckoutSession } from '@/server/stripe/subscriptions';
+import { createStripeCheckoutSession, switchStripeSubscriptionPlan } from '@/server/stripe/subscriptions';
 import { isStripePricingConfigured } from '@/server/stripe/client';
-import { getUserSubscriptionStatus } from '@/server/subscriptions';
+import { getUserSubscriptionStatus, isStripeSubscriptionEnvironment } from '@/server/subscriptions';
+import type { SubscriptionPlanKey } from '@/shared/constants/subscriptions';
 
 type CheckoutBody = {
-  plan?: 'weekly' | 'monthly';
+  plan?: SubscriptionPlanKey;
 };
 
 export const POST = withApiError(async function POST(req: NextRequest) {
@@ -22,17 +23,24 @@ export const POST = withApiError(async function POST(req: NextRequest) {
 
   const body = (await req.json().catch(() => null)) as CheckoutBody | null;
   const plan = body?.plan;
-  if (plan !== 'weekly' && plan !== 'monthly') {
-    return error('VALIDATION_ERROR', 'Plan must be either "weekly" or "monthly".', 400);
+  if (plan !== 'weekly' && plan !== 'monthly' && plan !== 'monthly_pro') {
+    return error('VALIDATION_ERROR', 'Plan must be one of: "weekly", "monthly", "monthly_pro".', 400);
   }
 
   const currentSubscription = await getUserSubscriptionStatus(userId);
   if (currentSubscription.active) {
-    return error(
-      'SUBSCRIPTION_ACTIVE',
-      'You already have an active subscription. Manage billing to update it.',
-      409,
-    );
+    if (!isStripeSubscriptionEnvironment(currentSubscription.environment)) {
+      return error(
+        'NON_STRIPE_SUBSCRIPTION_ACTIVE',
+        'You already have an active subscription from another platform. Manage or cancel it there before switching web billing.',
+        409,
+      );
+    }
+    const switched = await switchStripeSubscriptionPlan({
+      userId,
+      targetPlanKey: plan,
+    });
+    return ok(switched);
   }
 
   const checkout = await createStripeCheckoutSession({
@@ -42,6 +50,7 @@ export const POST = withApiError(async function POST(req: NextRequest) {
   });
 
   return ok({
+    action: 'checkout' as const,
     url: checkout.url,
     sessionId: checkout.sessionId,
   });

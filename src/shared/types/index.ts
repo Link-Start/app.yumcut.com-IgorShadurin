@@ -2,6 +2,9 @@ import { ProjectStatus } from '../constants/status';
 import { TokenTransactionType, TOKEN_COSTS } from '../constants/token-costs';
 import type { SchedulerCadenceValue } from '@/shared/constants/publish-scheduler';
 import type { TargetLanguageCode } from '@/shared/constants/languages';
+import type { ProjectExperience } from '@/shared/constants/project-experience';
+import type { ContentTone } from '@/shared/constants/content-tone';
+import type { CharacterCreationSettings } from '@/shared/constants/character-creation-settings';
 
 export type LanguageVoiceMap = Partial<Record<TargetLanguageCode, string | null>>;
 
@@ -23,9 +26,11 @@ export interface UserSettingsDTO {
   autoApproveAudio: boolean;
   watermarkEnabled: boolean;
   captionsEnabled: boolean;
+  characterCreationSettings: CharacterCreationSettings;
   defaultDurationSeconds: number | null;
   sidebarOpen: boolean;
   defaultUseScript: boolean;
+  characterContentTone: ContentTone;
   targetLanguages: string[];
   languageVoicePreferences: LanguageVoiceMap;
   scriptCreationGuidanceEnabled: boolean;
@@ -69,6 +74,57 @@ export interface CharacterSelectionSnapshot {
   status?: 'ready' | 'processing' | 'failed';
   badgeLabel?: string | null;
   displayLabel?: string | null;
+}
+
+export interface LocalizedCatalogTextDTO {
+  en: string;
+  ru: string;
+}
+
+export interface CharacterCatalogMetricsDTO {
+  creationsCount: number;
+  favoritesCount: number;
+  isFavorited: boolean;
+}
+
+export interface MobileCharacterCatalogCharacterDTO extends CharacterCatalogMetricsDTO {
+  id: string;
+  slug: string;
+  name: string;
+  bio: string;
+  hiddenSearchText: LocalizedCatalogTextDTO;
+  previewImageUrl: string;
+  previewVideoUrl: string | null;
+  previewVideoHasAudio: boolean;
+  defaultVoiceId?: string | null;
+  defaultVoiceProvider?: string | null;
+}
+
+export interface MobileCharacterCatalogCategoryDTO {
+  id: string;
+  title: LocalizedCatalogTextDTO;
+  subtitle: LocalizedCatalogTextDTO;
+  description: LocalizedCatalogTextDTO;
+  hiddenSearchText: LocalizedCatalogTextDTO;
+  characters: MobileCharacterCatalogCharacterDTO[];
+}
+
+export interface MobileCharacterCatalogDTO {
+  categories: MobileCharacterCatalogCategoryDTO[];
+}
+
+export interface MobileCharacterProfileDTO extends CharacterCatalogMetricsDTO {
+  id: string;
+  characterId: string;
+  slug: string;
+  name: string;
+  tagline: string;
+  bio: string;
+  previewImageUrl: string;
+  previewVideoUrl: string | null;
+  previewVideoHasAudio: boolean;
+  defaultVoiceId?: string | null;
+  defaultVoiceProvider?: string | null;
 }
 
 export interface ProjectListItemDTO {
@@ -192,6 +248,7 @@ export interface ProjectDetailDTO {
   statusInfo?: Record<string, unknown>;
   imageEditorEnabled?: boolean;
   templateImages?: ProjectTemplateImageDTO[];
+  tokensUsed?: number;
   creation?: {
     durationSeconds?: number | null;
     useExactTextAsScript?: boolean | null;
@@ -212,15 +269,23 @@ export interface ProjectDetailDTO {
     targetLanguage?: string | null;
     languages?: string[];
     languageVoiceAssignments?: LanguageVoiceMap;
+    videoGeneration?: {
+      mode: 'lipsync_runware';
+      lipsyncPrompt?: string | null;
+    } | null;
+    projectExperience?: ProjectExperience;
+    contentTone?: ContentTone;
     characterSelection?: {
       type: 'global' | 'user' | 'dynamic' | null;
       source?: CharacterSelectionSource;
       characterId?: string | null;
+      characterSlug?: string | null;
       variationId?: string | null;
       userCharacterId?: string | null;
       characterTitle?: string | null;
       variationTitle?: string | null;
       imageUrl?: string | null;
+      previewVideoUrl?: string | null;
       generated?: boolean | null;
       status?: 'ready' | 'processing' | 'failed';
       badgeLabel?: string | null;
@@ -252,6 +317,7 @@ export interface TokenSummaryDTO {
   perSecondProject: number;
   minimumProjectTokens: number;
   minimumProjectSeconds: number;
+  characterProjectTokens: number;
   actionCosts: typeof TOKEN_COSTS.actions;
   signUpBonus: number;
 }
@@ -276,12 +342,18 @@ export interface TokenHistoryDTO {
 }
 
 export interface SubscriptionPlanDTO {
-  planKey: 'weekly' | 'monthly';
+  planKey: 'weekly' | 'monthly' | 'monthly_pro';
   productId: string;
   label: string;
   interval: 'week' | 'month';
   priceUsd: number;
   tokens: number;
+  benefits: Array<{
+    key: 'tokens_per_charge' | 'videos_per_period' | 'most_popular';
+    tokens?: number;
+    videos?: number;
+    interval?: 'week' | 'month';
+  }>;
   configured: boolean;
 }
 
@@ -363,6 +435,12 @@ export interface PendingProjectDraft {
     voiceId?: string | null;
     languages?: string[];
     languageVoices?: LanguageVoiceMap;
+    videoGeneration?: {
+      mode?: 'lipsync_runware';
+      lipsyncPrompt?: string;
+    };
+    projectExperience?: ProjectExperience;
+    contentTone?: ContentTone;
   };
   // Optional snapshot to show in confirmation UI
   template?: {

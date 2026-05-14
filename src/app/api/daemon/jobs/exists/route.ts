@@ -18,9 +18,9 @@ export const GET = withApiError(async function GET(req: NextRequest) {
 
   const project = await prisma.project.findUnique({
     where: { id: parsed.data.projectId },
-    select: { id: true, currentDaemonId: true },
+    select: { id: true, currentDaemonId: true, deleted: true },
   });
-  if (!project) {
+  if (!project || (project as any).deleted) {
     return ok({ exists: false });
   }
   if (project.currentDaemonId && project.currentDaemonId !== daemonId) {

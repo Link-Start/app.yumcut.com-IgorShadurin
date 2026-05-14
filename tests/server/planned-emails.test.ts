@@ -7,6 +7,7 @@ const prismaMock = vi.hoisted(() => ({
   plannedEmail: {
     count: vi.fn(),
     createMany: vi.fn(),
+    deleteMany: vi.fn(),
     updateMany: vi.fn(),
   },
   $transaction: vi.fn(),
@@ -47,7 +48,7 @@ function mockClaimedEmails(claimed: Array<{
   kind: string;
   attempts: number;
   targetLanguage: string;
-  user: { preferredLanguage: string; name: string | null } | null;
+  user: { preferredLanguage: string; name: string | null; deleted: boolean } | null;
 }>) {
   prismaMock.$transaction.mockImplementation(async (callback: any) => {
     const tx = {
@@ -71,6 +72,7 @@ describe('planned emails localization', () => {
       .mockResolvedValueOnce(1)
       .mockResolvedValueOnce(1);
     prismaMock.plannedEmail.createMany.mockResolvedValue({ count: 2 });
+    prismaMock.plannedEmail.deleteMany.mockResolvedValue({ count: 1 });
     prismaMock.plannedEmail.updateMany.mockResolvedValue({ count: 1 });
     resendSendMock.mockResolvedValue({ data: { id: 're_test_1' } });
   });
@@ -116,7 +118,7 @@ describe('planned emails localization', () => {
         kind: 'welcome_v1',
         attempts: 0,
         targetLanguage: 'en',
-        user: { preferredLanguage: 'ru', name: 'Иван' },
+        user: { preferredLanguage: 'ru', name: 'Иван', deleted: false },
       },
     ]);
 
@@ -159,7 +161,7 @@ describe('planned emails localization', () => {
         kind: 'welcome_v1',
         attempts: 0,
         targetLanguage: 'ru',
-        user: { preferredLanguage: 'ru', name: null },
+        user: { preferredLanguage: 'ru', name: null, deleted: false },
       },
     ]);
 
@@ -188,7 +190,7 @@ describe('planned emails localization', () => {
         kind: 'welcome_v1',
         attempts: 0,
         targetLanguage: 'de',
-        user: { preferredLanguage: 'de-DE', name: 'Max' },
+        user: { preferredLanguage: 'de-DE', name: 'Max', deleted: false },
       },
     ]);
 
@@ -206,6 +208,41 @@ describe('planned emails localization', () => {
         data: expect.objectContaining({
           status: 'sent',
           targetLanguage: 'en',
+        }),
+      }),
+    );
+  });
+
+  it('skips and removes claimed emails for deleted users', async () => {
+    mockClaimedEmails([
+      {
+        id: 'planned-deleted-user',
+        userId: 'deleted-user-1',
+        email: 'user@example.com',
+        kind: 'welcome_v1',
+        attempts: 0,
+        targetLanguage: 'en',
+        user: { preferredLanguage: 'en', name: 'Deleted User', deleted: true },
+      },
+    ]);
+
+    const result = await processPlannedEmails({ limit: 10 });
+
+    expect(result).toEqual({
+      plannedDue: 1,
+      plannedPending: 1,
+      claimed: 1,
+      sent: 0,
+      rescheduled: 0,
+      failed: 0,
+      skipped: 1,
+    });
+    expect(resendSendMock).not.toHaveBeenCalled();
+    expect(prismaMock.plannedEmail.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'planned-deleted-user',
+          status: 'pending',
         }),
       }),
     );

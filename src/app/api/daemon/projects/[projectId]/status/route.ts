@@ -63,7 +63,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     status === ProjectStatus.Error ||
     status === ProjectStatus.Cancelled;
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  const project = await prisma.project.findFirst({ where: { id: projectId, deleted: false } });
   if (!project) return notFound('Project not found');
   if (project.currentDaemonId && project.currentDaemonId !== daemonId) {
     return forbidden('Project locked by another daemon');
@@ -160,7 +160,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
       data: { projectId, status, message: buildStatusMessage(message, refundedTokens), extra: extra as any },
     });
     if (shouldReleaseDaemon) {
-      await tx.project.update({
+      await tx.project.updateMany({
         where: { id: projectId, currentDaemonId: daemonId },
         data: { currentDaemonId: null, currentDaemonLockedAt: null },
       });

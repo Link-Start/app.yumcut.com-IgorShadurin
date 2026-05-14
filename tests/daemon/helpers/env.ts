@@ -26,6 +26,7 @@ export type BuildDaemonEnvOptions = {
 
 const DEFAULT_SCRIPT_WORKSPACE = path.resolve('tests/daemon/dummy-scripts/DAEMON_SCRIPT_WORKSPACE');
 const DEFAULT_SCRIPT_WORKSPACE_V2 = path.resolve('tests/daemon/dummy-scripts/DAEMON_SCRIPT_WORKSPACE_V2');
+const DEFAULT_CHARACTERS_WORKSPACE = path.resolve('tests/daemon/dummy-scripts/DAEMON_CHARACTERS_WORKSPACE');
 const DEFAULT_SCRIPT_CAPTION_WORKSPACE = path.resolve('tests/daemon/dummy-scripts/DAEMON_SCRIPT_CAPTION');
 
 export function buildDaemonEnvMap(options: BuildDaemonEnvOptions): Record<string, string> {
@@ -42,6 +43,7 @@ export function buildDaemonEnvMap(options: BuildDaemonEnvOptions): Record<string
     DAEMON_STORAGE_HEALTH_PATH: '/api/storage/health',
     DAEMON_SCRIPT_WORKSPACE: DEFAULT_SCRIPT_WORKSPACE,
     DAEMON_SCRIPT_WORKSPACE_V2: DEFAULT_SCRIPT_WORKSPACE_V2,
+    DAEMON_CHARACTERS_WORKSPACE: DEFAULT_CHARACTERS_WORKSPACE,
     DAEMON_SCRIPT_CAPTION: DEFAULT_SCRIPT_CAPTION_WORKSPACE,
     DAEMON_PROJECTS_WORKSPACE: options.projectsWorkspace,
     DAEMON_AUDIO_DEFAULT_VOICE: 'Kore',

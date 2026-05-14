@@ -10,5 +10,5 @@ export function usePoll(fn: () => void, opts: { intervalMs: number; enabled?: bo
     return () => {
       if (timer.current) window.clearInterval(timer.current);
     };
-  }, [intervalMs, enabled]);
+  }, [fn, intervalMs, enabled]);
 }

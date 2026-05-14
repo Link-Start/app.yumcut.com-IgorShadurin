@@ -13,21 +13,21 @@ function format(meta?: Record<string, unknown>) {
 export const logger = {
   info(message: string, meta?: Record<string, unknown>) {
     if (SILENT) return;
-    // eslint-disable-next-line no-console
+     
     console.log(`[${stamp()}] INFO  ${message}${format(meta)}`);
   },
   warn(message: string, meta?: Record<string, unknown>) {
     if (SILENT) return;
-    // eslint-disable-next-line no-console
+     
     console.warn(`[${stamp()}] WARN  ${message}${format(meta)}`);
   },
   error(message: string, meta?: Record<string, unknown>) {
-    // eslint-disable-next-line no-console
+     
     console.error(`[${stamp()}] ERROR ${message}${format(meta)}`);
   },
   debug(message: string, meta?: Record<string, unknown>) {
     if (!DEBUG || SILENT) return;
-    // eslint-disable-next-line no-console
+     
     console.debug(`[${stamp()}] DEBUG ${message}${format(meta)}`);
   },
 };

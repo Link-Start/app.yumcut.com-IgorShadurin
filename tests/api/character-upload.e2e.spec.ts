@@ -35,7 +35,10 @@ describe('character upload end-to-end', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ttlMs: 60_000 }),
     });
-    expect(uploadTokenRes.ok).toBe(true);
+    if (!uploadTokenRes.ok) {
+      const body = await uploadTokenRes.text();
+      throw new Error(`Upload token failed ${uploadTokenRes.status}: ${body}`);
+    }
     const uploadToken = await uploadTokenRes.json();
     expect(uploadToken.data).toBeTruthy();
     expect(uploadToken.signature).toBeTruthy();

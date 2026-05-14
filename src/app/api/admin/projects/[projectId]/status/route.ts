@@ -5,7 +5,15 @@ import { withApiError } from '@/server/errors';
 import { requireAdminApiSession } from '@/server/admin';
 import { adminProjectStatusSchema } from '@/server/validators/admin';
 import { jobTypeForStatus } from '@/shared/pipeline/job-types';
-import { buildProgressResetPlan, resetDownstreamJobs, resetStageJobs } from '@/server/pipeline/resets';
+import {
+  buildProgressResetPlan,
+  invalidateResetMetadataArtifacts,
+  resetDownstreamJobs,
+  resetStageJobs,
+  shouldInvalidateMetadataForReset,
+} from '@/server/pipeline/resets';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
+import { isStatusAllowedForExperience } from '@/shared/pipeline/project-pipeline';
 
 type Params = { projectId: string };
 
@@ -23,8 +31,17 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
 
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) return notFound('Project not found');
+  const initialJob = await prisma.job.findFirst({
+    where: { projectId: project.id },
+    orderBy: { createdAt: 'asc' },
+    select: { payload: true },
+  });
+  const projectExperience = normalizeProjectExperience((initialJob?.payload as any)?.projectExperience);
 
   const { status, resetProgress, languagesToReset } = parsed.data;
+  if (!isStatusAllowedForExperience(status, projectExperience)) {
+    return error('VALIDATION_ERROR', 'Status is not available for this project type', 400);
+  }
   const hasExplicitLanguageSelection = Array.isArray(languagesToReset);
   const normalizedLanguages = hasExplicitLanguageSelection
     ? Array.from(new Set((languagesToReset ?? []).map((code) => code.trim().toLowerCase())))
@@ -74,9 +91,14 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     }
   });
 
-  const jobType = jobTypeForStatus(status);
+  if (resetProgress && shouldInvalidateMetadataForReset(status)) {
+    await invalidateResetMetadataArtifacts(prisma, project.id, {
+      languages: hasExplicitLanguageSelection ? normalizedLanguages : null,
+    });
+  }
+  const jobType = jobTypeForStatus(status, projectExperience);
   if (jobType) await resetStageJobs(prisma, project.id, jobType);
-  await resetDownstreamJobs(prisma, project.id, status);
+  await resetDownstreamJobs(prisma, project.id, status, projectExperience);
 
   return ok({ ok: true });
 }, 'Failed to update project status');

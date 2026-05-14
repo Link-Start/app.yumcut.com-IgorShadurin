@@ -27,19 +27,16 @@ import {
   Video,
   Crown,
   CreditCard,
-  Mail,
-  BadgeDollarSign,
 } from 'lucide-react';
 import { LIMITS } from '@/shared/constants/limits';
 import { useTokenSummary } from '@/hooks/useTokenSummary';
 import { TOKEN_COSTS } from '@/shared/constants/token-costs';
-import { SUBSCRIPTION_PRODUCTS_BY_PLAN_KEY } from '@/shared/constants/subscriptions';
+import { getSubscriptionPlansForUi, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
 import { pickRandomPlaceholder } from '@/shared/constants/prompt-placeholders';
 import { DEFAULT_LANGUAGE, TargetLanguageCode, normalizeLanguageList, resolvePrimaryLanguage } from '@/shared/constants/languages';
 import { useSettings } from '@/hooks/useSettings';
 import { storeProjectDraft } from '@/lib/project-draft';
 import { Api } from '@/lib/api-client';
-import { CONTACT_EMAIL } from '@/shared/constants/app';
 import { toast } from 'sonner';
 import type { CharacterSelectionSnapshot, PendingProjectDraft, LanguageVoiceMap, SubscriptionStatusDTO } from '@/shared/types';
 import { useVoices } from '@/hooks/useVoices';
@@ -132,8 +129,8 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     settings: 'Settings',
     chooseCharacter: 'Choose character',
     character: 'Character',
-    modeScriptTooltip: 'Script mode: exact text will be used as-is',
-    modeIdeaTooltip: 'Idea mode: your idea will be expanded into a script',
+    modeScriptTooltip: 'Now in Script mode. Your text is used as-is. Tap for Idea mode.',
+    modeIdeaTooltip: 'Now in Idea mode. AI will write text. Tap for Script mode.',
     modeScript: 'Script',
     modeIdea: 'Idea',
   createProject: 'Create project',
@@ -174,8 +171,8 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     settings: 'Настройки',
     chooseCharacter: 'Выбрать персонажа',
     character: 'Персонаж',
-    modeScriptTooltip: 'Режим сценария: используем ваш текст без изменений',
-    modeIdeaTooltip: 'Режим идеи: ИИ расширит идею до готового сценария',
+    modeScriptTooltip: 'Сейчас режим сценария. Текст используется как есть. Нажмите для режима идеи.',
+    modeIdeaTooltip: 'Сейчас режим идеи. ИИ напишет текст. Нажмите для режима сценария.',
     modeScript: 'Сценарий',
     modeIdea: 'Идея',
   createProject: 'Создать проект',
@@ -234,7 +231,7 @@ export function PromptInput() {
   const [toolPrefillReady, setToolPrefillReady] = useState(false);
   const { summary: tokenSummary, balance: tokenBalance, loading: tokensLoading } = useTokenSummary();
   const [paywallOpen, setPaywallOpen] = useState(false);
-  const [checkoutPlan, setCheckoutPlan] = useState<'weekly' | 'monthly' | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlanKey | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatusDTO | null>(null);
   const [templateSelection, setTemplateSelection] = useState<TemplateSelection | null>(null);
   const handleTemplateChange = useCallback((sel: TemplateSelection | null) => setTemplateSelection(sel), []);
@@ -338,7 +335,7 @@ export function PromptInput() {
       const nextSerialized = JSON.stringify(nextMap);
       return prevSerialized === nextSerialized ? prev : nextMap;
     });
-  }, [settings?.languageVoicePreferences]);
+  }, [settings, settings?.languageVoicePreferences]);
 
   const handleVoiceButtonClick = useCallback((language: TargetLanguageCode) => {
     setVoicePickerLanguage(language);
@@ -429,27 +426,30 @@ export function PromptInput() {
   const displayedProjectCreationReason = projectCreationReason || copy.creationDisabledNoReason;
   const showLowBalanceWarning = tokenBalance <= projectCost;
   const isEnglish = language === 'en';
-  const weeklyPlan = SUBSCRIPTION_PRODUCTS_BY_PLAN_KEY.weekly;
-  const monthlyPlan = SUBSCRIPTION_PRODUCTS_BY_PLAN_KEY.monthly;
-  const activePlanKey: 'weekly' | 'monthly' | null =
-    subscriptionStatus?.active && subscriptionStatus.productId === weeklyPlan.productId
-      ? 'weekly'
-      : subscriptionStatus?.active && subscriptionStatus.productId === monthlyPlan.productId
-        ? 'monthly'
-        : null;
-  const monthlyLimitReached = activePlanKey === 'monthly';
+  const subscriptionPlans = getSubscriptionPlansForUi();
+  const activePlanKey: SubscriptionPlanKey | null = subscriptionStatus?.active
+    ? (subscriptionPlans.find((plan) => plan.productId === subscriptionStatus.productId)?.planKey ?? null)
+    : null;
 
-  const openSubscriptionCheckout = useCallback(async (plan: 'weekly' | 'monthly') => {
+  const openSubscriptionCheckout = useCallback(async (plan: SubscriptionPlanKey) => {
     setCheckoutPlan(plan);
     try {
-      const { url } = await Api.createSubscriptionCheckout(plan);
-      window.location.href = url;
+      const result = await Api.createSubscriptionCheckout(plan);
+      if (result.action === 'checkout') {
+        window.location.href = result.url;
+      } else if (result.action === 'already_on_plan') {
+        toast.info(copy.paywallCurrentPlan);
+      } else {
+        toast.success('Subscription updated.');
+        const nextStatus = await Api.getSubscriptionStatus().catch(() => null);
+        if (nextStatus) setSubscriptionStatus(nextStatus);
+      }
     } catch (error) {
       void error;
     } finally {
       setCheckoutPlan(null);
     }
-  }, []);
+  }, [copy.paywallCurrentPlan]);
 
   useEffect(() => {
     if (!isEnglish || !paywallOpen) return;
@@ -535,7 +535,10 @@ export function PromptInput() {
     const trimmed = text.trim();
     const sanitizedLanguageVoices = normalizeLanguageVoiceMap(languageVoices);
     const apiLanguageVoices = extractExplicitLanguageVoices(sanitizedLanguageVoices);
-    const payload: PendingProjectDraft['payload'] = { useExactTextAsScript: useExact };
+    const payload: PendingProjectDraft['payload'] = {
+      useExactTextAsScript: useExact,
+      projectExperience: 'story',
+    };
     if (useExact) {
       payload.rawScript = trimmed;
     } else {
@@ -871,30 +874,13 @@ export function PromptInput() {
               <DialogDescription>{copy.paywallDescription(projectCost, tokenBalance)}</DialogDescription>
             </DialogHeader>
 
-            {monthlyLimitReached ? (
-              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
-                <p className="font-semibold">{copy.paywallMonthlyLimitReached}</p>
-                <p className="mt-1">
-                  {copy.paywallMonthlyLimitWait} {copy.paywallMonthlyLimitOr}{' '}
-                  <a href={`mailto:${CONTACT_EMAIL}`} className="underline underline-offset-2">
-                    <Mail className="mr-1 inline h-3.5 w-3.5" />
-                    {copy.paywallMonthlyLimitEmailLink}
-                  </a>
-                  .
-                </p>
-              </div>
-            ) : null}
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {[weeklyPlan, monthlyPlan].map((plan) => {
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {subscriptionPlans.map((plan) => {
                 const isLoading = checkoutPlan === plan.planKey;
-                const videos = Math.floor(plan.tokens / 30);
                 const perLabel = plan.interval === 'week' ? copy.paywallWeekLabel : copy.paywallMonthLabel;
                 const isCurrentPlan = activePlanKey === plan.planKey;
-                const isPopular = plan.planKey === 'monthly';
-                const monthlySavingsVsWeekly = Math.max((weeklyPlan.priceUsd * 4) - monthlyPlan.priceUsd, 0);
-                const canChoose =
-                  !monthlyLimitReached && (!activePlanKey || (activePlanKey === 'weekly' && plan.planKey === 'monthly'));
+                const isPopular = Boolean(plan.ui.benefits.some((benefit) => benefit.key === 'most_popular'));
+                const canChoose = !isCurrentPlan;
                 return (
                   <div
                     key={plan.planKey}
@@ -912,23 +898,25 @@ export function PromptInput() {
                       </span>
                     </div>
                     <div className="mt-4 flex-1 space-y-2 rounded-lg border border-gray-200/80 bg-white/70 p-3 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-300">
-                      <p className="flex items-center gap-2">
-                        <Video className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
-                        <span>{copy.paywallVideosPerPeriod(videos, plan.interval)}</span>
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Coins className="h-4 w-4 text-blue-600 dark:text-blue-300" />
-                        <span>{plan.tokens.toLocaleString()} {copy.paywallPerCharge}</span>
-                      </p>
-                      {plan.planKey === 'monthly' && monthlySavingsVsWeekly > 0 ? (
-                        <p className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                          <BadgeDollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
-                          <span>
-                            {copy.paywallSavePrefix} <span className="font-semibold">${monthlySavingsVsWeekly.toFixed(2)}</span>{' '}
-                            {copy.paywallSaveSuffix}
-                          </span>
-                        </p>
-                      ) : null}
+                      {plan.ui.benefits.map((benefit, benefitIndex) => {
+                        if (benefit.key === 'videos_per_period' && typeof benefit.videos === 'number' && benefit.interval) {
+                          return (
+                            <p key={`${plan.planKey}-benefit-${benefitIndex}`} className="flex items-center gap-2">
+                              <Video className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                              <span>{copy.paywallVideosPerPeriod(benefit.videos, benefit.interval)}</span>
+                            </p>
+                          );
+                        }
+                        if (benefit.key === 'tokens_per_charge' && typeof benefit.tokens === 'number') {
+                          return (
+                            <p key={`${plan.planKey}-benefit-${benefitIndex}`} className="flex items-center gap-2">
+                              <Coins className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+                              <span>{benefit.tokens.toLocaleString()} {copy.paywallPerCharge}</span>
+                            </p>
+                          );
+                        }
+                        return null;
+                      })}
                     </div>
                     <Button
                       className="mt-4 w-full"

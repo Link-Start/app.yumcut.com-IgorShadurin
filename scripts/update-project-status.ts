@@ -6,7 +6,15 @@ import { ProjectStatus } from '../src/shared/constants/status';
 import { DEFAULT_LANGUAGE } from '../src/shared/constants/languages';
 import { toStoredMediaPath } from '../src/server/storage';
 import { jobTypeForStatus } from '../src/shared/pipeline/job-types';
-import { buildProgressResetPlan, resetDownstreamJobs, resetStageJobs } from '../src/server/pipeline/resets';
+import {
+  buildProgressResetPlan,
+  invalidateResetMetadataArtifacts,
+  resetDownstreamJobs,
+  resetStageJobs,
+  shouldInvalidateMetadataForReset,
+} from '../src/server/pipeline/resets';
+import { normalizeProjectExperience } from '../src/shared/constants/project-experience';
+import { isStatusAllowedForExperience } from '../src/shared/pipeline/project-pipeline';
 
 function loadDotEnv(rootDir: string) {
   const envPath = path.join(rootDir, '.env');
@@ -109,6 +117,15 @@ async function main() {
     if (!project) {
       printUsage('Project not found');
     }
+    const initialJob = await prisma.job.findFirst({
+      where: { projectId },
+      orderBy: { createdAt: 'asc' },
+      select: { payload: true },
+    });
+    const projectExperience = normalizeProjectExperience((initialJob?.payload as any)?.projectExperience);
+    if (!isStatusAllowedForExperience(statusArg, projectExperience)) {
+      printUsage(`Status ${statusArg} is not available for ${projectExperience} projects.`);
+    }
     const progressPlan = buildProgressResetPlan(statusArg);
 
     await prisma.$transaction(async (tx) => {
@@ -198,8 +215,20 @@ async function main() {
       }
     });
 
+    let workspaceMessage = '';
+    if (resetProgress && shouldInvalidateMetadataForReset(statusArg)) {
+      const invalidation = await invalidateResetMetadataArtifacts(prisma, projectId);
+      if (invalidation.skipped) {
+        workspaceMessage = ' Skipped workspace metadata invalidation (DAEMON_PROJECTS_WORKSPACE is not configured).';
+      } else if (invalidation.deleted > 0) {
+        workspaceMessage = ` Invalidated ${invalidation.deleted} metadata file(s).`;
+      } else if (invalidation.considered > 0) {
+        workspaceMessage = ' No metadata files needed invalidation.';
+      }
+    }
+
     let jobResetMessage = '';
-    const jobType = jobTypeForStatus(statusArg);
+    const jobType = jobTypeForStatus(statusArg, projectExperience);
     if (jobType && !skipJobReset) {
       const resetResult = await resetStageJobs(prisma, projectId, jobType);
       jobResetMessage = resetResult.message;
@@ -209,7 +238,7 @@ async function main() {
 
     let downstreamMessage = '';
     if (!skipDownstreamReset) {
-      const downstreamJobs = await resetDownstreamJobs(prisma, projectId, statusArg);
+      const downstreamJobs = await resetDownstreamJobs(prisma, projectId, statusArg, projectExperience);
       if (downstreamJobs.total > 0) {
         downstreamMessage = ` Reset ${downstreamJobs.total} downstream job(s) (${downstreamJobs.types.join(', ')}).`;
       } else if (downstreamJobs.considered > 0) {
@@ -220,7 +249,7 @@ async function main() {
     }
 
     console.log(
-      `Updated project ${projectId} to ${statusArg}${extra ? ' with extra data' : ''}.${jobResetMessage}${downstreamMessage}`,
+      `Updated project ${projectId} to ${statusArg}${extra ? ' with extra data' : ''}.${jobResetMessage}${downstreamMessage}${workspaceMessage}`,
     );
   } finally {
     await prisma.$disconnect();

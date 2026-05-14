@@ -156,12 +156,12 @@ describe('Real handlers + virtual DB: full workflow', () => {
     if (!sawAllStatuses) {
       const snap = app!.state.statuses.filter(s => s.projectId === projectId);
       const snapshot = snap.map(s => s.status);
-      // eslint-disable-next-line no-console
+       
       console.log('Observed statuses:', snapshot);
       console.log('Last status detail:', snap[snap.length - 1]);
-      // eslint-disable-next-line no-console
+       
       console.log('Daemon stdout:', daemon?.stdout || '');
-      // eslint-disable-next-line no-console
+       
       console.log('Daemon stderr:', daemon?.stderr || '');
       console.log('Captured app.state.assets:', app!.state.assets);
       console.log('Storage calls:', storage!.calls);

@@ -12,6 +12,7 @@ import type { AppLanguageCode } from '@/shared/constants/app-language';
 import type { SubscriptionStatusDTO } from '@/shared/types';
 import { requestTokenRefresh } from '@/hooks/useTokenSummary';
 import { formatDateTime } from '@/lib/date';
+import type { SubscriptionPlanKey } from '@/shared/constants/subscriptions';
 
 type SubscriptionCardCopy = {
   title: string;
@@ -23,6 +24,7 @@ type SubscriptionCardCopy = {
   expiresAt: string;
   currentPlan: string;
   planTokens: (tokens: number) => string;
+  planVideos: (videos: number, interval: 'week' | 'month') => string;
   per: {
     week: string;
     month: string;
@@ -52,6 +54,7 @@ const COPY: Record<AppLanguageCode, SubscriptionCardCopy> = {
     expiresAt: 'Current period ends',
     currentPlan: 'Current plan',
     planTokens: (tokens) => `${tokens.toLocaleString()} tokens per charge`,
+    planVideos: (videos, interval) => `${videos} videos/${interval}`,
     per: {
       week: 'week',
       month: 'month',
@@ -79,6 +82,7 @@ const COPY: Record<AppLanguageCode, SubscriptionCardCopy> = {
     expiresAt: 'Текущий период до',
     currentPlan: 'Текущий план',
     planTokens: (tokens) => `${tokens.toLocaleString()} токенов за списание`,
+    planVideos: (videos, interval) => `${videos} видео/${interval === 'week' ? 'неделя' : 'месяц'}`,
     per: {
       week: 'неделю',
       month: 'месяц',
@@ -116,7 +120,7 @@ export function SubscriptionPlansCard({ initialStatus }: { initialStatus: Subscr
 
   const [status, setStatus] = useState<SubscriptionStatusDTO>(initialStatus);
   const [refreshing, setRefreshing] = useState(false);
-  const [checkoutPlan, setCheckoutPlan] = useState<'weekly' | 'monthly' | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlanKey | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
 
   const activeProductId = status.active ? status.productId : null;
@@ -143,11 +147,18 @@ export function SubscriptionPlansCard({ initialStatus }: { initialStatus: Subscr
     }
   }, [fetchStatus]);
 
-  const startCheckout = async (plan: 'weekly' | 'monthly') => {
+  const startCheckout = async (plan: SubscriptionPlanKey) => {
     setCheckoutPlan(plan);
     try {
-      const { url } = await Api.createSubscriptionCheckout(plan);
-      window.location.href = url;
+      const result = await Api.createSubscriptionCheckout(plan);
+      if (result.action === 'checkout') {
+        window.location.href = result.url;
+      } else if (result.action === 'already_on_plan') {
+        toast.info(t.currentPlanButton);
+      } else {
+        toast.success(t.checkoutSuccess);
+        await fetchStatus();
+      }
     } catch (error) {
       toast.error(t.checkoutError);
       void error;
@@ -273,7 +284,7 @@ export function SubscriptionPlansCard({ initialStatus }: { initialStatus: Subscr
             {t.notConfigured}
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {status.plans.map((plan) => {
               const isCurrent = status.active && plan.productId === activeProductId;
               const planPeriod = plan.interval === 'week' ? t.per.week : t.per.month;
@@ -286,9 +297,17 @@ export function SubscriptionPlansCard({ initialStatus }: { initialStatus: Subscr
                   <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                     ${plan.priceUsd.toFixed(2)} / {planPeriod}
                   </p>
-                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-                    {t.planTokens(plan.tokens)}
-                  </p>
+                  <div className="mt-1 space-y-1 text-xs text-gray-600 dark:text-gray-300">
+                    {plan.benefits.map((benefit, index) => {
+                      if (benefit.key === 'tokens_per_charge' && typeof benefit.tokens === 'number') {
+                        return <p key={`${plan.planKey}-benefit-${index}`}>{t.planTokens(benefit.tokens)}</p>;
+                      }
+                      if (benefit.key === 'videos_per_period' && typeof benefit.videos === 'number' && benefit.interval) {
+                        return <p key={`${plan.planKey}-benefit-${index}`}>{t.planVideos(benefit.videos, benefit.interval)}</p>;
+                      }
+                      return null;
+                    })}
+                  </div>
                   <Button
                     className="mt-3 w-full"
                     variant={isCurrent ? 'outline' : 'default'}

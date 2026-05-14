@@ -3,6 +3,7 @@ import { ok, unauthorized } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { getTokenSummary } from '@/server/tokens';
 import { TOKEN_COSTS, MINIMUM_PROJECT_TOKENS } from '@/shared/constants/token-costs';
+import { CHARACTER_PROJECT_CREATION_TOKENS } from '@/shared/constants/subscriptions';
 import { verifyMobileAccessToken } from '@/server/mobile-auth';
 
 export const GET = withApiError(async function GET(req: NextRequest) {
@@ -26,6 +27,7 @@ export const GET = withApiError(async function GET(req: NextRequest) {
     perSecondProject: TOKEN_COSTS.perSecondProject,
     minimumProjectTokens: MINIMUM_PROJECT_TOKENS,
     minimumProjectSeconds: TOKEN_COSTS.minimumProjectSeconds,
+    characterProjectTokens: CHARACTER_PROJECT_CREATION_TOKENS,
     actionCosts: TOKEN_COSTS.actions,
     signUpBonus: TOKEN_COSTS.signUpBonus,
   });

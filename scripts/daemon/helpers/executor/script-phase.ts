@@ -2,9 +2,12 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { ProjectStatus } from '@/shared/constants/status';
 import { normalizeLanguageList, DEFAULT_LANGUAGE, TargetLanguageCode } from '@/shared/constants/languages';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
+import { normalizeContentTone } from '@/shared/constants/content-tone';
 import { log } from '../logger';
 import { archiveInitialSuccess, archiveRefinementSuccess, archiveInitialError, archiveRefinementError } from '../script-archive';
 import { generateScript, refineScript, PromptToTextError } from '../prompt-to-text';
+import { CharacterTextV2Error, generateCharacterScriptV2, refineCharacterScriptV2 } from '../character-text-v2';
 import { upsertScript, getScriptText, setStatus, markLanguageFailure, addImageAsset } from '../db';
 import { translateScript } from '../translate';
 import type { CreationSnapshot } from './types';
@@ -82,6 +85,9 @@ export async function handleScriptPhase(args: ScriptPhaseArgs) {
   const failedTranslations: string[] = [];
   const successfulTranslations: string[] = [];
   const customTemplateData = isCustomTemplateData(cfg.template?.customData) ? cfg.template!.customData : null;
+  const projectExperience = normalizeProjectExperience((jobPayload as any)?.projectExperience ?? (cfg as any)?.projectExperience);
+  const contentTone = normalizeContentTone((jobPayload as any)?.contentTone ?? (cfg as any)?.contentTone);
+  const useCharacterV2TextFlow = projectExperience === 'character' && !customTemplateData;
   const templateFeatureWarnings: string[] = [];
   const normalizedPrompt = typeof prompt === 'string' && prompt.trim().length > 0 ? prompt.trim() : null;
   let effectiveCustomPrompt = normalizedPrompt;
@@ -145,7 +151,22 @@ export async function handleScriptPhase(args: ScriptPhaseArgs) {
         requestPreview: requestText.slice(0, 200),
         durationSeconds,
       });
-      const refinement = await refineScript({ script: existingScript, instructions: requestText, durationSeconds, language: languageLabel || undefined, workspaceRoot: languageInfo.workspaceRoot });
+      const refinement = useCharacterV2TextFlow
+        ? await refineCharacterScriptV2({
+            script: existingScript,
+            instructions: requestText,
+            durationSeconds,
+            tone: contentTone,
+            language: languageLabel || undefined,
+            workspaceRoot: languageInfo.workspaceRoot,
+          })
+        : await refineScript({
+            script: existingScript,
+            instructions: requestText,
+            durationSeconds,
+            language: languageLabel || undefined,
+            workspaceRoot: languageInfo.workspaceRoot,
+          });
       scriptText = refinement.text;
       archiveTask = () => archiveRefinementSuccess({
         projectId,
@@ -182,9 +203,25 @@ export async function handleScriptPhase(args: ScriptPhaseArgs) {
         durationSeconds,
         hasGuidance: !!(mustHave || avoid),
         language: languageLabel,
+        mode: useCharacterV2TextFlow ? 'character-v2' : 'legacy',
       });
       const languageInfo = await ensureLanguageWorkspace(projectId, targetLanguageCode);
-      const generation = await generateScript({ prompt: effectivePrompt, durationSeconds, mustHave, avoid, language: languageLabel, workspaceRoot: languageInfo.workspaceRoot });
+      const generation = useCharacterV2TextFlow
+        ? await generateCharacterScriptV2({
+            prompt: effectivePrompt,
+            durationSeconds,
+            tone: contentTone,
+            language: languageLabel,
+            workspaceRoot: languageInfo.workspaceRoot,
+          })
+        : await generateScript({
+            prompt: effectivePrompt,
+            durationSeconds,
+            mustHave,
+            avoid,
+            language: languageLabel,
+            workspaceRoot: languageInfo.workspaceRoot,
+          });
       scriptText = generation.text;
       archiveTask = () => archiveInitialSuccess({
         projectId,
@@ -290,11 +327,11 @@ export async function handleScriptPhase(args: ScriptPhaseArgs) {
       reason,
       error: err?.message || String(err),
     });
-    if (err instanceof PromptToTextError) {
+    if (err instanceof PromptToTextError || err instanceof CharacterTextV2Error) {
       if (isRefinement) {
-        await archiveRefinementError(projectId, targetLanguageCode, err.command, err.message, requestText ?? '');
+        await archiveRefinementError(projectId, targetLanguageCode, (err as any).command, err.message, requestText ?? '');
       } else {
-        await archiveInitialError(projectId, normalizedSourceLanguage, err.command, err.message);
+        await archiveInitialError(projectId, normalizedSourceLanguage, (err as any).command, err.message);
       }
     }
     await setStatus(projectId, ProjectStatus.Error, failureMessage);

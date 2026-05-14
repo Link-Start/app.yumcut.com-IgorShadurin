@@ -167,12 +167,15 @@ function CharacterCard({ source, characterId, characterTitle, variation, selecte
         <CardContent className="p-0">
           <div className="mx-auto aspect-[9/16] h-36 w-auto overflow-hidden rounded-md bg-gradient-to-br from-gray-100 via-gray-200 to-gray-300 dark:from-gray-900 dark:via-gray-950 dark:to-black">
             {variation.imageUrl ? (
-              <img
-                src={variation.imageUrl}
-                alt={variation.title || characterTitle}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={variation.imageUrl}
+                  alt={variation.title || characterTitle}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </>
             ) : isDynamic ? (
               <div className="relative flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400">
                 <div className="rounded-full bg-white/10 p-3 shadow-lg backdrop-blur ring-2 ring-white/40">

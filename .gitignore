@@ -51,3 +51,6 @@ tests/daemon-and-api/.tmp
 
 # dummy script deps
 tests/daemon/dummy-scripts/**/node_modules
+
+# local imported character batch
+public/characters/brainrot/

@@ -18,6 +18,7 @@ export type DaemonConfig = {
   storageHealthPath: string;
   scriptWorkspace: string;
   scriptWorkspaceV2: string;
+  charactersWorkspace: string;
   scriptCaptionWorkspace: string;
   projectsWorkspace: string;
   audioDefaultVoice: string;
@@ -39,6 +40,7 @@ const RawEnvSchema = z.object({
   DAEMON_HEALTH_PATH: z.string().optional(),
   DAEMON_SCRIPT_WORKSPACE: z.string().min(1, 'Script workspace path is required'),
   DAEMON_SCRIPT_WORKSPACE_V2: z.string().min(1, 'Script workspace v2 path is required'),
+  DAEMON_CHARACTERS_WORKSPACE: z.string().min(1, 'Characters workspace path is required'),
   DAEMON_SCRIPT_CAPTION: z.string().min(1, 'Caption renderer workspace path is required'),
   DAEMON_PROJECTS_WORKSPACE: z.string().min(1, 'Projects workspace path is required'),
   DAEMON_AUDIO_DEFAULT_VOICE: z.string().optional(),
@@ -111,6 +113,7 @@ export function loadConfig(): DaemonConfig {
         : '/api/storage/health',
     scriptWorkspace: resolveWorkspace(base.DAEMON_SCRIPT_WORKSPACE),
     scriptWorkspaceV2: resolveWorkspace(base.DAEMON_SCRIPT_WORKSPACE_V2),
+    charactersWorkspace: resolveWorkspace(base.DAEMON_CHARACTERS_WORKSPACE),
     scriptCaptionWorkspace: resolveWorkspace(base.DAEMON_SCRIPT_CAPTION),
     projectsWorkspace: resolveWorkspace(base.DAEMON_PROJECTS_WORKSPACE, true),
     audioDefaultVoice: (base.DAEMON_AUDIO_DEFAULT_VOICE && base.DAEMON_AUDIO_DEFAULT_VOICE.trim()) || 'Kore',

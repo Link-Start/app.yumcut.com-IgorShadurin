@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { ok } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { prisma } from '@/server/db';
+import { getViewerFavoriteCreatedAtMap, sortByFavoriteRecencyFirst } from '@/server/character-favorites';
 import { normalizeMediaUrl } from '@/server/storage';
 import { requireMobileUserId } from '../shared/auth';
 
@@ -26,7 +27,15 @@ export const GET = withApiError(async function GET(req: NextRequest) {
   }
 
   const [globalChars, userChars] = await Promise.all([
-    prisma.character.findMany({ include: { variations: true } }),
+    prisma.character.findMany({
+      where: { isCatalogPublic: true },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+      include: {
+        variations: {
+          orderBy: [{ priority: 'desc' }, { id: 'asc' }],
+        },
+      },
+    }),
     prisma.userCharacter.findMany({
       where: { userId: auth.userId, deleted: false },
       include: { variations: { where: { deleted: false }, orderBy: { createdAt: 'desc' } } },
@@ -34,10 +43,20 @@ export const GET = withApiError(async function GET(req: NextRequest) {
     }),
   ]);
 
-  const mapGlobal = globalChars.map((character) => ({
+  const favoriteCreatedAtByCharacterId = await getViewerFavoriteCreatedAtMap(
+    globalChars.map((character) => character.id),
+    auth.userId,
+  );
+  const sortedGlobalChars = sortByFavoriteRecencyFirst(globalChars, {
+    getCharacterId: (item) => item.id,
+    getPriority: (item) => Number(item.priority) || 0,
+    favoriteCreatedAtByCharacterId,
+  });
+
+  const mapGlobal = sortedGlobalChars.map((character) => ({
     id: character.id,
-    title: character.title,
-    description: character.description,
+    title: character.name?.trim() || character.title,
+    description: character.bio ?? character.description,
     variations: character.variations.map((variation) => ({
       id: variation.id,
       title: variation.title,

@@ -5,6 +5,7 @@ import { withApiError } from '@/server/errors';
 import { assertDaemonAuth } from '@/server/auth';
 import { daemonJobCreateSchema } from '@/server/validators/daemon';
 import { jobTypeForStatus } from '@/shared/pipeline/job-types';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
 
 export const POST = withApiError(async function POST(req: NextRequest) {
   const daemonId = await assertDaemonAuth(req);
@@ -15,16 +16,25 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     return error('VALIDATION_ERROR', 'Invalid payload', 400, parsed.error.flatten());
   }
 
-  const project = await prisma.project.findUnique({ where: { id: parsed.data.projectId } });
+  const project = await prisma.project.findFirst({ where: { id: parsed.data.projectId, deleted: false } });
   if (!project) return notFound('Project not found');
   if (project.currentDaemonId && project.currentDaemonId !== daemonId) {
     return forbidden('Project locked by another daemon');
   }
 
   // Guard: only create if type matches current project status
-  const expected = jobTypeForStatus(project.status as any);
+  const initialJob = await prisma.job.findFirst({
+    where: { projectId: project.id },
+    orderBy: { createdAt: 'asc' },
+    select: { payload: true },
+  });
+  const projectExperience = normalizeProjectExperience((initialJob?.payload as any)?.projectExperience);
+  const expected = jobTypeForStatus(project.status as any, projectExperience);
   if (expected && expected !== parsed.data.type) {
     return ok({ skipped: true, reason: 'status-mismatch' } as any);
+  }
+  if (!expected) {
+    return ok({ skipped: true, reason: 'status-not-supported' } as any);
   }
 
   // Idempotent: if a queued/running job of the same type exists, return it instead of creating a duplicate

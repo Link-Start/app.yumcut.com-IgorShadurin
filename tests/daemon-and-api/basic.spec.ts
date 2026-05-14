@@ -96,7 +96,7 @@ describe('daemon + real APIs (health only)', () => {
       await new Promise((r) => setTimeout(r, 300));
     }
     if (!appOk || !storageOk) {
-      // eslint-disable-next-line no-console
+       
       console.warn('Health check failed', { appOk, storageOk, appBase: app!.baseUrl, storageBase: storage!.baseUrl });
     }
     expect(appOk || storageOk).toBe(true);

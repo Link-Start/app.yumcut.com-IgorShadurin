@@ -11,6 +11,9 @@ import { normalizeLanguageVoiceMap, mergeLanguageVoicePreferences, selectVoiceFo
 import type { LanguageVoiceMap } from '@/shared/types';
 import { getAdminVoiceProviderSettings } from '@/server/admin/voice-providers';
 import { buildVoiceProviderSet, FALLBACK_VOICE_PROVIDER_IDS } from '@/shared/constants/voice-providers';
+import { normalizeContentTone } from '@/shared/constants/content-tone';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
+import { defaultCharacterVideoGeneration } from '@/shared/constants/video-generation';
 
 type Params = { projectId: string };
 
@@ -19,8 +22,8 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
   if (!daemonId) return forbidden('Invalid daemon credentials');
   const { projectId } = await params;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, deleted: false },
     select: {
       id: true,
       userId: true,
@@ -39,6 +42,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       voiceProvider: true,
       languageVoiceAssignments: true,
       languageVoiceProviders: true,
+      contentTone: true,
     },
   });
   if (!project) return notFound('Project not found');
@@ -148,6 +152,23 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
   const scriptAvoidanceGuidance = typeof payload.scriptAvoidanceGuidance === 'string' ? payload.scriptAvoidanceGuidance : '';
   const audioStyleEnabled = !!payload.audioStyleGuidanceEnabled;
   const audioStyleGuidance = typeof payload.audioStyleGuidance === 'string' ? payload.audioStyleGuidance : '';
+  const projectExperience = normalizeProjectExperience(payload.projectExperience);
+  const defaultVideoGeneration = projectExperience === 'character'
+    ? defaultCharacterVideoGeneration()
+    : null;
+  const payloadVideoGeneration = payload?.videoGeneration as Record<string, unknown> | undefined;
+  const videoGenerationMode = typeof payloadVideoGeneration?.mode === 'string'
+    ? payloadVideoGeneration.mode.trim().toLowerCase()
+    : '';
+  const videoGenerationPrompt = typeof payloadVideoGeneration?.lipsyncPrompt === 'string'
+    ? payloadVideoGeneration.lipsyncPrompt.trim()
+    : '';
+  const videoGeneration = videoGenerationMode === 'lipsync_runware'
+    ? {
+        mode: 'lipsync_runware' as const,
+        lipsyncPrompt: videoGenerationPrompt || defaultVideoGeneration?.lipsyncPrompt || null,
+      }
+    : defaultVideoGeneration;
   // Resolve voice id (global list)
   const voiceId = project.voiceId || (typeof payload.voiceId === 'string' ? payload.voiceId : null);
   const targetLanguage = typeof payload.targetLanguage === 'string' ? payload.targetLanguage : 'en';
@@ -228,6 +249,8 @@ const voiceQueryWhere = candidateVoiceIds.length > 0
     watermarkEnabled: typeof payload.watermarkEnabled === 'boolean' ? payload.watermarkEnabled : true,
     captionsEnabled: typeof payload.captionsEnabled === 'boolean' ? payload.captionsEnabled : true,
     useExactTextAsScript: !!payload.useExactTextAsScript,
+    contentTone: normalizeContentTone(payload.contentTone ?? project.contentTone),
+    projectExperience,
     durationSeconds: typeof payload.durationSeconds === 'number' ? payload.durationSeconds : null,
     targetLanguage,
     languages,
@@ -237,6 +260,7 @@ const voiceQueryWhere = candidateVoiceIds.length > 0
     scriptAvoidanceGuidance: scriptAvoidanceEnabled ? scriptAvoidanceGuidance : '',
     audioStyleGuidanceEnabled: audioStyleEnabled,
     audioStyleGuidance: audioStyleEnabled ? audioStyleGuidance : '',
+    videoGeneration,
     voiceId: voiceId || null,
     voiceAssignments,
     voiceProviders,

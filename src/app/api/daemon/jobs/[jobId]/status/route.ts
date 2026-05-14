@@ -34,7 +34,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
       data: { status: parsed.data.status, ...(job.daemonId ? {} : { daemonId }) },
     });
     if (shouldRelease && job.daemonId === daemonId) {
-      await tx.project.update({
+      await tx.project.updateMany({
         where: { id: job.projectId, currentDaemonId: daemonId },
         data: { currentDaemonId: null, currentDaemonLockedAt: null },
       });

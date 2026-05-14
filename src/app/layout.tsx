@@ -16,12 +16,18 @@ import { Toaster } from '@/components/ui/sonner';
 import { UtmSourceTracker } from '@/components/analytics/UtmSourceTracker';
 import { config } from '@/server/config';
 import { TOKEN_COSTS, MINIMUM_PROJECT_TOKENS } from '@/shared/constants/token-costs';
+import { CHARACTER_PROJECT_CREATION_TOKENS } from '@/shared/constants/subscriptions';
 import { DEFAULT_LANGUAGE, normalizeLanguageList } from '@/shared/constants/languages';
 import { parseStoredCharacterSelection, resolveCharacterSelectionSnapshot } from '@/server/characters/selection';
 import { getDefaultVoiceExternalId } from '@/server/voices';
 import { ensureSchedulerPreferences } from '@/server/publishing/preferences';
 import { normalizeLanguageVoiceMap } from '@/shared/voices/language-voice-map';
 import { getProjectCreationSettings } from '@/server/admin/project-creation';
+import {
+  DEFAULT_CHARACTER_CREATION_SETTINGS,
+} from '@/shared/constants/character-creation-settings';
+import { normalizeContentTone } from '@/shared/constants/content-tone';
+import { resolveCharacterCreationSettings } from '@/server/settings/character-creation';
 import {
   DEFAULT_APP_LANGUAGE,
   normalizeAppLanguage,
@@ -205,9 +211,11 @@ export default async function RootLayout({
     autoApproveAudio: true,
     watermarkEnabled: true,
     captionsEnabled: true,
+    characterCreationSettings: DEFAULT_CHARACTER_CREATION_SETTINGS,
     defaultDurationSeconds: null,
     sidebarOpen,
     defaultUseScript: false,
+    characterContentTone: 'neutral',
     targetLanguages: ['en'],
     languageVoicePreferences: {},
     scriptCreationGuidanceEnabled: false,
@@ -268,8 +276,10 @@ export default async function RootLayout({
         autoApproveAudio: settingsRecord?.autoApproveAudio ?? true,
         watermarkEnabled: (settingsRecord as any)?.watermarkEnabled ?? true,
         captionsEnabled: (settingsRecord as any)?.captionsEnabled ?? true,
+        characterCreationSettings: resolveCharacterCreationSettings(settingsRecord),
         defaultDurationSeconds: settingsRecord?.defaultDurationSec ?? null,
         defaultUseScript: (settingsRecord as any)?.defaultUseScript ?? false,
+        characterContentTone: normalizeContentTone((settingsRecord as any)?.characterContentTone),
         targetLanguages: storedLanguages,
         languageVoicePreferences: storedLanguageVoices,
         scriptCreationGuidanceEnabled: (settingsRecord as any)?.scriptCreationGuidanceEnabled ?? false,
@@ -289,6 +299,7 @@ export default async function RootLayout({
         perSecondProject: TOKEN_COSTS.perSecondProject,
         minimumProjectTokens: MINIMUM_PROJECT_TOKENS,
         minimumProjectSeconds: TOKEN_COSTS.minimumProjectSeconds,
+        characterProjectTokens: CHARACTER_PROJECT_CREATION_TOKENS,
         actionCosts: TOKEN_COSTS.actions,
         signUpBonus: TOKEN_COSTS.signUpBonus,
       };
@@ -350,6 +361,7 @@ export default async function RootLayout({
 
         <noscript>
           <div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
                 src="https://mc.yandex.ru/watch/106798597"
                 style={{ position: 'absolute', left: '-9999px' }}

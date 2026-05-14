@@ -296,7 +296,7 @@ export async function notifyProjectStatusChange(projectId: string, status: Proje
       projectUrl: adminProjectUrl,
       finalVideoUrl: finalVideoLink,
     }).catch((err) => {
-      // eslint-disable-next-line no-console
+       
       console.error('Failed to notify admins about completed project', err);
     });
   } else if (status === ProjectStatus.Error) {

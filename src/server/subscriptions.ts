@@ -3,7 +3,7 @@ import { prisma } from './db';
 import { config } from './config';
 import { grantTokens } from './tokens';
 import { TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
-import { getSubscriptionConfig } from '@/shared/constants/subscriptions';
+import { getSubscriptionConfig, resolveSubscriptionGrantByProductId } from '@/shared/constants/subscriptions';
 import { decodeSignedTransactionPayload } from './app-store/signed-data-verifier';
 import { logAppleSubscriptionEvent } from './app-store/subscription-logger';
 import { notifyAdminsOfSubscriptionPurchase } from './telegram';
@@ -47,6 +47,7 @@ export type ProcessServerSubscriptionPurchaseInput = {
   purchaseDate: Date;
   expiresDate?: Date | null;
   environment: string;
+  tokensOverride?: number | null;
   payload?: Prisma.JsonValue;
   source?: PurchaseSource;
 };
@@ -58,6 +59,7 @@ type PurchaseDescriptor = {
   purchaseDate: Date;
   expiresDate?: Date | null;
   environment: string;
+  tokensOverride?: number | null;
   payload: Prisma.JsonValue;
 };
 
@@ -78,6 +80,10 @@ export type UserSubscriptionStatus = {
   lastTransactionId: string | null;
   environment: string | null;
 };
+
+export function isStripeSubscriptionEnvironment(environment: string | null | undefined) {
+  return environment === 'StripeLive' || environment === 'StripeTest';
+}
 
 export class SubscriptionError extends Error {
   constructor(message: string, public readonly status: number = 400) {
@@ -172,6 +178,7 @@ export async function processServerSubscriptionPurchase(
     purchaseDate: input.purchaseDate,
     expiresDate: input.expiresDate ?? null,
     environment: input.environment,
+    tokensOverride: input.tokensOverride ?? null,
     payload:
       input.payload ??
       ({
@@ -291,10 +298,12 @@ async function processSignedTransactions(userId: string, signedTransactions: str
 }
 
 async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, source: PurchaseSource) {
-  const productConfig = getSubscriptionConfig(descriptor.productId);
-  if (!productConfig) {
+  const productGrant = resolveSubscriptionGrantByProductId(descriptor.productId);
+  if (!productGrant) {
     throw new SubscriptionError(`Unsupported subscription product: ${descriptor.productId}`);
   }
+  const productConfig = productGrant.product;
+  const subscriptionTokens = descriptor.tokensOverride ?? productGrant.tokens;
 
   const existing = await prisma.subscriptionPurchase.findUnique({
     where: { transactionId: descriptor.transactionId },
@@ -389,7 +398,7 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
     const newBalance = await grantTokens(
       {
         userId,
-        amount: productConfig.tokens,
+        amount: subscriptionTokens,
         type: TOKEN_TRANSACTION_TYPES.subscriptionCredit,
         description: `Subscription ${productConfig.label}`,
         metadata: {
@@ -420,7 +429,7 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
     select: { email: true, name: true },
   });
 
-  const totalTokensGranted = productConfig.tokens + purchaseOutcome.winbackBonusGranted;
+  const totalTokensGranted = subscriptionTokens + purchaseOutcome.winbackBonusGranted;
 
   const result = {
     alreadyProcessed: false,
@@ -438,7 +447,7 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
     transactionId: descriptor.transactionId,
     originalTransactionId: descriptor.originalTransactionId,
     tokensGranted: totalTokensGranted,
-    subscriptionTokensGranted: productConfig.tokens,
+    subscriptionTokensGranted: subscriptionTokens,
     winbackBonusGranted: purchaseOutcome.winbackBonusGranted,
     balance: purchaseOutcome.balance,
     environment: descriptor.environment,
@@ -458,7 +467,7 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
     balance: purchaseOutcome.balance,
     source,
   }).catch((err) => {
-    // eslint-disable-next-line no-console
+     
     console.error('Failed to send subscription purchase notification', err);
   });
 

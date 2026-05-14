@@ -23,7 +23,7 @@ if (
   nextAuthUrl &&
   /localhost|127\.0\.0\.1/i.test(nextAuthUrl)
 ) {
-  // eslint-disable-next-line no-console
+   
   console.warn(
     'NEXTAUTH_URL points to localhost while NODE_ENV=production. Use the public domain (e.g. https://app.yumcut.com) so PKCE cookies survive across redirects.'
   );
@@ -71,7 +71,7 @@ if (oauthProviders.length === 0) {
       })
     );
     if (logPlaceholderAuth) {
-      // eslint-disable-next-line no-console
+       
       console.warn('ALLOW_NO_OAUTH is enabled; using placeholder auth provider for build/tests.');
     }
   } else {
@@ -113,13 +113,13 @@ export const authOptions: NextAuthOptions = {
     // Only log errors; drop warn/debug to keep console clean unless failures occur
     error(code: any, metadata?: unknown) {
       try {
-        // eslint-disable-next-line no-console
+         
         console.error('[next-auth][error]', code, metadata ?? '');
       } catch {}
     },
     warn(code: any, metadata?: unknown) {
       if (!metadata) return;
-      // eslint-disable-next-line no-console
+       
       console.warn('[next-auth][warn]', code, metadata);
     },
     debug(_code: any) {
@@ -180,7 +180,7 @@ export const authOptions: NextAuthOptions = {
         });
         signupBonusAmount = signupBonusResult.amount;
       } catch (e) {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to grant signup tokens', e);
       }
       notifyAdminsOfNewUser({
@@ -190,7 +190,7 @@ export const authOptions: NextAuthOptions = {
         signupBonusAmount,
         ...(utmSource ? { utmSource } : {}),
       }).catch((err) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to notify admins about new user', err);
       });
       scheduleUserOnboardingEmails({
@@ -198,7 +198,7 @@ export const authOptions: NextAuthOptions = {
         email: user.email,
         name: user.name,
       }).catch((err) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Failed to schedule onboarding emails for new user', err);
       });
     },

@@ -97,7 +97,12 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
       <AdminBackButton className="w-fit" />
 
       {/* Admin-only status changer below the back button */}
-      <AdminProjectStatusChanger projectId={project.id} current={project.status} languages={selectableLanguages} />
+      <AdminProjectStatusChanger
+        projectId={project.id}
+        current={project.status}
+        languages={selectableLanguages}
+        projectExperience={project.creation?.projectExperience}
+      />
 
       {statusDescription ? (
         <Card>
