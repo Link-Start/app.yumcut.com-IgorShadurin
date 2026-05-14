@@ -10,8 +10,12 @@ import { Button } from '@/components/ui/button-1';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from '@/components/ui/pagination';
 import { CharacterPreviewCard } from './CharacterPreviewCard';
 import {
+  filterMainPageGroupsForSearch,
+  findMainPageMatchingCharacters,
   getMainPageGroupById,
+  normalizeMainPageSearchQuery,
   pickLocalizedText,
+  resolveMainPageLandingView,
   type MainPageGroup,
   type MainPageGroupCharacter,
 } from './main-page-groups';
@@ -77,13 +81,6 @@ type LandingCopy = {
   of: string;
   goTo: string;
   go: string;
-};
-
-type CharacterSearchRow = {
-  key: string;
-  character: MainPageGroupCharacter;
-  groupId: string;
-  groupLabel: string;
 };
 
 function buildSectionPreviewImages(images: string[]): string[] {
@@ -255,7 +252,8 @@ export function CharacterLanding({
     () => getMainPageGroupById(groups, initialOpenCategoryId)?.id ?? singleGroupId,
   );
   const [expandedGroupPage, setExpandedGroupPage] = useState(1);
-  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const normalizedSearch = normalizeMainPageSearchQuery(searchQuery);
+  const isSearchActive = normalizedSearch.length > 0;
 
   useEffect(() => {
     const next: Record<string, { isFavorited: boolean; favoritesCount: number }> = {};
@@ -320,61 +318,11 @@ export function CharacterLanding({
   }, [favoriteStateBySlug, favoriteSubmittingBySlug]);
 
   const filteredGroups = useMemo(() => {
-    if (!normalizedSearch) return groups;
-
-    return groups.filter((group) => {
-      const title = pickLocalizedText(group.title, language).toLowerCase();
-      const subtitle = pickLocalizedText(group.subtitle, language).toLowerCase();
-      const description = pickLocalizedText(group.description, language).toLowerCase();
-      const hiddenSearchText = pickLocalizedText(group.hiddenSearchText, language).toLowerCase();
-      const groupMatches =
-        title.includes(normalizedSearch) ||
-        subtitle.includes(normalizedSearch) ||
-        description.includes(normalizedSearch) ||
-        hiddenSearchText.includes(normalizedSearch);
-      const characterMatches = group.characters.some((character) => {
-        const characterHiddenSearchText = pickLocalizedText(character.hiddenSearchText, language).toLowerCase();
-        return (
-          character.name.toLowerCase().includes(normalizedSearch) ||
-          character.bio.toLowerCase().includes(normalizedSearch) ||
-          characterHiddenSearchText.includes(normalizedSearch)
-        );
-      });
-
-      return groupMatches || characterMatches;
-    });
+    return filterMainPageGroupsForSearch(groups, normalizedSearch, language);
   }, [groups, language, normalizedSearch]);
 
   const matchingCharacters = useMemo(() => {
-    if (!normalizedSearch) return [] as CharacterSearchRow[];
-
-    const rows: CharacterSearchRow[] = [];
-    for (const group of groups) {
-      const groupTitle = pickLocalizedText(group.title, language);
-      const groupLower = groupTitle.toLowerCase();
-      const groupMatches =
-        groupLower.includes(normalizedSearch) ||
-        pickLocalizedText(group.subtitle, language).toLowerCase().includes(normalizedSearch) ||
-        pickLocalizedText(group.description, language).toLowerCase().includes(normalizedSearch) ||
-        pickLocalizedText(group.hiddenSearchText, language).toLowerCase().includes(normalizedSearch);
-
-      for (const character of group.characters) {
-        const characterMatches =
-          character.name.toLowerCase().includes(normalizedSearch) ||
-          character.bio.toLowerCase().includes(normalizedSearch) ||
-          pickLocalizedText(character.hiddenSearchText, language).toLowerCase().includes(normalizedSearch);
-        if (groupMatches || characterMatches) {
-          rows.push({
-            key: `${group.id}:${character.slug}`,
-            character,
-            groupId: group.id,
-            groupLabel: groupTitle,
-          });
-        }
-      }
-    }
-
-    return rows;
+    return findMainPageMatchingCharacters(groups, normalizedSearch, language);
   }, [groups, language, normalizedSearch]);
 
   const resolveExpandedStateFromSearchParams = useCallback((searchParams: URLSearchParams) => {
@@ -403,8 +351,14 @@ export function CharacterLanding({
       safeExpandedGroupPage * MAX_CHARACTERS_PER_CATEGORY_PAGE,
     )
     : null;
-  const showCategoriesView = expandedGroup === null && !hasSingleGroup;
-  const showBackToCategories = expandedGroup !== null && !hasSingleGroup;
+  const landingView = resolveMainPageLandingView({
+    isSearchActive,
+    hasExpandedGroup: expandedGroup !== null,
+    hasSingleGroup,
+  });
+  const showSearchOrCategoriesView = landingView === 'search' || landingView === 'categories';
+  const showExpandedGroupView = landingView === 'expanded' && expandedGroup !== null;
+  const showBackToCategories = expandedGroup !== null && !hasSingleGroup && !isSearchActive;
 
   const syncExpandedStateToUrl = useCallback((nextGroupId: string | null, nextPage: number, mode: 'push' | 'replace') => {
     if (typeof window === 'undefined') return;
@@ -480,6 +434,13 @@ export function CharacterLanding({
     setExpandedGroupPage(1);
     syncExpandedStateToUrl(validGroupId, 1, 'push');
   }, [groups, syncExpandedStateToUrl]);
+
+  const handleCategorySelect = useCallback((groupId: string) => {
+    if (isSearchActive) {
+      setSearchQuery('');
+    }
+    openExpandedGroup(groupId);
+  }, [isSearchActive, openExpandedGroup]);
 
   const goToExpandedGroupPage = useCallback((nextPage: number) => {
     if (!expandedGroup) return;
@@ -634,7 +595,7 @@ export function CharacterLanding({
           <div
             className={cn(
               'space-y-4 transition-[opacity,transform] duration-180 ease-out will-change-transform',
-              showCategoriesView
+              showSearchOrCategoriesView
                 ? 'relative opacity-100 translate-y-0 scale-100'
                 : 'pointer-events-none absolute inset-0 opacity-0 -translate-y-1 scale-[0.995]',
             )}
@@ -671,7 +632,7 @@ export function CharacterLanding({
                   key={group.id}
                   group={group}
                   selected={expandedGroupId === group.id}
-                  onSelect={() => openExpandedGroup(group.id)}
+                  onSelect={() => handleCategorySelect(group.id)}
                   language={language}
                 />
               ))}
@@ -687,14 +648,14 @@ export function CharacterLanding({
           <div
             className={cn(
               'transition-[opacity,transform] duration-180 ease-out will-change-transform',
-              expandedGroup
+              showExpandedGroupView
                 ? 'relative opacity-100 translate-y-0 scale-100'
                 : 'pointer-events-none absolute inset-0 opacity-0 translate-y-1 scale-[0.995]',
             )}
           >
-            {expandedGroup && expandedGroupTotalPages > 1 ? renderExpandedGroupPagination('top') : null}
+            {showExpandedGroupView && expandedGroupTotalPages > 1 ? renderExpandedGroupPagination('top') : null}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              {expandedGroup && expandedGroupCharacters
+              {showExpandedGroupView && expandedGroupCharacters
                 ? expandedGroupCharacters.map((character) => (
                   <GroupCharacterVideoCard
                     key={character.id}
@@ -710,7 +671,7 @@ export function CharacterLanding({
                 ))
                 : null}
             </div>
-            {expandedGroup && expandedGroupTotalPages > 1 ? renderExpandedGroupPagination('bottom') : null}
+            {showExpandedGroupView && expandedGroupTotalPages > 1 ? renderExpandedGroupPagination('bottom') : null}
           </div>
         </div>
       </section>
