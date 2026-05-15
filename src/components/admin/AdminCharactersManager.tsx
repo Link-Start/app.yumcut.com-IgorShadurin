@@ -70,6 +70,7 @@ type PendingCatalogVideo = {
   file: File;
   previewUrl: string;
   previousUrl: string | null;
+  processVideo: boolean;
 };
 
 type PriorityCheckResult = {
@@ -894,6 +895,7 @@ export function AdminCharactersManager() {
       if (pendingVideo) {
         const response = await Api.adminCharacterUploadVideo(row.id, pendingVideo.file, {
           hasAudio: row.previewVideoHasAudio,
+          processVideo: pendingVideo.processVideo !== false,
         });
         URL.revokeObjectURL(pendingVideo.previewUrl);
         setPendingCatalogVideos((prev) => {
@@ -1048,7 +1050,7 @@ export function AdminCharactersManager() {
     const previousUrl = previousPending ? previousPending.previousUrl : row.previewVideoUrl;
     setPendingCatalogVideos((prev) => ({
       ...prev,
-      [row.id]: { file, previewUrl, previousUrl },
+      [row.id]: { file, previewUrl, previousUrl, processVideo: true },
     }));
     setCatalogRows((prev) => prev.map((item) => (item.id === row.id ? { ...item, previewVideoUrl: previewUrl } : item)));
     toast.success('Preview video selected. Click Save to upload it.');
@@ -1759,8 +1761,32 @@ export function AdminCharactersManager() {
                                   </Button>
                                 </div>
                                 {pendingVideo ? (
-                                  <div className="text-xs text-amber-600 dark:text-amber-400">
-                                    New preview selected. Click Save to upload and apply it.
+                                  <div className="space-y-2">
+                                    <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                                      <Checkbox
+                                        className="cursor-pointer"
+                                        checked={pendingVideo.processVideo !== false}
+                                        onCheckedChange={(checked) => {
+                                          const nextValue = checked === true;
+                                          setPendingCatalogVideos((prev) => {
+                                            const current = prev[row.id];
+                                            if (!current) return prev;
+                                            return {
+                                              ...prev,
+                                              [row.id]: {
+                                                ...current,
+                                                processVideo: nextValue,
+                                              },
+                                            };
+                                          });
+                                        }}
+                                        disabled={rowBusy}
+                                      />
+                                      Process video before upload (recommended)
+                                    </label>
+                                    <div className="text-xs text-amber-600 dark:text-amber-400">
+                                      New preview selected. Click Save to upload and apply it.
+                                    </div>
                                   </div>
                                 ) : null}
                               </div>

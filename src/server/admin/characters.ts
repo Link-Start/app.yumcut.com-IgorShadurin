@@ -5,6 +5,7 @@ import {
   normalizeMediaUrl,
   uploadCharacterAssetToStorage,
 } from '@/server/storage';
+import { convertUploadedVideoPreview, VideoPreviewConversionError } from '@/server/video-preview-converter';
 
 export type AdminCharacterCategoryDTO = {
   id: string;
@@ -807,6 +808,7 @@ export async function uploadAdminCharacterPreviewVideo(input: {
   videoFile: File;
   extension: string;
   hasAudio?: boolean;
+  processVideo?: boolean;
 }): Promise<{ previewVideoUrl: string }> {
   const character = await prisma.character.findUnique({
     where: { id: input.id },
@@ -829,10 +831,27 @@ export async function uploadAdminCharacterPreviewVideo(input: {
   if (!slug) throw new Error('Character slug is empty');
   const categorySlug = slugify(character.categories[0]?.category?.slug || '') || 'uncategorized';
   const ext = input.extension.trim().toLowerCase().replace(/^\./, '');
-  const fileName = `preview.${ext}`;
+  const shouldProcessVideo = input.processVideo !== false;
+  const fileName = shouldProcessVideo ? 'preview.mp4' : `preview.${ext}`;
+  let sourceFile = input.videoFile;
+
+  if (shouldProcessVideo) {
+    try {
+      sourceFile = await convertUploadedVideoPreview({
+        sourceFile: input.videoFile,
+        sourceExtension: ext,
+      });
+    } catch (err) {
+      if (err instanceof VideoPreviewConversionError) {
+        throw new AdminCharacterPreviewVideoProcessingError(err.message);
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      throw new AdminCharacterPreviewVideoProcessingError(`Video preview conversion failed: ${message}`);
+    }
+  }
 
   const uploaded = await uploadCharacterAssetToStorage({
-    file: input.videoFile,
+    file: sourceFile,
     fileName: `${categorySlug}-${slug}-${fileName}`,
     kind: 'video',
   });
@@ -855,6 +874,13 @@ export async function uploadAdminCharacterPreviewVideo(input: {
   }
 
   return { previewVideoUrl: uploaded.url };
+}
+
+export class AdminCharacterPreviewVideoProcessingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AdminCharacterPreviewVideoProcessingError';
+  }
 }
 
 export async function deleteAdminCharacterPreviewVideo(id: string): Promise<void> {

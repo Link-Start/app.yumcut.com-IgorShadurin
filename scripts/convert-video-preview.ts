@@ -1,11 +1,10 @@
 #!/usr/bin/env tsx
 import { promises as fs } from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
+import {
+  VIDEO_PREVIEW_DEFAULTS,
+  convertVideoPreviewAtPath,
+} from '@/server/video-preview-converter';
 
 type CliOptions = {
   source?: string;
@@ -17,31 +16,6 @@ type CliOptions = {
   preset: string;
   audioBitrate: string;
   noAudio: boolean;
-};
-
-type ProbeStream = {
-  codec_type?: string;
-  width?: number;
-  height?: number;
-  r_frame_rate?: string;
-};
-
-type ProbeResult = {
-  streams?: ProbeStream[];
-  format?: {
-    duration?: string;
-    size?: string;
-  };
-};
-
-const DEFAULTS: CliOptions = {
-  maxWidth: 720,
-  maxHeight: 720,
-  maxFps: 30,
-  crf: 24,
-  preset: 'slow',
-  audioBitrate: '128k',
-  noAudio: false,
 };
 
 function printUsage(message?: string): never {
@@ -113,7 +87,17 @@ function parseArgs(): CliOptions {
     }
   }
 
-  const merged = { ...DEFAULTS, ...options } as CliOptions;
+  const merged = {
+    maxWidth: VIDEO_PREVIEW_DEFAULTS.maxWidth,
+    maxHeight: VIDEO_PREVIEW_DEFAULTS.maxHeight,
+    maxFps: VIDEO_PREVIEW_DEFAULTS.maxFps,
+    crf: VIDEO_PREVIEW_DEFAULTS.crf,
+    preset: VIDEO_PREVIEW_DEFAULTS.preset,
+    audioBitrate: VIDEO_PREVIEW_DEFAULTS.audioBitrate,
+    noAudio: VIDEO_PREVIEW_DEFAULTS.noAudio,
+    ...options,
+  } as CliOptions;
+
   if (!merged.source) {
     printUsage('Missing required --source option');
   }
@@ -127,6 +111,7 @@ function parseArgs(): CliOptions {
   if (!merged.audioBitrate.trim()) {
     printUsage('--audio-bitrate must not be empty');
   }
+
   return merged;
 }
 
@@ -142,118 +127,9 @@ function validatePositiveNumber(value: number, label: string) {
   }
 }
 
-async function ensureParentDir(filePath: string) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-}
-
 function defaultTargetFor(sourcePath: string) {
   const parsed = path.parse(sourcePath);
   return path.join(parsed.dir, `${parsed.name}.preview.mp4`);
-}
-
-function runCommand(command: string, args: string[]) {
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit' });
-    child.on('error', (err) => reject(err));
-    child.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`${command} exited with code ${code}`));
-      } else {
-        resolve();
-      }
-    });
-  });
-}
-
-async function probeVideo(filePath: string): Promise<ProbeResult> {
-  const result = await execFileAsync('ffprobe', [
-    '-v',
-    'error',
-    '-show_entries',
-    'stream=codec_type,width,height,r_frame_rate',
-    '-show_entries',
-    'format=duration,size',
-    '-of',
-    'json',
-    filePath,
-  ]);
-  return JSON.parse(result.stdout || '{}') as ProbeResult;
-}
-
-function parseFrameRate(value?: string) {
-  if (!value) return null;
-  const [numeratorRaw, denominatorRaw] = value.split('/');
-  const numerator = Number(numeratorRaw);
-  const denominator = Number(denominatorRaw || '1');
-  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) return null;
-  const fps = numerator / denominator;
-  return Number.isFinite(fps) && fps > 0 ? fps : null;
-}
-
-function resolveOutputFps(probe: ProbeResult, maxFps: number) {
-  const video = probe.streams?.find((stream) => stream.codec_type === 'video');
-  const sourceFps = parseFrameRate(video?.r_frame_rate);
-  if (!sourceFps) return maxFps;
-  return Math.min(sourceFps, maxFps);
-}
-
-function formatFps(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
-}
-
-function hasAudio(probe: ProbeResult) {
-  return Boolean(probe.streams?.some((stream) => stream.codec_type === 'audio'));
-}
-
-function buildVideoFilter(options: CliOptions, outputFps: number) {
-  const scale = [
-    `scale=w='min(${options.maxWidth},iw)':h='min(${options.maxHeight},ih)'`,
-    'force_original_aspect_ratio=decrease',
-    'force_divisible_by=2',
-    'flags=lanczos',
-  ].join(':');
-  return `${scale},fps=${formatFps(outputFps)},format=yuv420p`;
-}
-
-function buildFfmpegArgs(options: CliOptions, sourcePath: string, targetPath: string, probe: ProbeResult) {
-  const outputFps = resolveOutputFps(probe, options.maxFps);
-  const args = [
-    '-y',
-    '-i',
-    sourcePath,
-    '-map',
-    '0:v:0',
-  ];
-
-  if (!options.noAudio && hasAudio(probe)) {
-    args.push('-map', '0:a:0');
-  }
-
-  args.push(
-    '-vf',
-    buildVideoFilter(options, outputFps),
-    '-c:v',
-    'libx264',
-    '-profile:v',
-    'high',
-    '-level:v',
-    '4.0',
-    '-preset',
-    options.preset,
-    '-crf',
-    String(options.crf),
-    '-pix_fmt',
-    'yuv420p',
-  );
-
-  if (options.noAudio || !hasAudio(probe)) {
-    args.push('-an');
-  } else {
-    args.push('-c:a', 'aac', '-b:a', options.audioBitrate, '-ac', '2');
-  }
-
-  args.push('-movflags', '+faststart', targetPath);
-  return args;
 }
 
 async function main() {
@@ -267,27 +143,19 @@ async function main() {
     printUsage(`Source video not found at ${sourcePath}`);
   }
 
-  await ensureParentDir(targetPath);
-  const probe = await probeVideo(sourcePath);
-  const video = probe.streams?.find((stream) => stream.codec_type === 'video');
-  if (!video) {
-    printUsage(`No video stream found in ${sourcePath}`);
-  }
-
-  const args = buildFfmpegArgs(options, sourcePath, targetPath, probe);
   console.log('> Running ffmpeg to create compact MP4 video preview');
-  await runCommand('ffmpeg', args);
-
-  const outputProbe = await probeVideo(targetPath).catch(() => null);
-  const outputVideo = outputProbe?.streams?.find((stream) => stream.codec_type === 'video');
-  const outputStats = await fs.stat(targetPath);
-  console.log('Conversion complete:', {
-    target: targetPath,
-    width: outputVideo?.width ?? null,
-    height: outputVideo?.height ?? null,
-    hasAudio: hasAudio(outputProbe ?? {}),
-    bytes: outputStats.size,
+  const result = await convertVideoPreviewAtPath({
+    sourcePath,
+    targetPath,
+    maxWidth: options.maxWidth,
+    maxHeight: options.maxHeight,
+    maxFps: options.maxFps,
+    crf: options.crf,
+    preset: options.preset,
+    audioBitrate: options.audioBitrate,
+    noAudio: options.noAudio,
   });
+  console.log('Conversion complete:', result);
 }
 
 main().catch((err) => {

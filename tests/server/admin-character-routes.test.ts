@@ -19,6 +19,7 @@ const precheckAdminCharacterImportRows = vi.hoisted(() => vi.fn());
 const checkAdminCharacterPriorities = vi.hoisted(() => vi.fn());
 const applyAdminCharacterPriorities = vi.hoisted(() => vi.fn());
 const prismaQueryRawUnsafe = vi.hoisted(() => vi.fn());
+const AdminCharacterPreviewVideoProcessingError = vi.hoisted(() => class AdminCharacterPreviewVideoProcessingError extends Error {});
 
 vi.mock('@/server/admin', () => ({
   requireAdminApiSession,
@@ -42,6 +43,7 @@ vi.mock('@/server/admin/characters', () => ({
   checkAdminCharacterPriorities,
   applyAdminCharacterPriorities,
   slugify: (input: string) => input.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+  AdminCharacterPreviewVideoProcessingError,
 }));
 
 vi.mock('@/server/db', () => ({
@@ -539,6 +541,7 @@ describe('admin character routes', () => {
       id: 'ch-1',
       extension: 'mp4',
       hasAudio: true,
+      processVideo: true,
     }));
   });
 
@@ -547,6 +550,7 @@ describe('admin character routes', () => {
     const fd = new FormData();
     fd.set('video', new File([new Uint8Array([1, 2, 3])], 'preview.mp4', { type: 'video/mp4' }));
     fd.set('hasAudio', 'false');
+    fd.set('processVideo', 'false');
     const req = new NextRequest('http://localhost/api/admin/characters/ch-1/video', {
       method: 'POST',
       body: fd,
@@ -558,7 +562,24 @@ describe('admin character routes', () => {
       id: 'ch-1',
       extension: 'mp4',
       hasAudio: false,
+      processVideo: false,
     }));
+  });
+
+  it('POST /api/admin/characters/[id]/video returns validation error for preview processing failure', async () => {
+    uploadAdminCharacterPreviewVideo.mockRejectedValueOnce(new AdminCharacterPreviewVideoProcessingError('Video preview conversion failed'));
+    const route = await import('@/app/api/admin/characters/[id]/video/route');
+    const fd = new FormData();
+    fd.set('video', new File([new Uint8Array([1, 2, 3])], 'preview.mp4', { type: 'video/mp4' }));
+    const req = new NextRequest('http://localhost/api/admin/characters/ch-1/video', {
+      method: 'POST',
+      body: fd,
+    });
+
+    const res = await route.POST(req, { params: Promise.resolve({ id: 'ch-1' }) });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error?.message).toContain('conversion failed');
   });
 
   it('DELETE /api/admin/characters/[id]/video removes preview', async () => {

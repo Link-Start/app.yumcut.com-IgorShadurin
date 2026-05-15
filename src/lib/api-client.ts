@@ -325,10 +325,11 @@ export const Api = {
       method: 'POST',
       body: JSON.stringify({ ids, isPublic }),
     }),
-  adminCharacterUploadVideo: async (id: string, video: File, options?: { hasAudio?: boolean }) => {
+  adminCharacterUploadVideo: async (id: string, video: File, options?: { hasAudio?: boolean; processVideo?: boolean }) => {
     const form = new FormData();
     form.set('video', video);
     form.set('hasAudio', options?.hasAudio === false ? 'false' : 'true');
+    form.set('processVideo', options?.processVideo === false ? 'false' : 'true');
     return api<{ ok: boolean; previewVideoUrl: string }>(`/api/admin/characters/${id}/video`, {
       method: 'POST',
       body: form,

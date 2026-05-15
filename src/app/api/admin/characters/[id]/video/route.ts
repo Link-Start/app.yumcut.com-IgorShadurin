@@ -2,7 +2,11 @@ import { NextRequest } from 'next/server';
 import { withApiError } from '@/server/errors';
 import { requireAdminApiSession } from '@/server/admin';
 import { error, ok } from '@/server/http';
-import { deleteAdminCharacterPreviewVideo, uploadAdminCharacterPreviewVideo } from '@/server/admin/characters';
+import {
+  AdminCharacterPreviewVideoProcessingError,
+  deleteAdminCharacterPreviewVideo,
+  uploadAdminCharacterPreviewVideo,
+} from '@/server/admin/characters';
 
 const VIDEO_EXT_BY_MIME: Record<string, string> = {
   'video/mp4': 'mp4',
@@ -33,7 +37,9 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
   const form = await req.formData();
   const video = form.get('video');
   const hasAudioRaw = (form.get('hasAudio') || '').toString().trim().toLowerCase();
+  const processVideoRaw = (form.get('processVideo') || '').toString().trim().toLowerCase();
   const hasAudio = hasAudioRaw ? hasAudioRaw === 'true' || hasAudioRaw === '1' : true;
+  const processVideo = processVideoRaw ? processVideoRaw === 'true' || processVideoRaw === '1' : true;
   if (!(video instanceof File)) return error('VALIDATION_ERROR', 'video file is required', 400);
   if (video.size <= 0) return error('VALIDATION_ERROR', 'video file is empty', 400);
 
@@ -42,12 +48,21 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     return error('VALIDATION_ERROR', 'Unsupported video type. Use mp4, webm, mov, or m4v.', 400);
   }
 
-  const result = await uploadAdminCharacterPreviewVideo({
-    id,
-    videoFile: video,
-    extension,
-    hasAudio,
-  });
+  let result: { previewVideoUrl: string };
+  try {
+    result = await uploadAdminCharacterPreviewVideo({
+      id,
+      videoFile: video,
+      extension,
+      hasAudio,
+      processVideo,
+    });
+  } catch (err) {
+    if (err instanceof AdminCharacterPreviewVideoProcessingError) {
+      return error('VALIDATION_ERROR', err.message, 400);
+    }
+    throw err;
+  }
 
   return ok({ ok: true, previewVideoUrl: result.previewVideoUrl });
 }, 'Failed to upload character preview video');

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const uploadCharacterAssetToStorage = vi.hoisted(() => vi.fn());
 const deleteStoredCatalogCharacterMedia = vi.hoisted(() => vi.fn());
+const convertUploadedVideoPreview = vi.hoisted(() => vi.fn());
 const prisma = vi.hoisted(() => ({
   $queryRawUnsafe: vi.fn(),
   $transaction: vi.fn(),
@@ -45,6 +46,11 @@ vi.mock('@/server/storage', () => ({
   },
 }));
 
+vi.mock('@/server/video-preview-converter', () => ({
+  convertUploadedVideoPreview,
+  VideoPreviewConversionError: class VideoPreviewConversionError extends Error {},
+}));
+
 const adminCharacters = await import('@/server/admin/characters');
 
 describe('admin character storage-backed assets', () => {
@@ -68,6 +74,8 @@ describe('admin character storage-backed assets', () => {
     uploadCharacterAssetToStorage
       .mockResolvedValueOnce({ path: 'characters/catalog/prepared.webp', url: 'https://storage.test/api/media/characters/catalog/prepared.webp' })
       .mockResolvedValueOnce({ path: 'characters/catalog/empty.webp', url: 'https://storage.test/api/media/characters/catalog/empty.webp' });
+    convertUploadedVideoPreview.mockImplementation(async ({ sourceFile }: { sourceFile: File }) =>
+      new File([await sourceFile.arrayBuffer()], 'preview.mp4', { type: 'video/mp4' }));
     deleteStoredCatalogCharacterMedia.mockResolvedValue(undefined);
   });
 
@@ -126,6 +134,9 @@ describe('admin character storage-backed assets', () => {
       fileName: 'brainrot-matteo-preview.mp4',
       kind: 'video',
     }));
+    expect(convertUploadedVideoPreview).toHaveBeenCalledWith(expect.objectContaining({
+      sourceExtension: 'mp4',
+    }));
     expect(prisma.character.update).toHaveBeenCalledWith({
       where: { id: 'ch-1' },
       data: {
@@ -134,6 +145,54 @@ describe('admin character storage-backed assets', () => {
       },
     });
     expect(deleteStoredCatalogCharacterMedia).toHaveBeenCalledWith(['characters/catalog/old-preview.mp4']);
+  });
+
+  it('uploads preview videos without processing when processVideo is false', async () => {
+    uploadCharacterAssetToStorage.mockReset().mockResolvedValueOnce({
+      path: 'characters/catalog/preview.mov',
+      url: 'https://storage.test/api/media/characters/catalog/preview.mov',
+    });
+    prisma.character.findUnique.mockResolvedValueOnce({
+      id: 'ch-1',
+      slug: 'Matteo',
+      previewVideoUrl: null,
+      categories: [{ category: { slug: 'brainrot' } }],
+    });
+    prisma.character.update.mockResolvedValue({});
+
+    const original = new File([new Uint8Array([1, 2, 3])], 'preview.mov', { type: 'video/quicktime' });
+    const result = await adminCharacters.uploadAdminCharacterPreviewVideo({
+      id: 'ch-1',
+      videoFile: original,
+      extension: 'mov',
+      processVideo: false,
+    });
+
+    expect(result).toEqual({ previewVideoUrl: 'https://storage.test/api/media/characters/catalog/preview.mov' });
+    expect(convertUploadedVideoPreview).not.toHaveBeenCalled();
+    expect(uploadCharacterAssetToStorage).toHaveBeenCalledWith(expect.objectContaining({
+      file: original,
+      fileName: 'brainrot-matteo-preview.mov',
+      kind: 'video',
+    }));
+  });
+
+  it('fails before storage upload when processed preview conversion fails', async () => {
+    prisma.character.findUnique.mockResolvedValueOnce({
+      id: 'ch-1',
+      slug: 'Matteo',
+      previewVideoUrl: null,
+      categories: [{ category: { slug: 'brainrot' } }],
+    });
+    convertUploadedVideoPreview.mockRejectedValueOnce(new Error('ffmpeg failed'));
+
+    await expect(adminCharacters.uploadAdminCharacterPreviewVideo({
+      id: 'ch-1',
+      videoFile: new File([new Uint8Array([1, 2, 3])], 'preview.mov', { type: 'video/quicktime' }),
+      extension: 'mov',
+    })).rejects.toThrow('Video preview conversion failed');
+
+    expect(uploadCharacterAssetToStorage).not.toHaveBeenCalled();
   });
 
   it('maps admin list asset paths through storage URLs', async () => {
