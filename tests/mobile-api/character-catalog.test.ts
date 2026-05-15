@@ -62,11 +62,13 @@ describe('mobile character catalog APIs', () => {
   });
 
   it('returns character profile payload', async () => {
-    getCharacterCatalogProfileBySlug.mockResolvedValue({ id: 'kim-masters', characterId: 'char-1', slug: 'kim-masters', name: 'Kim Masters', tagline: 'Tag', bio: 'Bio', previewImageUrl: '/kim.png', previewVideoUrl: '/kim.mp4', previewVideoHasAudio: false, defaultVoiceId: 'voice-1', defaultVoiceProvider: 'elevenlabs', creationsCount: 2, favoritesCount: 9, isFavorited: true });
+    getCharacterCatalogProfileBySlug.mockResolvedValue({ id: 'kim-masters', characterId: 'char-1', slug: 'kim-masters', name: 'Kim Masters', title: 'Kim Masters', tagline: 'Tag', bio: 'Bio', previewImageUrl: '/kim.png', previewVideoUrl: '/kim.mp4', previewVideoHasAudio: false, defaultVoiceId: 'voice-1', defaultVoiceProvider: 'elevenlabs', creationsCount: 2, favoritesCount: 9, isFavorited: true });
     const res = await profileRoute.GET(makeRequest('/api/mobile/characters/kim-masters', 'token'), { params: Promise.resolve({ slug: 'kim-masters' }) });
     expect(res.status).toBe(200);
     const payload = await res.json();
     expect(payload.slug).toBe('kim-masters');
+    expect(payload.name).toBe('Kim Masters');
+    expect(payload.title).toBe('Kim Masters');
     expect(getCharacterCatalogProfileBySlug).toHaveBeenCalledWith('kim-masters', { viewerUserId: 'user-1' });
   });
 

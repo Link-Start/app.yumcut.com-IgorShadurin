@@ -91,6 +91,7 @@ export interface MobileCharacterCatalogCharacterDTO extends CharacterCatalogMetr
   id: string;
   slug: string;
   name: string;
+  title: string;
   bio: string;
   hiddenSearchText: LocalizedCatalogTextDTO;
   previewImageUrl: string;
@@ -118,6 +119,7 @@ export interface MobileCharacterProfileDTO extends CharacterCatalogMetricsDTO {
   characterId: string;
   slug: string;
   name: string;
+  title: string;
   tagline: string;
   bio: string;
   previewImageUrl: string;

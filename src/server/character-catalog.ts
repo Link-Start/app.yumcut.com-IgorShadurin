@@ -289,6 +289,7 @@ export type CatalogCharacterProfile = {
   characterId: string;
   slug: string;
   name: string;
+  title: string;
   tagline: string;
   bio: string;
   previewImageUrl: string;
@@ -311,6 +312,7 @@ export type MobileCharacterCatalogCategory = {
     id: string;
     slug: string;
     name: string;
+    title: string;
     bio: string;
     hiddenSearchText: LocalizedText;
     previewImageUrl: string;
@@ -519,6 +521,7 @@ export async function listMobileCharacterCatalog(
         id: character.id,
         slug,
         name: character.name?.trim() || character.title,
+        title: character.title?.trim() || character.name?.trim() || '',
         bio: character.bio?.trim() || character.description?.trim() || '',
         hiddenSearchText: asLocalizedText({
           en: character.searchTextEn ?? '',
@@ -618,6 +621,7 @@ export async function getCharacterCatalogProfileBySlug(
     characterId: character.id,
     slug: character.slug,
     name: character.name?.trim() || character.title,
+    title: character.title?.trim() || character.name?.trim() || '',
     tagline: fallbackTagline,
     bio: character.bio?.trim() || character.description?.trim() || '',
     previewImageUrl: pickOriginalVariationImagePath(character.variations),
