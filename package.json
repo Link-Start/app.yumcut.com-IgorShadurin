@@ -24,6 +24,7 @@
     "daemon:cleanup": "tsx scripts/daemon/cleanup-stale-jobs.ts",
     "admin:set": "tsx scripts/set-admin.ts",
     "templates:fill": "tsx scripts/templates/fill.ts",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:fast": "vitest run --exclude \"tests/daemon/**\" --exclude \"tests/daemon-and-api/**\"",
     "hooks:install": "git config core.hooksPath scripts/git-hooks",
