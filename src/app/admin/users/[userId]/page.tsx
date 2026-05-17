@@ -24,6 +24,13 @@ function transactionTypeLabel(type: string) {
     .join(' ');
 }
 
+function languageLabel(language: string) {
+  const normalized = language.trim().toLowerCase();
+  if (normalized === 'ru') return 'Russian (ru)';
+  if (normalized === 'en') return 'English (en)';
+  return language || '—';
+}
+
 function makeHref(userId: string, nextTxPage: number, nextProjectPage: number) {
   const params = new URLSearchParams();
   if (nextTxPage > 1) params.set('txPage', String(nextTxPage));
@@ -85,6 +92,10 @@ export default async function AdminUserDetailPage(props: {
               <div className="flex items-center justify-between">
                 <span>Balance</span>
                 <span className="font-semibold text-gray-900 dark:text-gray-100">{user.tokenBalance.toLocaleString()} tokens</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Language</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{languageLabel(user.preferredLanguage)}</span>
               </div>
               {user.telegramAccount ? (
                 <div className="rounded-md border border-emerald-200/70 bg-emerald-50 p-3 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">

@@ -157,6 +157,7 @@ export interface AdminUserDetailResult {
     image: string | null;
     createdAt: string;
     tokenBalance: number;
+    preferredLanguage: string;
     isAdmin: boolean;
     telegramAccount: {
       telegramId: string;
@@ -218,6 +219,7 @@ export async function getUserDetail(userId: string, options: AdminUserDetailOpti
       image: true,
       createdAt: true,
       tokenBalance: true,
+      preferredLanguage: true,
       isAdmin: true,
       telegramAccount: {
         select: {
@@ -299,6 +301,7 @@ export async function getUserDetail(userId: string, options: AdminUserDetailOpti
       image: user.image,
       createdAt: user.createdAt.toISOString(),
       tokenBalance: user.tokenBalance,
+      preferredLanguage: user.preferredLanguage,
       isAdmin: user.isAdmin,
       telegramAccount: user.telegramAccount
         ? {
