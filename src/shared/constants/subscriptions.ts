@@ -3,10 +3,15 @@ import { CHARACTER_PROJECT_CREATION_TOKENS as HIGH_QUALITY_CHARACTER_PROJECT_CRE
 export type SubscriptionPlanKey = 'weekly' | 'monthly' | 'monthly_pro';
 export type SubscriptionInterval = 'week' | 'month';
 
+export type SubscriptionMaxValues = {
+  videos: number;
+};
+
 export type SubscriptionProductConfig = {
   planKey: SubscriptionPlanKey;
   productId: string;
   tokens: number;
+  maxValues: SubscriptionMaxValues;
   label: string;
   interval: SubscriptionInterval;
   priceUsd: number;
@@ -47,11 +52,18 @@ export type LegacyStripePriceTokenMapping = {
 
 export const CHARACTER_PROJECT_CREATION_TOKENS = HIGH_QUALITY_CHARACTER_PROJECT_CREATION_TOKENS;
 
+export const SUBSCRIPTION_PLAN_MAX_VALUES: Record<SubscriptionPlanKey, SubscriptionMaxValues> = {
+  weekly: { videos: 1 },
+  monthly: { videos: 10 },
+  monthly_pro: { videos: 20 },
+};
+
 export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, SubscriptionPlanDefinition> = {
   weekly: {
     planKey: 'weekly',
     productId: 'yumcut_weekly_0526',
     tokens: 75,
+    maxValues: SUBSCRIPTION_PLAN_MAX_VALUES.weekly,
     label: 'Weekly',
     interval: 'week',
     priceUsd: 2.99,
@@ -62,7 +74,7 @@ export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, Subscription
       i18nChooseKey: 'subscription.action.choose_plan',
       i18nCurrentPlanKey: 'subscription.action.current_plan',
       benefits: [
-        { key: 'videos_per_period', videos: 1, interval: 'week' },
+        { key: 'videos_per_period', videos: SUBSCRIPTION_PLAN_MAX_VALUES.weekly.videos, interval: 'week' },
         { key: 'tokens_per_charge', tokens: 75 },
       ],
     },
@@ -71,6 +83,7 @@ export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, Subscription
     planKey: 'monthly',
     productId: 'yumcut_monthly_basic',
     tokens: 750,
+    maxValues: SUBSCRIPTION_PLAN_MAX_VALUES.monthly,
     label: 'Monthly',
     interval: 'month',
     priceUsd: 19.99,
@@ -82,7 +95,7 @@ export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, Subscription
       i18nCurrentPlanKey: 'subscription.action.current_plan',
       i18nBadgeKey: 'subscription.badge.popular',
       benefits: [
-        { key: 'videos_per_period', videos: 10, interval: 'month' },
+        { key: 'videos_per_period', videos: SUBSCRIPTION_PLAN_MAX_VALUES.monthly.videos, interval: 'month' },
         { key: 'tokens_per_charge', tokens: 750 },
         { key: 'most_popular' },
       ],
@@ -92,6 +105,7 @@ export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, Subscription
     planKey: 'monthly_pro',
     productId: 'yumcut_monthly_pro_0526',
     tokens: 1500,
+    maxValues: SUBSCRIPTION_PLAN_MAX_VALUES.monthly_pro,
     label: 'Monthly Pro',
     interval: 'month',
     priceUsd: 34.99,
@@ -102,7 +116,7 @@ export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, Subscription
       i18nChooseKey: 'subscription.action.choose_plan',
       i18nCurrentPlanKey: 'subscription.action.current_plan',
       benefits: [
-        { key: 'videos_per_period', videos: 20, interval: 'month' },
+        { key: 'videos_per_period', videos: SUBSCRIPTION_PLAN_MAX_VALUES.monthly_pro.videos, interval: 'month' },
         { key: 'tokens_per_charge', tokens: 1500 },
       ],
     },
@@ -115,6 +129,7 @@ export const SUBSCRIPTION_LEGACY_PRODUCTS: Record<string, SubscriptionProductCon
     planKey: 'weekly',
     productId: 'yumcut_weekly_basic',
     tokens: 175,
+    maxValues: SUBSCRIPTION_PLAN_MAX_VALUES.weekly,
     label: 'Weekly (Legacy)',
     interval: 'week',
     priceUsd: 6.99,

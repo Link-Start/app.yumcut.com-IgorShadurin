@@ -869,6 +869,7 @@ export async function getWebSubscriptionStatus(userId: string): Promise<Subscrip
       interval: plan.interval,
       priceUsd: plan.priceUsd,
       tokens: plan.tokens,
+      maxValues: plan.maxValues,
       benefits: plan.ui.benefits,
       configured: Boolean(getStripePriceIdForProductId(plan.productId)),
     };

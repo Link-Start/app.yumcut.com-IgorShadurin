@@ -357,6 +357,9 @@ export interface SubscriptionPlanDTO {
   interval: 'week' | 'month';
   priceUsd: number;
   tokens: number;
+  maxValues: {
+    videos: number;
+  };
   benefits: Array<{
     key: 'tokens_per_charge' | 'videos_per_period' | 'most_popular';
     tokens?: number;
@@ -378,6 +381,18 @@ export interface SubscriptionStatusDTO {
   plans: SubscriptionPlanDTO[];
   stripeReady: boolean;
   canManageBilling: boolean;
+}
+
+export interface MobilePaywallConfigDTO {
+  plans: Array<{
+    planKey: 'weekly' | 'monthly' | 'monthly_pro';
+    productId: string;
+    interval: 'week' | 'month';
+    tokens: number;
+    maxValues: {
+      videos: number;
+    };
+  }>;
 }
 
 export interface ProjectDraftSettingsSnapshot {
