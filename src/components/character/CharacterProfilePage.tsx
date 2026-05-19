@@ -168,7 +168,7 @@ const COPY: Record<AppLanguageCode, CharacterProfileCopy> = {
     topUpTitle: 'Top up with subscription',
     topUpDescription: 'Subscribe to automatically get more tokens after each successful charge.',
     tokensPerCharge: 'tokens per charge',
-    videosPerPeriod: (videos, period) => `${videos} videos/${period}`,
+    videosPerPeriod: (videos, period) => `${videos} ${videos === 1 ? 'video' : 'videos'}/${period}`,
     paywallPerPeriod: (period) => period,
     paywallChipLabel: (planKey) => {
       if (planKey === 'weekly') return 'Just to try';
