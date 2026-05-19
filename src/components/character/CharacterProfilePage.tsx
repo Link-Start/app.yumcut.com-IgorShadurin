@@ -1058,13 +1058,13 @@ export function CharacterProfilePage({
                   onClick={() => setSelectedPlanKey(plan.planKey)}
                   disabled={checkoutPlan !== null}
                   className={[
-                    'min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition-[border-color,box-shadow,background-color,transform] duration-200',
+                    'relative mt-3 min-w-0 cursor-pointer rounded-2xl border p-5 pt-6 text-left transition-[border-color,box-shadow,background-color,transform] duration-200',
                     isSelected
                       ? 'border-blue-400 bg-blue-50/60 shadow-[0_12px_28px_rgba(37,99,235,0.18)] dark:border-blue-700 dark:bg-blue-950/25'
                       : 'border-gray-200 bg-white hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900/40 dark:hover:border-blue-800',
                   ].join(' ')}
                 >
-                  <div className="mb-3 inline-flex rounded-full border border-amber-300/70 bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/30 dark:text-amber-200">
+                  <div className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 rounded-full border border-amber-300/80 bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-900 shadow-sm dark:border-amber-700/60 dark:bg-amber-900/40 dark:text-amber-200">
                     {copy.paywallChipLabel(plan.planKey)}
                   </div>
                   <div className="flex items-end justify-center gap-1 whitespace-nowrap">
@@ -1088,7 +1088,7 @@ export function CharacterProfilePage({
           </div>
           <Button
             type="button"
-            className="brainrot-cta-gradient mt-4 w-full cursor-pointer rounded-2xl border-0 px-5 py-3 text-base font-semibold text-black shadow-lg outline-none transition hover:text-black hover:shadow-xl focus-visible:outline-none"
+            className="brainrot-cta-gradient mx-auto mt-5 w-full cursor-pointer rounded-2xl border-0 px-5 py-3 text-base font-semibold text-black shadow-lg outline-none transition hover:text-black hover:shadow-xl focus-visible:outline-none sm:w-[320px] lg:w-[330px]"
             onClick={() => {
               if (!selectedPlan) return;
               void openSubscriptionCheckout(selectedPlan.planKey);
