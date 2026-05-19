@@ -1088,7 +1088,7 @@ export function CharacterProfilePage({
           </div>
           <Button
             type="button"
-            className="brainrot-cta-gradient mx-auto mt-5 flex h-14 w-full max-w-[352px] cursor-pointer items-center justify-center rounded-2xl border-0 px-6 text-base font-semibold text-black shadow-lg outline-none transition hover:text-black hover:shadow-xl focus-visible:outline-none"
+            className="brainrot-cta-gradient mx-auto mt-5 flex h-14 w-full max-w-[352px] cursor-pointer items-center justify-center rounded-full border-0 px-6 text-base font-semibold text-black shadow-lg outline-none transition hover:text-black hover:shadow-xl focus-visible:outline-none"
             onClick={() => {
               if (!selectedPlan) return;
               void openSubscriptionCheckout(selectedPlan.planKey);
