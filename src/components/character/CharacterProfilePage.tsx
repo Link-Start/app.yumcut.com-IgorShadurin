@@ -97,6 +97,7 @@ type CharacterProfileCopy = {
   toastOpenCheckoutFailed: string;
   topUpTitle: string;
   topUpDescription: string;
+  paywallCurrentBalance: (balance: number) => string;
   tokensPerCharge: string;
   videosPerPeriod: (videos: number, period: 'week' | 'month') => string;
   paywallPerPeriod: (period: 'week' | 'month') => string;
@@ -167,6 +168,7 @@ const COPY: Record<AppLanguageCode, CharacterProfileCopy> = {
     toastOpenCheckoutFailed: 'Failed to open checkout',
     topUpTitle: 'Top up with subscription',
     topUpDescription: 'Subscribe to automatically get more tokens after each successful charge.',
+    paywallCurrentBalance: (currentBalance) => `Current balance: ${currentBalance.toLocaleString()} tokens.`,
     tokensPerCharge: 'tokens per charge',
     videosPerPeriod: (videos, period) => `${videos} ${videos === 1 ? 'video' : 'videos'}/${period}`,
     paywallPerPeriod: (period) => period,
@@ -239,6 +241,7 @@ const COPY: Record<AppLanguageCode, CharacterProfileCopy> = {
     toastOpenCheckoutFailed: 'Не удалось открыть оплату',
     topUpTitle: 'Пополнение через подписку',
     topUpDescription: 'Оформите подписку, чтобы автоматически получать токены после каждого успешного списания.',
+    paywallCurrentBalance: (currentBalance) => `Текущий баланс: ${currentBalance.toLocaleString()} токенов.`,
     tokensPerCharge: 'токенов за списание',
     videosPerPeriod: (videos, period) => `${videos} видео/${period === 'week' ? 'неделю' : 'месяц'}`,
     paywallPerPeriod: (period) => (period === 'week' ? 'неделю' : 'месяц'),
@@ -1046,6 +1049,9 @@ export function CharacterProfilePage({
           </DialogHeader>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {copy.topUpDescription}
+          </p>
+          <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {copy.paywallCurrentBalance(balance)}
           </p>
           <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {subscriptionPlans.map((plan) => {
