@@ -719,7 +719,10 @@ function buildEnglishResearchPrompt(task: CharacterTask): string {
     'You are writing factual metadata for one Brainrot character.',
     'MANDATORY: browse the web to research this exact character before writing.',
     'Use source context as extra hints, not as the only source.',
-    'Do not invent facts. If uncertain, state uncertainty plainly inside longBio.',
+    'Do not invent facts.',
+    'Write the best concise character profile from the facts and context you can verify.',
+    'Do NOT write a search-process audit trail. Do not list failed queries, missing catalog entries, websites checked, or phrases like "I could not find", "not confirmed", "not documented", "no reliable sources", or "uncertain".',
+    'If exact canonical lore is thin, focus on useful observed context: name meaning/transliteration, visual design from the provided character identity, likely meme/trend context from source hints, and cautious wording without dwelling on absence of information.',
     '',
     `Character JSON: ${JSON.stringify({ slug: task.info.slug, currentName: en.name, currentTitle: en.title })}`,
     `Source context JSON: ${JSON.stringify(sourceContext)}`,
@@ -730,7 +733,7 @@ function buildEnglishResearchPrompt(task: CharacterTask): string {
     'Rules:',
     `1) bio max ${BIO_MAX} chars.`,
     `2) longBio ${LONG_BIO_MIN}-${LONG_BIO_MAX} chars.`,
-    '3) Write for humans; no fluff or repetitive filler.',
+    '3) Write for humans; no fluff, no repetitive filler, no research-log narration.',
     '4) Output language must be English.',
   ].join('\n');
 }
