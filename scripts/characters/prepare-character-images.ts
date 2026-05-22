@@ -55,7 +55,7 @@ type CategoryManifest = {
   category: string;
   generatedAt: string;
   source: string;
-  metaTemplateUrl: string;
+  metaTemplateUrl: string | null;
   variants: Record<ImageVariant['key'], { width: number; height: number; format: 'webp'; note: string }>;
   socialVariants: Record<SocialCardVariant['key'], {
     width: number;
@@ -334,38 +334,6 @@ async function buildSubjectBuffer(sourceFile: string, targetWidth: number, targe
     .toBuffer();
 }
 
-async function createSocialCard(
-  subjectSourceFile: string,
-  templateFile: string,
-  targetFile: string,
-  variant: SocialCardVariant,
-): Promise<void> {
-  await ensureDirectory(path.dirname(targetFile));
-  const targetHeight = Math.max(1, Math.round(variant.height * variant.subjectHeightRatio));
-  const targetWidth = variant.width;
-  const [subjectBuffer, templateBuffer] = await Promise.all([
-    buildSubjectBuffer(subjectSourceFile, targetWidth, targetHeight),
-    sharp(templateFile)
-      .rotate()
-      .resize(variant.width, variant.height, {
-        fit: 'cover',
-        position: 'center',
-        withoutEnlargement: false,
-      })
-      .toBuffer(),
-  ]);
-
-  await sharp(templateBuffer)
-    .composite([{ input: subjectBuffer, gravity: 'center' }])
-    .jpeg({
-      quality: variant.quality,
-      mozjpeg: true,
-      progressive: true,
-      chromaSubsampling: '4:2:0',
-    })
-    .toFile(targetFile);
-}
-
 async function createSocialCardWhite(
   subjectSourceFile: string,
   targetFile: string,
@@ -421,12 +389,6 @@ async function main(): Promise<void> {
   const sourceExists = await fileExists(options.source);
   if (!sourceExists) {
     throw new Error(`Source directory does not exist: ${options.source}`);
-  }
-  if (!options.socialOnly) {
-    const templateExists = await fileExists(options.metaTemplatePath);
-    if (!templateExists) {
-      throw new Error(`Meta template image does not exist: ${options.metaTemplatePath}`);
-    }
   }
 
   const categoryOutputDir = path.join(options.publicRoot, options.category);
@@ -504,7 +466,7 @@ async function main(): Promise<void> {
     const subjectSource = emptyPath ?? preparedPath;
     for (const socialVariant of SOCIAL_CARD_VARIANTS) {
       const socialPath = path.join(targetSocialDir, `${socialVariant.key}.jpg`);
-      await createSocialCard(subjectSource, options.metaTemplatePath, socialPath, socialVariant);
+      await createSocialCardWhite(subjectSource, socialPath, socialVariant);
       socialCards[socialVariant.key] = {
         url: toOutputReference(socialPath),
         width: socialVariant.width,
@@ -534,7 +496,7 @@ async function main(): Promise<void> {
     category: options.category,
     generatedAt: new Date().toISOString(),
     source: options.source,
-    metaTemplateUrl: toOutputReference(options.metaTemplatePath),
+    metaTemplateUrl: null,
     variants: Object.fromEntries(
       IMAGE_VARIANTS.map((variant) => [
         variant.key,
