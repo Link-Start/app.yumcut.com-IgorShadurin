@@ -17,6 +17,7 @@
     "telegram:webhook:set": "tsx scripts/set-telegram-webhook.ts",
     "telegram:poll": "tsx scripts/telegram-polling-worker.ts",
     "emails:planned:send": "tsx scripts/send-planned-emails.ts",
+    "answer-resend": "tsx scripts/answer-resend.ts",
     "tokens:adjust": "tsx scripts/manage-tokens.ts",
     "daemon": "tsx scripts/daemon/index.ts",
     "publish-daemon": "tsx scripts/publish-daemon/index.ts",
