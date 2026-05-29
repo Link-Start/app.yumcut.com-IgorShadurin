@@ -25,6 +25,8 @@ export type DaemonConfig = {
   audioDefaultStyle: string | null;
   captionsRenderer: 'python' | 'legacy';
   scriptMode: ScriptMode;
+  riggerRunpodEndpoint: string | null;
+  riggerRunpodApiKey: string | null;
 };
 
 const RawEnvSchema = z.object({
@@ -47,6 +49,8 @@ const RawEnvSchema = z.object({
   DAEMON_AUDIO_DEFAULT_STYLE: z.string().optional(),
   DAEMON_CAPTIONS_RENDERER: z.string().optional(),
   DAEMON_SCRIPT_MODE: z.string().optional(),
+  DAEMON_RIGGER_RUNPOD_ENDPOINT: z.string().optional(),
+  DAEMON_RIGGER_RUNPOD_API_KEY: z.string().optional(),
 });
 
 let cachedConfig: DaemonConfig | null = null;
@@ -123,6 +127,14 @@ export function loadConfig(): DaemonConfig {
         : null,
     captionsRenderer,
     scriptMode,
+    riggerRunpodEndpoint:
+      base.DAEMON_RIGGER_RUNPOD_ENDPOINT && base.DAEMON_RIGGER_RUNPOD_ENDPOINT.trim()
+        ? base.DAEMON_RIGGER_RUNPOD_ENDPOINT.trim()
+        : null,
+    riggerRunpodApiKey:
+      base.DAEMON_RIGGER_RUNPOD_API_KEY && base.DAEMON_RIGGER_RUNPOD_API_KEY.trim()
+        ? base.DAEMON_RIGGER_RUNPOD_API_KEY.trim()
+        : null,
   };
   cachedConfig = cfg;
   return cfg;

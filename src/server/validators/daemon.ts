@@ -15,13 +15,13 @@ export const daemonScriptUpsertSchema = z.object({
 
 export const daemonAssetRegisterSchema = z
   .object({
-    type: z.enum(['audio', 'image', 'video']),
+    type: z.enum(['audio', 'image', 'video', 'artifact']),
     url: z.string().min(1),
     path: z.string().min(1).optional(),
     isFinal: z.coerce.boolean().optional(),
     localPath: z.string().optional(),
     languageCode: LANGUAGE_ENUM.optional(),
-    variant: z.enum(['raw']).optional(),
+    variant: z.enum(['raw', 'transparent', 'mp4', 'ditto', 'landmarks', 'timing', 'render-result', 'debug', 'final']).optional(),
   });
 
 export const daemonJobStatusSchema = z.object({

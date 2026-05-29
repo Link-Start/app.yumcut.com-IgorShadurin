@@ -17,7 +17,8 @@ type Params = { projectId: string };
 type AssetResponse =
   | { kind: 'audio'; id: string; path: string; url: string }
   | { kind: 'image'; id: string; path: string; url: string }
-  | { kind: 'video'; id: string; path: string; url: string; isFinal: boolean };
+  | { kind: 'video'; id: string; path: string; url: string; isFinal: boolean }
+  | { kind: 'artifact'; id: string; path: string; url: string; variant: string | null };
 
 export const POST = withApiError(async function POST(req: NextRequest, { params }: { params: Promise<Params> }) {
   const daemonId = await assertDaemonAuth(req);
@@ -58,6 +59,18 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
   } else if (kind === 'image') {
     const record = await prisma.imageAsset.create({ data: { projectId, path: storedPath, publicUrl: responseUrl } });
     response = { kind, id: record.id, path: record.path, url: responseUrl };
+  } else if (kind === 'artifact') {
+    const record = await (prisma as any).projectArtifact.create({
+      data: {
+        projectId,
+        kind: 'artifact',
+        variant: variant ?? null,
+        path: storedPath,
+        publicUrl: responseUrl,
+        localPath: localPath || null,
+      },
+    });
+    response = { kind, id: record.id, path: record.path, url: responseUrl, variant: record.variant ?? null };
   } else {
     if (isFinal) {
       const rawLanguages = Array.isArray((project as any).languages) && (project as any).languages.length > 0

@@ -5,7 +5,7 @@ import path from 'node:path';
 export type UploadGrantPurpose = 'user-character-image';
 
 export type StorageCommandType = 'delete-character-image' | 'delete-user-media' | 'resize-character-image';
-export type DaemonAssetKind = 'audio' | 'image' | 'video' | 'character-image';
+export type DaemonAssetKind = 'audio' | 'image' | 'video' | 'character-image' | 'artifact';
 
 export interface UploadGrantPayload {
   version: number;
@@ -16,6 +16,7 @@ export interface UploadGrantPayload {
   nonce: string;
   maxBytes: number;
   mimeTypes: string[];
+  keyId?: string;
 }
 
 export interface SignedUploadGrant {
@@ -33,6 +34,7 @@ export interface StorageCommandPayload {
   issuedAt: string;
   expiresAt: string;
   nonce: string;
+  keyId?: string;
 }
 
 export interface SignedStorageCommand {
@@ -49,6 +51,7 @@ export interface DaemonUploadGrantPayload {
   nonce: string;
   maxBytes: number;
   mimeTypes: string[];
+  keyId?: string;
 }
 
 export interface SignedDaemonUploadGrant {
@@ -64,6 +67,7 @@ export interface MediaDownloadGrantPayload {
   issuedAt: string;
   expiresAt: string;
   nonce: string;
+  keyId?: string;
 }
 
 export interface SignedMediaDownloadGrant {
@@ -109,6 +113,92 @@ function ensurePublicKey(): string {
   return loadKeyFromEnv(process.env.UPLOAD_SIGNING_PUBLIC_KEY, 'UPLOAD_SIGNING_PUBLIC_KEY');
 }
 
+function signingKeyId(): string | undefined {
+  const value = process.env.UPLOAD_SIGNING_KEY_ID?.trim();
+  return value && value.length > 0 ? value : undefined;
+}
+
+function parsePublicKeyRing(): Record<string, string> {
+  const raw = process.env.UPLOAD_SIGNING_PUBLIC_KEYS_JSON?.trim();
+  if (!raw) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error: any) {
+    throw new Error(`UPLOAD_SIGNING_PUBLIC_KEYS_JSON is invalid JSON: ${error?.message || String(error)}`);
+  }
+  const ring: Record<string, string> = {};
+  if (Array.isArray(parsed)) {
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue;
+      const id = String((item as any).id || (item as any).keyId || '').trim();
+      const key = String((item as any).publicKey || (item as any).key || '').trim();
+      if (id && key) ring[id] = loadKeyFromEnv(key, `UPLOAD_SIGNING_PUBLIC_KEYS_JSON.${id}`);
+    }
+  } else if (parsed && typeof parsed === 'object') {
+    for (const [id, key] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof key === 'string' && id.trim()) {
+        ring[id] = loadKeyFromEnv(key, `UPLOAD_SIGNING_PUBLIC_KEYS_JSON.${id}`);
+      }
+    }
+  }
+  return ring;
+}
+
+function payloadKeyId(data: string): string | undefined {
+  try {
+    const parsed = JSON.parse(data);
+    const keyId = parsed && typeof parsed === 'object' ? (parsed as any).keyId : undefined;
+    return typeof keyId === 'string' && keyId.trim().length > 0 ? keyId.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function signSerializedPayload(data: string): string {
+  const signer = crypto.createSign('RSA-SHA256');
+  signer.update(data);
+  signer.end();
+  return signer.sign(ensurePrivateKey()).toString('base64');
+}
+
+function verifySerializedPayload(data: string, signature: string, label = 'upload'): void {
+  const ring = parsePublicKeyRing();
+  const keyId = payloadKeyId(data);
+  const keys = (() => {
+    if (keyId) {
+      const selected = ring[keyId];
+      if (!selected) throw new Error(`Unknown upload signing key id: ${keyId}`);
+      return [selected];
+    }
+    const values = Object.values(ring);
+    try {
+      return [ensurePublicKey(), ...values];
+    } catch {
+      return values;
+    }
+  })();
+  if (keys.length === 0) throw new Error('UPLOAD_SIGNING_PUBLIC_KEY is not configured');
+  const signatureBuffer = Buffer.from(signature, 'base64');
+  for (const key of keys) {
+    const verifier = crypto.createVerify('RSA-SHA256');
+    verifier.update(data);
+    verifier.end();
+    if (verifier.verify(key, signatureBuffer)) return;
+  }
+  throw new Error(`Invalid ${label} signature`);
+}
+
+export function verifySignedJsonPayload(data: string, signature: string): unknown {
+  if (!data || !signature) throw new Error('Missing signed payload');
+  verifySerializedPayload(data, signature, 'payload');
+  try {
+    return JSON.parse(data);
+  } catch {
+    throw new Error('Signed payload is not valid JSON');
+  }
+}
+
 function canonicalSerialize(value: unknown): string {
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value);
@@ -142,11 +232,10 @@ export function issueSignedUploadGrant(params: {
     maxBytes: 2 * 1024 * 1024,
     mimeTypes: ['image/png', 'image/jpeg'],
   };
+  const keyId = signingKeyId();
+  if (keyId) payload.keyId = keyId;
   const data = canonicalSerialize(payload);
-  const signer = crypto.createSign('RSA-SHA256');
-  signer.update(data);
-  signer.end();
-  const signature = signer.sign(ensurePrivateKey()).toString('base64');
+  const signature = signSerializedPayload(data);
   return { data, signature, payload };
 }
 
@@ -154,13 +243,7 @@ export function verifySignedUploadGrant(data: string, signature: string): Upload
   if (!data || !signature) {
     throw new Error('Missing upload authorization data');
   }
-  const verifier = crypto.createVerify('RSA-SHA256');
-  verifier.update(data);
-  verifier.end();
-  const ok = verifier.verify(ensurePublicKey(), Buffer.from(signature, 'base64'));
-  if (!ok) {
-    throw new Error('Invalid upload signature');
-  }
+  verifySerializedPayload(data, signature, 'upload');
   let parsed: unknown;
   try {
     parsed = JSON.parse(data);
@@ -227,6 +310,8 @@ export function issueSignedStorageCommand(params: {
     expiresAt: expires.toISOString(),
     nonce: Buffer.from(randomBytes(16)).toString('hex'),
   };
+  const keyId = signingKeyId();
+  if (keyId) payload.keyId = keyId;
   if (params.type === 'delete-character-image' || params.type === 'resize-character-image') {
     payload.path = uniquePaths[0];
   } else {
@@ -236,10 +321,7 @@ export function issueSignedStorageCommand(params: {
     payload.height = Number(params.height);
   }
   const data = canonicalSerialize(payload);
-  const signer = crypto.createSign('RSA-SHA256');
-  signer.update(data);
-  signer.end();
-  const signature = signer.sign(ensurePrivateKey()).toString('base64');
+  const signature = signSerializedPayload(data);
   return { data, signature, payload };
 }
 
@@ -247,13 +329,7 @@ export function verifySignedStorageCommand(data: string, signature: string): Sto
   if (!data || !signature) {
     throw new Error('Missing storage command data');
   }
-  const verifier = crypto.createVerify('RSA-SHA256');
-  verifier.update(data);
-  verifier.end();
-  const ok = verifier.verify(ensurePublicKey(), Buffer.from(signature, 'base64'));
-  if (!ok) {
-    throw new Error('Invalid storage command signature');
-  }
+  verifySerializedPayload(data, signature, 'storage command');
   let parsed: unknown;
   try {
     parsed = JSON.parse(data);
@@ -323,23 +399,18 @@ export function issueSignedDaemonUploadGrant(params: {
     expiresAt: expires.toISOString(),
     nonce: Buffer.from(randomBytes(16)).toString('hex'),
     maxBytes: params.maxBytes ?? 1024 * 1024 * 1024,
-    mimeTypes: params.mimeTypes ?? ['audio/wav', 'audio/mpeg', 'audio/mp4', 'image/png', 'image/jpeg', 'video/mp4', 'video/quicktime', 'video/webm'],
+    mimeTypes: params.mimeTypes ?? ['audio/wav', 'audio/mpeg', 'audio/mp4', 'image/png', 'image/jpeg', 'video/mp4', 'video/quicktime', 'video/webm', 'application/json', 'application/gzip', 'application/x-gzip', 'application/zip', 'application/octet-stream'],
   };
+  const keyId = signingKeyId();
+  if (keyId) payload.keyId = keyId;
   const data = canonicalSerialize(payload);
-  const signer = crypto.createSign('RSA-SHA256');
-  signer.update(data);
-  signer.end();
-  const signature = signer.sign(ensurePrivateKey()).toString('base64');
+  const signature = signSerializedPayload(data);
   return { data, signature, payload };
 }
 
 export function verifySignedDaemonUploadGrant(data: string, signature: string): DaemonUploadGrantPayload {
   if (!data || !signature) throw new Error('Missing daemon upload authorization');
-  const verifier = crypto.createVerify('RSA-SHA256');
-  verifier.update(data);
-  verifier.end();
-  const ok = verifier.verify(ensurePublicKey(), Buffer.from(signature, 'base64'));
-  if (!ok) throw new Error('Invalid daemon upload signature');
+  verifySerializedPayload(data, signature, 'daemon upload');
   let parsed: unknown;
   try {
     parsed = JSON.parse(data);
@@ -350,7 +421,7 @@ export function verifySignedDaemonUploadGrant(data: string, signature: string): 
   const payload = parsed as DaemonUploadGrantPayload;
   if (payload.version !== 1) throw new Error('Unsupported daemon upload payload version');
   if (typeof payload.projectId !== 'string' || payload.projectId.length === 0) throw new Error('Daemon upload payload missing projectId');
-  if (!['audio', 'image', 'video', 'character-image'].includes(payload.kind)) throw new Error('Unsupported daemon upload kind');
+  if (!['audio', 'image', 'video', 'character-image', 'artifact'].includes(payload.kind)) throw new Error('Unsupported daemon upload kind');
   if (typeof payload.issuedAt !== 'string' || typeof payload.expiresAt !== 'string') throw new Error('Daemon upload payload missing timestamps');
   if (typeof payload.nonce !== 'string' || payload.nonce.length === 0) throw new Error('Daemon upload payload missing nonce');
   if (typeof payload.maxBytes !== 'number' || payload.maxBytes <= 0) throw new Error('Daemon upload payload missing maxBytes');
@@ -386,21 +457,16 @@ export function issueSignedMediaDownloadGrant(params: {
     expiresAt: expires.toISOString(),
     nonce: Buffer.from(randomBytes(16)).toString('hex'),
   };
+  const keyId = signingKeyId();
+  if (keyId) payload.keyId = keyId;
   const data = canonicalSerialize(payload);
-  const signer = crypto.createSign('RSA-SHA256');
-  signer.update(data);
-  signer.end();
-  const signature = signer.sign(ensurePrivateKey()).toString('base64');
+  const signature = signSerializedPayload(data);
   return { data, signature, payload };
 }
 
 export function verifySignedMediaDownloadGrant(data: string, signature: string): MediaDownloadGrantPayload {
   if (!data || !signature) throw new Error('Missing media download grant');
-  const verifier = crypto.createVerify('RSA-SHA256');
-  verifier.update(data);
-  verifier.end();
-  const ok = verifier.verify(ensurePublicKey(), Buffer.from(signature, 'base64'));
-  if (!ok) throw new Error('Invalid media download signature');
+  verifySerializedPayload(data, signature, 'media download');
   let parsed: unknown;
   try {
     parsed = JSON.parse(data);

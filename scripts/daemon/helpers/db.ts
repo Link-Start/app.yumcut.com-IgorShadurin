@@ -32,6 +32,14 @@ function guessMime(filePath: string) {
       return 'image/jpeg';
     case '.mp4':
       return 'video/mp4';
+    case '.webm':
+      return 'video/webm';
+    case '.json':
+      return 'application/json';
+    case '.gz':
+      return 'application/gzip';
+    case '.zip':
+      return 'application/zip';
     default:
       return 'application/octet-stream';
   }
@@ -172,7 +180,7 @@ async function requestStorageJson<T>(target: string, init: RequestInit = {}) {
 }
 
 type StorageUploadResponse = {
-  kind: 'audio' | 'image' | 'video';
+  kind: 'audio' | 'image' | 'video' | 'artifact';
   path: string;
   url: string;
   isFinal?: boolean;
@@ -181,15 +189,16 @@ type StorageUploadResponse = {
 type RegisteredAssetResponse =
   | { kind: 'audio'; id: string; path: string; url: string }
   | { kind: 'image'; id: string; path: string; url: string }
-  | { kind: 'video'; id: string; path: string; url: string; isFinal: boolean };
+  | { kind: 'video'; id: string; path: string; url: string; isFinal: boolean }
+  | { kind: 'artifact'; id: string; path: string; url: string; variant: string | null };
 
 async function uploadAsset(
   projectId: string,
-  kind: 'audio' | 'image' | 'video',
+  kind: 'audio' | 'image' | 'video' | 'artifact',
   filePath: string,
   isFinal = false,
   languageCode?: string,
-  variant?: 'raw',
+  variant?: 'raw' | 'transparent' | 'mp4' | 'ditto' | 'landmarks' | 'timing' | 'render-result' | 'debug' | 'final',
 ) {
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
   // Ensure the file exists before streaming
@@ -302,7 +311,7 @@ async function uploadAsset(
     isFinal?: boolean;
     localPath?: string;
     languageCode?: string;
-    variant?: 'raw';
+    variant?: 'raw' | 'transparent' | 'mp4' | 'ditto' | 'landmarks' | 'timing' | 'render-result' | 'debug' | 'final';
   } = {
     type: kind,
     path: storageResponse.path,
@@ -313,7 +322,7 @@ async function uploadAsset(
   if (languageCode) {
     payload.languageCode = languageCode;
   }
-  if (kind === 'video' && variant) {
+  if ((kind === 'video' || kind === 'artifact') && variant) {
     payload.variant = variant;
   }
   const registerEndpoint = `/api/daemon/projects/${projectId}/assets`;
@@ -325,6 +334,7 @@ async function uploadAsset(
   const kindLabel = (() => {
     if (kind === 'audio') return 'voiceover candidate';
     if (kind === 'image') return 'image asset';
+    if (kind === 'artifact') return 'artifact';
     if (kind === 'video' && isFinal) return 'final video';
     return 'video asset';
   })();
@@ -508,6 +518,18 @@ export async function addImageAsset(projectId: string, filePath: string): Promis
     throw new Error(`Unexpected asset response: expected image, received ${res.kind}`);
   }
   return { id: res.id, path: res.path, url: res.url, localPath: filePath };
+}
+
+export async function addProjectArtifact(
+  projectId: string,
+  filePath: string,
+  variant: 'landmarks' | 'timing' | 'render-result' | 'debug' | 'ditto' = 'debug',
+): Promise<{ id: string; path: string; url: string; localPath: string; variant: string | null }> {
+  const res = await uploadAsset(projectId, 'artifact', filePath, false, undefined, variant);
+  if (res.kind !== 'artifact') {
+    throw new Error(`Unexpected asset response: expected artifact, received ${res.kind}`);
+  }
+  return { id: res.id, path: res.path, url: res.url, localPath: filePath, variant: res.variant };
 }
 
 export async function uploadCharacterImage(projectId: string, filePath: string) {

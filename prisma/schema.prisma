@@ -111,6 +111,7 @@ model Project {
   scripts                  Script[]
   statusLog                ProjectStatusHistory[]
   audios                   AudioCandidate[]
+  artifacts                ProjectArtifact[]
   images                   ImageAsset[]
   templateImages           ProjectTemplateImage[]
   videos                   VideoAsset[]
@@ -244,6 +245,23 @@ model ProjectTemplateImage {
 
   @@unique([projectId, imageName])
   @@index([projectId])
+}
+
+model ProjectArtifact {
+  id           String   @id @default(uuid()) @db.Char(36)
+  projectId    String   @db.Char(36)
+  kind         String   @db.VarChar(32)
+  variant      String?  @db.VarChar(64)
+  path         String
+  publicUrl    String?  @db.VarChar(512)
+  localPath    String?  @db.Text
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  project      Project  @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([projectId, kind])
+  @@index([projectId, variant])
 }
 
 model VideoAsset {

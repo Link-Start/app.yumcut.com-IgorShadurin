@@ -13,7 +13,8 @@ export type DaemonJobType =
   | 'captions_video'
   | 'images'
   | 'video_parts'
-  | 'video_main';
+  | 'video_main'
+  | 'rigger_animation';
 
 const STATUS_JOB_TYPES: Partial<Record<ProjectStatus, DaemonJobType>> = {
   [ProjectStatus.New]: 'script',
@@ -48,10 +49,14 @@ export const CHARACTER_PIPELINE_ORDER: ProjectStatus[] = [
   ProjectStatus.ProcessVideoMain,
 ];
 
+export const RIGGER_ANIMATION_PIPELINE_ORDER: ProjectStatus[] = [
+  ProjectStatus.ProcessVideoMain,
+];
+
 export function pipelineOrderForExperience(projectExperience?: ProjectExperience | null): ProjectStatus[] {
-  return normalizeProjectExperience(projectExperience) === 'character'
-    ? CHARACTER_PIPELINE_ORDER
-    : STORY_PIPELINE_ORDER;
+  const experience = normalizeProjectExperience(projectExperience);
+  if (experience === 'rigger-animation') return RIGGER_ANIMATION_PIPELINE_ORDER;
+  return experience === 'character' ? CHARACTER_PIPELINE_ORDER : STORY_PIPELINE_ORDER;
 }
 
 export function isStatusAllowedForExperience(
@@ -96,6 +101,9 @@ export function jobTypeForProjectStatus(
   projectExperience?: ProjectExperience | null,
 ): DaemonJobType | null {
   if (!isStatusAllowedForExperience(status, projectExperience)) return null;
+  if (normalizeProjectExperience(projectExperience) === 'rigger-animation' && status === ProjectStatus.ProcessVideoMain) {
+    return 'rigger_animation';
+  }
   return STATUS_JOB_TYPES[status] ?? null;
 }
 
@@ -107,7 +115,9 @@ export function legalStatusTypePairsForExperience(
     { status: ProjectStatus.New, type: 'script' },
     ...pipelineOrderForExperience(experience).map((status) => ({
       status,
-      type: STATUS_JOB_TYPES[status]!,
+      type: experience === 'rigger-animation' && status === ProjectStatus.ProcessVideoMain
+        ? 'rigger_animation'
+        : STATUS_JOB_TYPES[status]!,
     })),
   ];
 }
@@ -116,6 +126,7 @@ export function legalStatusTypePairsForAllExperiences(): { status: ProjectStatus
   const pairs = [
     ...legalStatusTypePairsForExperience(DEFAULT_PROJECT_EXPERIENCE),
     ...legalStatusTypePairsForExperience('character'),
+    ...legalStatusTypePairsForExperience('rigger-animation'),
   ];
   return Array.from(new Map(pairs.map((pair) => [`${pair.status}:${pair.type}`, pair])).values());
 }

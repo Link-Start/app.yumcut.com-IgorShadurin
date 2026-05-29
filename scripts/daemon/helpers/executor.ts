@@ -10,6 +10,7 @@ import { handleCaptionsPhase } from './executor/captions-phase';
 import { handleImagesPhase } from './executor/images-phase';
 import { handleVideoPartsPhase } from './executor/video-parts-phase';
 import { handleVideoMainPhase } from './executor/video-main-phase';
+import { handleRiggerAnimationPhase } from './executor/rigger-animation-phase';
 import { createHandledError, getHandledJobResult, isHandledError } from './executor/error';
 import { isStatusAllowedForExperience } from '@/shared/pipeline/project-pipeline';
 
@@ -102,6 +103,15 @@ export async function executeForProject(projectId: string, status: ProjectStatus
         return;
       }
       case ProjectStatus.ProcessVideoMain: {
+        if (cfg.projectExperience === 'rigger-animation') {
+          await handleRiggerAnimationPhase({
+            projectId,
+            cfg,
+            jobPayload: jobPayload ?? {},
+            daemonConfig,
+          });
+          return;
+        }
         await handleVideoMainPhase({
           projectId,
           cfg,
@@ -155,6 +165,9 @@ export async function executeJob(job: { id: string; projectId: string; type: str
       status = ProjectStatus.ProcessVideoPartsGeneration;
       break;
     case 'video_main':
+      status = ProjectStatus.ProcessVideoMain;
+      break;
+    case 'rigger_animation':
       status = ProjectStatus.ProcessVideoMain;
       break;
     default:

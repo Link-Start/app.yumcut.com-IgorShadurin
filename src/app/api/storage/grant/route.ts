@@ -8,7 +8,7 @@ import { issueSignedDaemonUploadGrant } from '@/lib/upload-signature';
 
 const bodySchema = z.object({
   projectId: z.string().min(1),
-  kind: z.enum(['audio', 'image', 'video', 'character-image']),
+  kind: z.enum(['audio', 'image', 'video', 'character-image', 'artifact']),
   ttlMs: z.number().int().min(1_000).max(60 * 60 * 1000).optional(),
   maxBytes: z.number().int().positive().optional(),
   mimeTypes: z.array(z.string().min(1)).nonempty().optional(),
