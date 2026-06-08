@@ -8,10 +8,11 @@ type Props = {
   title: string;
   status: ProjectStatus;
   createdAtLabel: string;
+  tokensUsed: number;
   userDisplay: string;
 };
 
-export function AdminProjectCardMobile({ id, title, status, createdAtLabel, userDisplay }: Props) {
+export function AdminProjectCardMobile({ id, title, status, createdAtLabel, tokensUsed, userDisplay }: Props) {
   return (
     <Link
       href={`/admin/projects/${id}`}
@@ -23,8 +24,8 @@ export function AdminProjectCardMobile({ id, title, status, createdAtLabel, user
         <AdminStatusPill status={status} />
       </div>
       <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Created {createdAtLabel}</div>
+      <div className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-300">Used {tokensUsed.toLocaleString()} tokens</div>
       <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 break-words">{userDisplay}</div>
     </Link>
   );
 }
-

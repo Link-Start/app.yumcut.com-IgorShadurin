@@ -4,6 +4,7 @@ import { ok, forbidden, error } from '@/server/http';
 import { config } from '@/server/config';
 import { getReceivedEmail, verifyResendWebhook } from '@/server/emails/resend';
 import { extractLatestEmailReply } from '@/server/emails/reply-parser';
+import { processInboundReplyBonus } from '@/server/emails/reply-bonus';
 import { notifyAdminsWithMessage } from '@/server/telegram';
 
 export const runtime = 'nodejs';
@@ -242,6 +243,11 @@ export const POST = withApiError(async function POST(req: NextRequest) {
   }
 
   const textBody = apiSnippet || rawMimeSnippet;
+  const replyBonusResult = await processInboundReplyBonus({
+    from,
+    to,
+    emailId,
+  });
 
   const lines = [
     '📨 Incoming email for YumCut (app.yumcut.com)',
@@ -254,6 +260,17 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     '',
     `Email ID: ${emailId}`,
   ];
+
+  if (replyBonusResult.granted) {
+    lines.push(`Reply bonus: granted ${replyBonusResult.balance ?? '—'} balance (${replyBonusResult.userId})`);
+    if (replyBonusResult.confirmationSent === false && replyBonusResult.confirmationError) {
+      lines.push(`Reply bonus confirmation email error: ${trimTo(replyBonusResult.confirmationError, 500)}`);
+    }
+  } else if (replyBonusResult.alreadyGranted) {
+    lines.push(`Reply bonus: already granted (${replyBonusResult.userId ?? 'unknown user'})`);
+  } else if (replyBonusResult.eligible || replyBonusResult.reason === 'sender_mismatch') {
+    lines.push(`Reply bonus: skipped (${replyBonusResult.reason ?? 'unknown'})`);
+  }
 
   if (fetchResult.errorMessage) {
     lines.push(`Note: failed to fetch full inbound payload from Resend: ${trimTo(fetchResult.errorMessage, 500)}`);
@@ -273,6 +290,7 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     enriched: Boolean(received),
     snippetSource: apiSnippet ? 'api' : rawMimeSnippet ? 'raw' : 'none',
     forwardedToTelegram: !telegramForwardError,
+    replyBonus: replyBonusResult,
     ...(fetchResult.errorMessage ? { inboundFetchError: trimTo(fetchResult.errorMessage, 500) } : {}),
     ...(telegramForwardError ? { telegramForwardError: trimTo(telegramForwardError, 500) } : {}),
   });

@@ -4,6 +4,7 @@ import { config } from '@/server/config';
 import { revokeAppleTokens } from '@/server/apple/revoke-tokens';
 import { notifyAdminsOfAccountDeletion } from '@/server/telegram';
 import { deleteStoredMedia } from '@/server/storage';
+import { cancelPlannedEmailsForUser } from '@/server/emails/planned';
 
 export type DeleteUserAccountSource = 'mobile' | 'web' | 'support' | 'admin' | 'unknown';
 
@@ -116,7 +117,7 @@ export async function deleteUserAccount(options: DeleteUserAccountOptions): Prom
     await tx.templateArtStyle.deleteMany({ where: { ownerId: userId } });
     await tx.templateVoiceStyle.deleteMany({ where: { ownerId: userId } });
     await tx.templateMusic.deleteMany({ where: { ownerId: userId } });
-    await tx.plannedEmail.deleteMany({ where: { userId } });
+    await cancelPlannedEmailsForUser(userId, tx);
 
     await tx.tokenTransaction.deleteMany({ where: { userId } });
     await tx.subscriptionPurchase.deleteMany({ where: { userId } });

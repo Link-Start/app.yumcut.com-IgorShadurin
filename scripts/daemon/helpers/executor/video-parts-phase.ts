@@ -1,9 +1,11 @@
 import path from 'path';
+import { readFileSync } from 'fs';
 import { promises as fs } from 'fs';
 import { ProjectStatus } from '@/shared/constants/status';
 import { DEFAULT_LANGUAGE } from '@/shared/constants/languages';
+import { normalizeContentTone, type ContentTone } from '@/shared/constants/content-tone';
 import { log } from '../logger';
-import { getLanguageProgress, setStatus, updateLanguageProgress, markLanguageFailure } from '../db';
+import { getLanguageProgress, getTranscriptionSnapshot, setStatus, updateLanguageProgress, markLanguageFailure } from '../db';
 import { renderVideoParts } from '../video';
 import { isDummyScriptWorkspace, writeDummyMainVideo, writeDummyMergedVideo } from '../dummy-fallbacks';
 import type { DaemonConfig } from '../config';
@@ -13,6 +15,9 @@ import { createHandledError } from './error';
 import { ensureProjectScaffold, ensureLanguageWorkspace, ensureLanguageLogDir, ensureTemplateWorkspace } from '../language-workspace';
 import { isCustomTemplateData } from '@/shared/templates/custom-data';
 import { refreshTemplateImagesFromStorage } from '../template-images';
+import { resolveCharacterImagePath } from '../character-cache';
+import { runLipsyncRunpod, runLipsyncRunware } from '../lipsync';
+import type { CharacterVideoGenerationMode } from '@/shared/constants/character-video-quality';
 
 type VideoPartsPhaseArgs = {
   projectId: string;
@@ -20,6 +25,19 @@ type VideoPartsPhaseArgs = {
   jobPayload: Record<string, unknown>;
   daemonConfig: DaemonConfig;
 };
+
+const VIDEO_TONE_PROMPTS_ROOT = path.resolve(__dirname, '../../assets/video-generation-tone-prompts');
+const VIDEO_TONE_PROMPT_FILES = {
+  angry: path.join(VIDEO_TONE_PROMPTS_ROOT, 'tone-angry.md'),
+  playful: path.join(VIDEO_TONE_PROMPTS_ROOT, 'tone-playful.md'),
+  normal: path.join(VIDEO_TONE_PROMPTS_ROOT, 'tone-normal.md'),
+} as const;
+
+let cachedVideoTonePrompts: {
+  angry: string;
+  playful: string;
+  normal: string;
+} | null = null;
 
 export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemonConfig }: VideoPartsPhaseArgs) {
   const projectScaffold = await ensureProjectScaffold(projectId);
@@ -37,6 +55,7 @@ export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemon
   let effectName: string | null = null;
   let includeCallToAction = true;
   let voiceExternalId: string | null = null;
+  let videoGenerationMode: string | null = null;
   let lastAttempt: {
     languageCode: string | null;
     workspaceRoot: string | null;
@@ -76,6 +95,11 @@ export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemon
     effectName = determineEffectName(projectId, cfg.template ?? null);
     includeCallToAction = (cfg as any).includeCallToAction ?? true;
     voiceExternalId = (cfg as any).voiceId ?? null;
+    const payloadVideoConfig = (jobPayload as any)?.videoGeneration as Record<string, unknown> | null | undefined;
+    const snapshotVideoConfig = (cfg as any)?.videoGeneration as Record<string, unknown> | null | undefined;
+    videoGenerationMode = normalizeMode(payloadVideoConfig?.mode) ?? normalizeMode(snapshotVideoConfig?.mode);
+    const videoGeneration = resolveVideoGenerationConfig(cfg, jobPayload);
+    videoGenerationMode = videoGeneration.mode ?? videoGenerationMode;
     if (customTemplate && recreateVideo && templateWorkspace) {
       await refreshTemplateImagesFromStorage({
         projectId,
@@ -109,6 +133,15 @@ export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemon
       }
       return null;
     })();
+    const transcriptionSnapshot = await getTranscriptionSnapshot(projectId);
+    const audioLocalPaths = (jobPayload as any)?.audioLocalPaths as Record<string, string | null> | undefined;
+    const characterImagePath = videoGeneration.mode
+      ? await resolveVideoCharacterImagePath({
+          projectId,
+          absoluteImagePath: cfg.characterSelection?.absoluteImagePath ?? null,
+          imageUrl: cfg.characterSelection?.imageUrl ?? null,
+        })
+      : null;
     if (recreateVideo) {
       for (const languageCode of pendingLanguages) {
         const languageInfo = await ensureLanguageWorkspace(projectId, languageCode);
@@ -144,22 +177,60 @@ export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemon
         lastAttemptLogPath = null;
         lastAttemptCommand = null;
 
-        const partsResult = await renderVideoParts({
-          projectId,
-          workspaceRoot,
-          commandsWorkspaceRoot: agentWorkspace,
-          logDir,
-          scriptWorkspaceV2: daemonConfig.scriptWorkspaceV2,
-          metadataJsonPath,
-          effectName,
-          includeCallToAction,
-          targetLanguage: languageCode,
-          voiceExternalId,
-          imagesDir: sharedImagesDir ?? undefined,
-          clean: true,
-          scriptMode: daemonConfig.scriptMode,
-          isTemplateV2: customTemplate,
-        });
+        let partsResult: { logPath: string | null; command: string | null; mainVideoPath: string };
+        if (videoGeneration.mode) {
+          const voiceover = transcriptionSnapshot.finalVoiceovers?.[languageCode] ?? null;
+          let audioLocalPath = audioLocalPaths?.[languageCode] ?? voiceover?.localPath ?? null;
+          if (!audioLocalPath && languageCode === primaryLanguage) {
+            audioLocalPath = transcriptionSnapshot.localPath;
+          }
+          if (!audioLocalPath) {
+            throw new Error(`Voiceover audio not available locally for language ${languageCode}`);
+          }
+          const lipsyncResult = videoGeneration.mode === 'lipsync_runware'
+            ? await runLipsyncRunware({
+                projectId,
+                charactersWorkspace: daemonConfig.charactersWorkspace,
+                commandsWorkspaceRoot: agentWorkspace,
+                logDir,
+                audioPath: audioLocalPath,
+                imagePath: characterImagePath!,
+                prompt: videoGeneration.lipsyncPrompt,
+              })
+            : await runLipsyncRunpod({
+                projectId,
+                charactersWorkspace: daemonConfig.charactersWorkspace,
+                commandsWorkspaceRoot: agentWorkspace,
+                logDir,
+                audioPath: audioLocalPath,
+                imagePath: characterImagePath!,
+              });
+          const mainVideoPath = path.join(workspaceRoot, 'video-basic-effects', 'final', 'simple.1080p.mp4');
+          await fs.mkdir(path.dirname(mainVideoPath), { recursive: true });
+          await fs.copyFile(lipsyncResult.outputPath, mainVideoPath);
+          partsResult = {
+            logPath: lipsyncResult.logPath,
+            command: lipsyncResult.command,
+            mainVideoPath,
+          };
+        } else {
+          partsResult = await renderVideoParts({
+            projectId,
+            workspaceRoot,
+            commandsWorkspaceRoot: agentWorkspace,
+            logDir,
+            scriptWorkspaceV2: daemonConfig.scriptWorkspaceV2,
+            metadataJsonPath,
+            effectName,
+            includeCallToAction,
+            targetLanguage: languageCode,
+            voiceExternalId,
+            imagesDir: sharedImagesDir ?? undefined,
+            clean: true,
+            scriptMode: daemonConfig.scriptMode,
+            isTemplateV2: customTemplate,
+          });
+        }
         videoPartsLogs[languageCode] = partsResult.logPath;
         mainVideoPaths[languageCode] = partsResult.mainVideoPath;
         lastAttemptLogPath = partsResult.logPath ?? null;
@@ -176,6 +247,8 @@ export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemon
       } catch (languageErr: any) {
         const logPathFromError = typeof languageErr?.logPath === 'string' ? languageErr.logPath : null;
         const commandFromError = typeof languageErr?.command === 'string' ? languageErr.command : null;
+        lastAttemptLogPath = logPathFromError ?? lastAttemptLogPath;
+        lastAttemptCommand = commandFromError ?? lastAttemptCommand;
         log.error('Video parts rendering failed for language', {
           projectId,
           languageCode,
@@ -226,7 +299,7 @@ export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemon
     }
   } catch (err: any) {
     const isDummyWorkspace = isDummyScriptWorkspace(daemonConfig.scriptWorkspaceV2);
-    if (isDummyWorkspace) {
+    if (isDummyWorkspace && !videoGenerationMode) {
       const fallbackLanguages = projectLanguages.length > 0 ? projectLanguages : resolveProjectLanguagesFromSnapshot(cfg);
       const primaryLanguage = fallbackLanguages[0] ?? DEFAULT_LANGUAGE;
       const fallbackEffect = determineEffectName(projectId, cfg.template ?? null);
@@ -287,9 +360,10 @@ export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemon
       command: commandFromError ?? lastAttemptCommand,
       pendingLanguages,
       completedLanguages,
-        effectName,
+      effectName,
       includeCallToAction,
       voiceExternalId,
+      videoGenerationMode,
     });
     await setStatus(projectId, ProjectStatus.Error, 'Video parts rendering failed', {
       failedLanguage,
@@ -326,4 +400,93 @@ async function pickMetadataPath(params: {
   } catch {
     throw new Error(`Metadata file missing for ${languageCode} at ${legacyPath}`);
   }
+}
+
+function resolveVideoGenerationConfig(cfg: CreationSnapshot, jobPayload: Record<string, unknown>): {
+  mode: CharacterVideoGenerationMode | null;
+  lipsyncPrompt: string;
+} {
+  const snapshotConfig = (cfg as any)?.videoGeneration as Record<string, unknown> | null | undefined;
+  const payloadConfig = (jobPayload as any)?.videoGeneration as Record<string, unknown> | null | undefined;
+  const mode = normalizeMode(payloadConfig?.mode) ?? normalizeMode(snapshotConfig?.mode);
+  const promptValue = typeof payloadConfig?.lipsyncPrompt === 'string'
+    ? payloadConfig.lipsyncPrompt
+    : typeof snapshotConfig?.lipsyncPrompt === 'string'
+      ? snapshotConfig.lipsyncPrompt
+      : '';
+
+  if (!mode) {
+    return { mode: null, lipsyncPrompt: '' };
+  }
+  if (mode === 'lipsync_runpod') {
+    return { mode, lipsyncPrompt: '' };
+  }
+  const basePrompt = promptValue.trim();
+  if (!basePrompt) {
+    throw new Error('videoGeneration.lipsyncPrompt is required for lipsync_runware mode');
+  }
+  const tone = normalizeContentTone((jobPayload as any)?.contentTone ?? (cfg as any)?.contentTone);
+  const toneSuffix = tonePromptSuffix(tone);
+  const lipsyncPrompt = [basePrompt, toneSuffix].filter((part) => part.length > 0).join(' ');
+  return { mode, lipsyncPrompt };
+}
+
+function tonePromptSuffix(tone: ContentTone): string {
+  const prompts = loadVideoTonePrompts();
+  switch (tone) {
+    case 'playful':
+      return prompts.playful;
+    case 'angry':
+      return prompts.angry;
+    case 'neutral':
+    default:
+      return prompts.normal;
+  }
+}
+
+function loadVideoTonePrompts() {
+  if (cachedVideoTonePrompts) return cachedVideoTonePrompts;
+
+  const readPrompt = (filePath: string) => {
+    const value = readFileSync(filePath, 'utf8').replace(/\r/g, '').trim();
+    if (!value) throw new Error(`Video tone prompt file is empty: ${filePath}`);
+    return value;
+  };
+
+  cachedVideoTonePrompts = {
+    angry: readPrompt(VIDEO_TONE_PROMPT_FILES.angry),
+    playful: readPrompt(VIDEO_TONE_PROMPT_FILES.playful),
+    normal: readPrompt(VIDEO_TONE_PROMPT_FILES.normal),
+  };
+  return cachedVideoTonePrompts;
+}
+
+function normalizeMode(value: unknown): CharacterVideoGenerationMode | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'lipsync_runware' || normalized === 'lipsync_runpod'
+    ? normalized
+    : null;
+}
+
+async function resolveVideoCharacterImagePath(params: {
+  projectId: string;
+  absoluteImagePath: string | null;
+  imageUrl: string | null;
+}): Promise<string> {
+  const { projectId, absoluteImagePath, imageUrl } = params;
+  if (absoluteImagePath && absoluteImagePath.trim().length > 0) {
+    try {
+      const stats = await fs.stat(absoluteImagePath);
+      if (stats.isFile()) return absoluteImagePath;
+    } catch {
+      // Fall through to URL-based resolver.
+    }
+  }
+
+  const resolved = await resolveCharacterImagePath({ projectId, imageUrl });
+  if (!resolved) {
+    throw new Error('Character image is required for lipsync mode');
+  }
+  return resolved;
 }

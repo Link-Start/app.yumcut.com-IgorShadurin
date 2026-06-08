@@ -3,7 +3,6 @@ import { prisma } from '@/server/db';
 import { ok, forbidden, notFound } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { assertDaemonAuth } from '@/server/auth';
-import path from 'path';
 import { normalizeMediaUrl } from '@/server/storage';
 import { config } from '@/server/config';
 import { normalizeTemplateCustomData } from '@/shared/templates/custom-data';
@@ -11,6 +10,15 @@ import { normalizeLanguageVoiceMap, mergeLanguageVoicePreferences, selectVoiceFo
 import type { LanguageVoiceMap } from '@/shared/types';
 import { getAdminVoiceProviderSettings } from '@/server/admin/voice-providers';
 import { buildVoiceProviderSet, FALLBACK_VOICE_PROVIDER_IDS } from '@/shared/constants/voice-providers';
+import { normalizeContentTone } from '@/shared/constants/content-tone';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
+import { defaultCharacterVideoGeneration } from '@/shared/constants/video-generation';
+import {
+  CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE,
+  normalizeCharacterVideoGenerationMode,
+  normalizeCharacterVideoQuality,
+  qualityForVideoGenerationMode,
+} from '@/shared/constants/character-video-quality';
 
 type Params = { projectId: string };
 
@@ -19,8 +27,8 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
   if (!daemonId) return forbidden('Invalid daemon credentials');
   const { projectId } = await params;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, deleted: false },
     select: {
       id: true,
       userId: true,
@@ -39,6 +47,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       voiceProvider: true,
       languageVoiceAssignments: true,
       languageVoiceProviders: true,
+      contentTone: true,
     },
   });
   if (!project) return notFound('Project not found');
@@ -83,22 +92,17 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
     if (selectionRecord.characterVariationId) {
       const variation = await prisma.characterVariation.findUnique({ where: { id: selectionRecord.characterVariationId }, select: { id: true, characterId: true, imagePath: true } });
       if (variation) {
-        const relative = variation.imagePath ? variation.imagePath.replace(/^\/+/, '') : null;
-        const publicPath = relative
-          ? relative.startsWith('public/')
-            ? `/${relative.replace(/^public\//, '')}`
-            : `/${relative}`
-          : null;
-        const absolute = publicPath
-          ? path.resolve(process.cwd(), publicPath.startsWith('/') ? path.join('public', publicPath.slice(1)) : publicPath)
-          : null;
+        const imageUrl = toAbsoluteUrl(
+          normalizeMediaUrl(variation.imagePath ?? null),
+          config.STORAGE_PUBLIC_URL ?? config.NEXTAUTH_URL,
+        );
         characterSelection = {
           type: 'global',
           characterId: variation.characterId,
           variationId: variation.id,
-          imagePath: publicPath,
-          imageUrl: toAbsoluteUrl(publicPath, config.NEXTAUTH_URL),
-          absoluteImagePath: absolute,
+          imagePath: variation.imagePath,
+          imageUrl,
+          absoluteImagePath: null,
         };
       }
     } else if (selectionRecord.userCharacterVariationId) {
@@ -148,6 +152,31 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
   const scriptAvoidanceGuidance = typeof payload.scriptAvoidanceGuidance === 'string' ? payload.scriptAvoidanceGuidance : '';
   const audioStyleEnabled = !!payload.audioStyleGuidanceEnabled;
   const audioStyleGuidance = typeof payload.audioStyleGuidance === 'string' ? payload.audioStyleGuidance : '';
+  const projectExperience = normalizeProjectExperience(payload.projectExperience);
+  const defaultVideoGeneration = projectExperience === 'character'
+    ? defaultCharacterVideoGeneration()
+    : null;
+  const payloadVideoGeneration = payload?.videoGeneration as Record<string, unknown> | undefined;
+  const videoGenerationMode = normalizeCharacterVideoGenerationMode(payloadVideoGeneration?.mode);
+  const characterVideoQuality = projectExperience === 'character'
+    ? (videoGenerationMode
+      ? qualityForVideoGenerationMode(videoGenerationMode)
+      : normalizeCharacterVideoQuality(payload.characterVideoQuality))
+    : undefined;
+  const videoGenerationPrompt = typeof payloadVideoGeneration?.lipsyncPrompt === 'string'
+    ? payloadVideoGeneration.lipsyncPrompt.trim()
+    : '';
+  const resolvedVideoGenerationMode = projectExperience === 'character'
+    ? (videoGenerationMode ?? CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE[characterVideoQuality ?? 'high'])
+    : null;
+  const videoGeneration = resolvedVideoGenerationMode
+    ? {
+        mode: resolvedVideoGenerationMode,
+        ...(resolvedVideoGenerationMode === 'lipsync_runware'
+          ? { lipsyncPrompt: videoGenerationPrompt || defaultVideoGeneration?.lipsyncPrompt || null }
+          : {}),
+      }
+    : null;
   // Resolve voice id (global list)
   const voiceId = project.voiceId || (typeof payload.voiceId === 'string' ? payload.voiceId : null);
   const targetLanguage = typeof payload.targetLanguage === 'string' ? payload.targetLanguage : 'en';
@@ -228,15 +257,19 @@ const voiceQueryWhere = candidateVoiceIds.length > 0
     watermarkEnabled: typeof payload.watermarkEnabled === 'boolean' ? payload.watermarkEnabled : true,
     captionsEnabled: typeof payload.captionsEnabled === 'boolean' ? payload.captionsEnabled : true,
     useExactTextAsScript: !!payload.useExactTextAsScript,
+    contentTone: normalizeContentTone(payload.contentTone ?? project.contentTone),
+    projectExperience,
     durationSeconds: typeof payload.durationSeconds === 'number' ? payload.durationSeconds : null,
     targetLanguage,
     languages,
+    characterVideoQuality,
     scriptCreationGuidanceEnabled: scriptCreationEnabled,
     scriptCreationGuidance: scriptCreationEnabled ? scriptCreationGuidance : '',
     scriptAvoidanceGuidanceEnabled: scriptAvoidanceEnabled,
     scriptAvoidanceGuidance: scriptAvoidanceEnabled ? scriptAvoidanceGuidance : '',
     audioStyleGuidanceEnabled: audioStyleEnabled,
     audioStyleGuidance: audioStyleEnabled ? audioStyleGuidance : '',
+    videoGeneration,
     voiceId: voiceId || null,
     voiceAssignments,
     voiceProviders,

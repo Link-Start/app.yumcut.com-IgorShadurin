@@ -87,6 +87,22 @@ describe('GET /api/mobile/projects/[id]', () => {
       finalVideoUrl: null,
       finalVideoPath: '/videos/final.mp4',
       languages: ['en', 'es'],
+      videos: [
+        {
+          languageCode: 'en',
+          publicUrl: 'https://static.test/final-en.mp4',
+          path: 'projects/p1/final-en.mp4',
+          isFinal: true,
+          variant: null,
+        },
+        {
+          languageCode: 'en',
+          publicUrl: 'https://static.test/raw-en.mp4',
+          path: 'projects/p1/raw-en.mp4',
+          isFinal: false,
+          variant: 'raw',
+        },
+      ],
     });
     const req = new NextRequest('http://localhost/api/mobile/projects/p1');
     const res = await detailRoute.GET(req, { params: Promise.resolve({ projectId: 'p1' }) });
@@ -94,6 +110,11 @@ describe('GET /api/mobile/projects/[id]', () => {
     const payload = await res.json();
     expect(payload.id).toBe('p1');
     expect(payload.languages).toEqual(['en', 'es']);
+    expect(payload.rawVideoUrl).toBe('https://static.test/raw-en.mp4');
+    expect(payload.languageVariants[0]).toMatchObject({
+      languageCode: 'en',
+      rawVideoUrl: 'https://static.test/raw-en.mp4',
+    });
     expect(findFirst).toHaveBeenCalled();
   });
 });

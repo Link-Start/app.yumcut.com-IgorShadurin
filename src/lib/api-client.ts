@@ -1,7 +1,11 @@
 export type ApiRequestInit = RequestInit & { showErrorToast?: boolean; errorToastTitle?: string };
 
 export async function api<T>(url: string, init?: ApiRequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers || {}) } });
+  const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData;
+  const headers = isFormData
+    ? { ...(init?.headers || {}) }
+    : { 'content-type': 'application/json', ...(init?.headers || {}) };
+  const res = await fetch(url, { ...init, headers });
   let data: any = null;
   let text: string | null = null;
   try {
@@ -190,8 +194,12 @@ export const Api = {
     }),
   getTokenSummary: () => api<import('@/shared/types').TokenSummaryDTO>('/api/tokens'),
   getSubscriptionStatus: () => api<import('@/shared/types').SubscriptionStatusDTO>('/api/subscriptions/status'),
-  createSubscriptionCheckout: (plan: 'weekly' | 'monthly') =>
-    api<{ url: string; sessionId: string }>('/api/subscriptions/checkout', {
+  createSubscriptionCheckout: (plan: 'weekly' | 'monthly' | 'monthly_pro') =>
+    api<
+      | { action: 'checkout'; url: string; sessionId: string }
+      | { action: 'switched'; subscriptionId: string; planKey: 'weekly' | 'monthly' | 'monthly_pro' }
+      | { action: 'already_on_plan'; planKey: 'weekly' | 'monthly' | 'monthly_pro' }
+    >('/api/subscriptions/checkout', {
       method: 'POST',
       body: JSON.stringify({ plan }),
       errorToastTitle: 'Failed to start checkout',
@@ -230,6 +238,185 @@ export const Api = {
   adminTemplatesGet: (entity: string, id: string) => api(`/api/admin/templates/${entity}/${id}`),
   adminTemplatesUpdate: (entity: string, id: string, body: any) => api(`/api/admin/templates/${entity}/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   adminTemplatesDelete: (entity: string, id: string) => api(`/api/admin/templates/${entity}/${id}`, { method: 'DELETE' }),
+  adminCharacterCategoriesList: () => api<{ items: Array<{ id: string; slug: string; titleEn: string; titleRu: string; isActive: boolean; priority: number }> }>('/api/admin/character-categories'),
+  adminCharacterCategoriesCreate: (body: { slug: string; title: string; isActive?: boolean; priority?: number }) =>
+    api<{ id: string; slug: string; titleEn: string; titleRu: string; isActive: boolean; priority: number }>('/api/admin/character-categories', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  adminCharacterCategoriesUpdate: (id: string, body: { slug?: string; title?: string; isActive?: boolean; priority?: number }) =>
+    api<{ id: string; slug: string; titleEn: string; titleRu: string; isActive: boolean; priority: number }>(`/api/admin/character-categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  adminCharactersList: (params?: { q?: string; categoryId?: string | null; page?: number; pageSize?: number }) => {
+    const qp = new URLSearchParams();
+    const q = params?.q?.trim() || '';
+    if (q) qp.set('q', q);
+    if (params?.categoryId) qp.set('categoryId', params.categoryId);
+    if (typeof params?.page === 'number' && Number.isFinite(params.page)) qp.set('page', String(Math.max(1, Math.floor(params.page))));
+    if (typeof params?.pageSize === 'number' && Number.isFinite(params.pageSize)) qp.set('pageSize', String(Math.max(1, Math.floor(params.pageSize))));
+    const query = qp.toString() ? `?${qp.toString()}` : '';
+    return api<{
+      items: Array<{
+        id: string;
+        slug: string | null;
+        name: string;
+        title: string;
+        bio: string | null;
+        isPublic: boolean;
+        priority: number;
+        category: { id: string; slug: string; titleEn: string } | null;
+        preparedImageUrl: string | null;
+        emptyImageUrl: string | null;
+        previewVideoUrl: string | null;
+        previewVideoHasAudio: boolean;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
+    }>(`/api/admin/characters${query}`);
+  },
+  adminCharacterCheckSlug: (params: { slug: string; categoryId?: string | null; excludeId?: string | null }) => {
+    const qp = new URLSearchParams();
+    const slug = params.slug.trim();
+    if (slug) qp.set('slug', slug);
+    if (params.categoryId) qp.set('categoryId', params.categoryId);
+    if (params.excludeId) qp.set('excludeId', params.excludeId);
+    return api<{ available: boolean; normalizedSlug: string }>(`/api/admin/characters/slug-availability?${qp.toString()}`);
+  },
+  adminCharacterNextPriority: (params: { categoryId: string }) => {
+    const qp = new URLSearchParams();
+    const categoryId = params.categoryId.trim();
+    if (categoryId) qp.set('categoryId', categoryId);
+    return api<{ highestPriority: number; nextPriority: number }>(`/api/admin/characters/next-priority?${qp.toString()}`);
+  },
+  adminCharacterUpdate: (id: string, body: {
+    slug?: string;
+    name?: string;
+    title?: string;
+    bio?: string | null;
+    isPublic?: boolean;
+    priority?: number;
+    categoryId?: string;
+    previewVideoHasAudio?: boolean;
+  }) =>
+    api<{ ok: boolean }>(`/api/admin/characters/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  adminCharacterDelete: (id: string, options?: { deleteFiles?: boolean }) => {
+    const qp = new URLSearchParams();
+    if (options?.deleteFiles === true) qp.set('deleteFiles', '1');
+    const query = qp.toString();
+    const suffix = query ? `?${query}` : '';
+    return api<{ ok: boolean }>(`/api/admin/characters/${id}${suffix}`, { method: 'DELETE' });
+  },
+  adminCharactersBulkDelete: (ids: string[], options?: { deleteFiles?: boolean }) =>
+    api<{ ok: boolean; deleted: number }>(`/api/admin/characters/bulk-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ ids, deleteFiles: options?.deleteFiles === true }),
+    }),
+  adminCharactersBulkVisibility: (ids: string[], isPublic: boolean) =>
+    api<{ ok: boolean; updated: number }>(`/api/admin/characters/bulk-visibility`, {
+      method: 'POST',
+      body: JSON.stringify({ ids, isPublic }),
+    }),
+  adminCharacterUploadVideo: async (id: string, video: File, options?: { hasAudio?: boolean; processVideo?: boolean }) => {
+    const form = new FormData();
+    form.set('video', video);
+    form.set('hasAudio', options?.hasAudio === false ? 'false' : 'true');
+    form.set('processVideo', options?.processVideo === false ? 'false' : 'true');
+    return api<{ ok: boolean; previewVideoUrl: string }>(`/api/admin/characters/${id}/video`, {
+      method: 'POST',
+      body: form,
+      headers: {},
+    });
+  },
+  adminCharacterDeleteVideo: (id: string) => api<{ ok: boolean }>(`/api/admin/characters/${id}/video`, { method: 'DELETE' }),
+  adminCharacterImportValidationLimits: () => api<{ limits: import('@/shared/validators/admin-character-import').AdminCharacterImportValidationLimits }>('/api/admin/characters/import/validation'),
+  adminCharacterImportPrecheck: (payload: {
+    categoryId: string;
+    rows: Array<{
+      key: string;
+      slug: string;
+      name: string;
+      title: string;
+      bio?: string;
+    }>;
+  }) =>
+    api<{
+      items: Array<{
+        key: string;
+        issues: Array<{
+          field: 'slug' | 'name' | 'title' | 'bio';
+          message: string;
+        }>;
+      }>;
+    }>('/api/admin/characters/import/precheck', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  adminCharacterPrioritiesCheck: (payload: {
+    categoryId: string;
+    slugs: string[];
+  }) =>
+    api<{
+      categoryId: string;
+      normalizedSlugs: string[];
+      existingSlugs: string[];
+      missingSlugs: string[];
+      existingCount: number;
+      missingCount: number;
+    }>('/api/admin/characters/priorities/check', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  adminCharacterPrioritiesApply: (payload: {
+    categoryId: string;
+    slugs: string[];
+  }) =>
+    api<{
+      categoryId: string;
+      normalizedSlugs: string[];
+      existingSlugs: string[];
+      missingSlugs: string[];
+      updatedCount: number;
+      totalInCategory: number;
+      highestPriority: number;
+      step: number;
+    }>('/api/admin/characters/priorities/apply', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  adminCharacterImport: async (payload: {
+    categoryId: string;
+    slug: string;
+    name: string;
+    title: string;
+    bio?: string;
+    isPublic?: boolean;
+    prepared: File;
+    empty: File;
+  }) => {
+    const form = new FormData();
+    form.set('categoryId', payload.categoryId);
+    form.set('slug', payload.slug);
+    form.set('name', payload.name);
+    form.set('title', payload.title);
+    form.set('bio', payload.bio ?? '');
+    form.set('isPublic', payload.isPublic ? 'true' : 'false');
+    form.set('prepared', payload.prepared);
+    form.set('empty', payload.empty);
+    return api<{ status: 'saved' | 'skipped'; reason?: 'slug_exists'; characterId?: string }>('/api/admin/characters/import', {
+      method: 'POST',
+      body: form,
+      headers: {},
+    });
+  },
   // Public templates API
   // Only public templates for main page
   listTemplates: () => api<Array<{
@@ -249,7 +436,11 @@ export const Api = {
     voice?: { id: string; title: string; description?: string | null; externalId?: string | null } | null;
   }>>('/api/templates?onlyPublic=1'),
   getTemplate: (id: string) => api<{ id: string; title: string; description?: string | null; previewImageUrl: string; previewVideoUrl: string; textPrompt?: string; isPublic: boolean; weight?: number | null; createdAt: string; updatedAt: string }>(`/api/templates/${id}`),
-  getVoices: () => api<{ voices: import('@/shared/types').TemplateVoiceOptionDTO[] }>('/api/voices'),
+  getVoices: () =>
+    api<{
+      voices: import('@/shared/types').TemplateVoiceOptionDTO[];
+      providerAvailabilityRules: import('@/shared/voices/provider-availability-policy').VoiceProviderAvailabilityRuleDTO[];
+    }>('/api/voices'),
   // Scheduler
   getSchedulerState: () => api<import('@/shared/types').SchedulerStateDTO>('/api/scheduler/settings'),
   updateSchedulerState: (payload: { defaultTimes?: Record<string, string>; cadence?: Record<string, import('@/shared/constants/publish-scheduler').SchedulerCadenceValue>; channelLanguages?: Array<{ channelId: string; languages: string[] }> }) =>

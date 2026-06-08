@@ -4,13 +4,21 @@ import { readFile } from 'node:fs/promises';
 import { prisma } from '@/server/db';
 import { config } from '@/server/config';
 import { getResendClient } from '@/server/emails/resend';
+import { TOKEN_COSTS } from '@/shared/constants/token-costs';
 
-const EMAIL_KIND_WELCOME = 'welcome_v1';
-const EMAIL_KIND_FOLLOW_UP_24H = 'follow_up_24h_v1';
+export const EMAIL_KIND_WELCOME = 'welcome_v1';
+export const EMAIL_KIND_FOLLOW_UP_24H = 'follow_up_24h_v1';
+export const EMAIL_KIND_REPLY_BONUS_CONFIRMED = 'reply_bonus_confirmed_v1';
+export const EMAIL_KIND_SUBSCRIPTION_WINBACK = 'subscription_cancelled_winback_v1';
+export const EMAIL_KIND_PROJECT_CREATED = 'project_created_v1';
+export const EMAIL_KIND_PROJECT_READY = 'project_ready_v1';
 
 const DEFAULT_EMAIL_LANGUAGE = 'en';
 const EMAIL_TEMPLATE_ROOT = path.join(process.cwd(), 'email');
 const TEMPLATE_VARIABLE_PATTERN = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+const REPLY_BONUS_ALIAS_PREFIX = 'rb';
+const LEGACY_REPLY_BONUS_ALIAS_PREFIX = 'reply-bonus';
+const REPLY_BONUS_SIGNATURE_LENGTH = 16;
 
 const MAX_ATTEMPTS = 8;
 const DEFAULT_PROCESS_LIMIT = 50;
@@ -20,6 +28,10 @@ type SendResult = {
   ok: boolean;
   id?: string;
   error?: string;
+};
+
+export type LocalizedEmailSendResult = SendResult & {
+  language?: string;
 };
 
 type ParsedEmailTemplate = {
@@ -42,6 +54,8 @@ export type ProcessPlannedEmailsOptions = {
 };
 
 export type ProcessPlannedEmailsResult = {
+  plannedDue: number;
+  plannedPending: number;
   claimed: number;
   sent: number;
   rescheduled: number;
@@ -49,9 +63,10 @@ export type ProcessPlannedEmailsResult = {
   skipped: number;
 };
 
-function normalizeEmail(email?: string | null): string | null {
+export function normalizeEmail(email?: string | null): string | null {
   if (!email) return null;
-  const normalized = email.trim().toLowerCase();
+  const trimmed = email.trim().toLowerCase();
+  const normalized = trimmed.match(/<([^<>\s]+@[^<>\s]+)>/)?.[1] ?? trimmed.replace(/^mailto:/, '');
   if (!normalized.includes('@')) return null;
   if (normalized.endsWith('@guest.yumcut')) return null;
   if (normalized.length > 320) return null;
@@ -72,7 +87,7 @@ function normalizeLanguage(value: unknown): string {
 }
 
 function defaultGreetingName(language: string): string {
-  return language === 'ru' ? 'друг' : 'there';
+  return language === 'ru' ? '' : 'there';
 }
 
 function pickGreetingName(name: string | null | undefined, language: string): string {
@@ -179,7 +194,64 @@ async function resolveTargetLanguageForUser(userId: string, languageHint?: strin
   return normalizeLanguage(user?.preferredLanguage);
 }
 
-async function sendPlainTextEmail(params: { to: string; subject: string; text: string }): Promise<SendResult> {
+function parseConfiguredFromEmailAddress() {
+  return normalizeEmail(config.RESEND_FROM_EMAIL?.trim() ?? null);
+}
+
+function getReplyBonusSigningSecret() {
+  return config.NEXTAUTH_SECRET?.trim() || config.RESEND_WEBHOOK_SECRET?.trim() || null;
+}
+
+export function buildReplyBonusReplyToAddress(userId: string): string | null {
+  const fromEmail = parseConfiguredFromEmailAddress();
+  const secret = getReplyBonusSigningSecret();
+  if (!fromEmail || !secret) return null;
+
+  const domain = fromEmail.split('@')[1];
+  if (!domain) return null;
+
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(userId)
+    .digest('hex')
+    .slice(0, REPLY_BONUS_SIGNATURE_LENGTH);
+
+  return `${REPLY_BONUS_ALIAS_PREFIX}+${userId}.${signature}@${domain}`;
+}
+
+export function parseReplyBonusReplyToAddress(addresses: string[]): { userId: string } | null {
+  const secret = getReplyBonusSigningSecret();
+  if (!secret) return null;
+
+  for (const raw of addresses) {
+    const normalized = normalizeEmail(raw);
+    if (!normalized) continue;
+
+    const localPart = normalized.split('@')[0] ?? '';
+    const match = localPart.match(new RegExp(
+      `^(?:${REPLY_BONUS_ALIAS_PREFIX}|${LEGACY_REPLY_BONUS_ALIAS_PREFIX})\\+([a-f0-9-]{36})\\.([a-f0-9]{${REPLY_BONUS_SIGNATURE_LENGTH}})$`,
+      'i',
+    ));
+    if (!match) continue;
+
+    const userId = match[1];
+    const signature = match[2]?.toLowerCase();
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(userId)
+      .digest('hex')
+      .slice(0, REPLY_BONUS_SIGNATURE_LENGTH)
+      .toLowerCase();
+
+    if (signature === expectedSignature) {
+      return { userId };
+    }
+  }
+
+  return null;
+}
+
+async function sendPlainTextEmail(params: { to: string; subject: string; text: string; replyTo?: string | null }): Promise<SendResult> {
   const from = config.RESEND_FROM_EMAIL?.trim();
   if (!from) {
     return {
@@ -193,6 +265,7 @@ async function sendPlainTextEmail(params: { to: string; subject: string; text: s
     const response = await resend.emails.send({
       from,
       to: [params.to],
+      ...(params.replyTo ? { replyTo: [params.replyTo] } : {}),
       subject: params.subject,
       text: params.text,
     });
@@ -208,6 +281,64 @@ async function sendPlainTextEmail(params: { to: string; subject: string; text: s
     return {
       ok: true,
       id: (response as any)?.data?.id,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: stringifyError(error),
+    };
+  }
+}
+
+function makeTemplateVariables(params: {
+  name?: string | null;
+  language: string;
+  extra?: Record<string, string>;
+}) {
+  const greetingName = pickGreetingName(params.name, params.language);
+  const nameCommaSuffix = greetingName ? `, ${greetingName}` : '';
+  const nameSpaceSuffix = greetingName ? ` ${greetingName}` : '';
+  const namePrefixComma = greetingName ? `${greetingName}, ` : '';
+  const nameForClause = greetingName ? ` для ${greetingName}` : '';
+  return {
+    name: greetingName,
+    name_comma_suffix: nameCommaSuffix,
+    name_space_suffix: nameSpaceSuffix,
+    name_prefix_comma: namePrefixComma,
+    name_for_clause: nameForClause,
+    bonus_tokens: String(TOKEN_COSTS.emailReplyBonus),
+    ...(params.extra ?? {}),
+  };
+}
+
+export async function sendLocalizedPlainTextEmail(params: {
+  to: string;
+  kind: string;
+  languageHint?: string | null;
+  name?: string | null;
+  replyTo?: string | null;
+  variables?: Record<string, string>;
+}): Promise<LocalizedEmailSendResult> {
+  const languageHint = parseLanguage(params.languageHint) ?? DEFAULT_EMAIL_LANGUAGE;
+
+  try {
+    const template = await loadLocalizedTemplate(params.kind, languageHint);
+    const variables = makeTemplateVariables({
+      name: params.name,
+      language: template.language,
+      extra: params.variables,
+    });
+
+    const sendResult = await sendPlainTextEmail({
+      to: params.to,
+      subject: fillTemplate(template.subjectTemplate, variables),
+      text: fillTemplate(template.textTemplate, variables),
+      replyTo: params.replyTo,
+    });
+
+    return {
+      ...sendResult,
+      language: template.language,
     };
   } catch (error) {
     return {
@@ -250,6 +381,14 @@ export async function queueUserOnboardingEmails(input: ScheduleUserOnboardingEma
   return true;
 }
 
+export async function cancelPlannedEmailsForUser(
+  userId: string,
+  db: Pick<typeof prisma, 'plannedEmail'> = prisma,
+): Promise<number> {
+  const result = await db.plannedEmail.deleteMany({ where: { userId } });
+  return result.count;
+}
+
 export async function processPlannedEmails(options: ProcessPlannedEmailsOptions = {}): Promise<ProcessPlannedEmailsResult> {
   const limit = Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit as number)) : DEFAULT_PROCESS_LIMIT;
   const lockStaleMinutes = Number.isFinite(options.lockStaleMinutes)
@@ -258,13 +397,24 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
   const now = new Date();
   const staleBefore = new Date(now.getTime() - lockStaleMinutes * 60 * 1000);
   const lockId = crypto.randomUUID();
+  const basePendingWhere = {
+    status: 'pending' as const,
+    ...(options.userId ? { userId: options.userId } : {}),
+  };
+  const duePendingWhere = {
+    ...basePendingWhere,
+    scheduledAt: { lte: now },
+  };
+
+  const [plannedPending, plannedDue] = await Promise.all([
+    prisma.plannedEmail.count({ where: basePendingWhere }),
+    prisma.plannedEmail.count({ where: duePendingWhere }),
+  ]);
 
   const claimed = await prisma.$transaction(async (tx) => {
     const due = await tx.plannedEmail.findMany({
       where: {
-        status: 'pending',
-        scheduledAt: { lte: now },
-        ...(options.userId ? { userId: options.userId } : {}),
+        ...duePendingWhere,
         OR: [
           { lockedAt: null },
           { lockedAt: { lt: staleBefore } },
@@ -281,11 +431,12 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
     if (due.length === 0) {
       return [] as Array<{
         id: string;
+        userId: string;
         email: string;
         kind: string;
         attempts: number;
         targetLanguage: string;
-        user: { preferredLanguage: string; name: string | null } | null;
+        user: { preferredLanguage: string; name: string | null; deleted: boolean } | null;
       }>;
     }
 
@@ -310,6 +461,7 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
       where: { lockId, status: 'pending' },
       select: {
         id: true,
+        userId: true,
         email: true,
         kind: true,
         attempts: true,
@@ -318,6 +470,7 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
           select: {
             preferredLanguage: true,
             name: true,
+            deleted: true,
           },
         },
       },
@@ -329,6 +482,8 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
   });
 
   const result: ProcessPlannedEmailsResult = {
+    plannedDue,
+    plannedPending,
     claimed: claimed.length,
     sent: 0,
     rescheduled: 0,
@@ -337,6 +492,14 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
   };
 
   for (const planned of claimed) {
+    if (!planned.user || planned.user.deleted) {
+      await prisma.plannedEmail.deleteMany({
+        where: { id: planned.id, lockId, status: 'pending' },
+      });
+      result.skipped += 1;
+      continue;
+    }
+
     const languageHint = parseLanguage(planned.user?.preferredLanguage)
       ?? parseLanguage(planned.targetLanguage)
       ?? DEFAULT_EMAIL_LANGUAGE;
@@ -345,16 +508,19 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
     let sendResult: SendResult;
 
     try {
-      const template = await loadLocalizedTemplate(planned.kind, languageHint);
-      resolvedLanguage = template.language;
-      const greetingName = pickGreetingName(planned.user?.name, resolvedLanguage);
-      const subject = fillTemplate(template.subjectTemplate, { name: greetingName });
-      const text = fillTemplate(template.textTemplate, { name: greetingName });
-      sendResult = await sendPlainTextEmail({
+      const replyTo = planned.kind === EMAIL_KIND_WELCOME || planned.kind === EMAIL_KIND_FOLLOW_UP_24H
+        ? buildReplyBonusReplyToAddress(planned.userId)
+        : null;
+
+      const localizedResult = await sendLocalizedPlainTextEmail({
         to: planned.email,
-        subject,
-        text,
+        kind: planned.kind,
+        languageHint,
+        name: planned.user?.name,
+        replyTo,
       });
+      resolvedLanguage = localizedResult.language ?? resolvedLanguage;
+      sendResult = localizedResult;
     } catch (error) {
       sendResult = {
         ok: false,

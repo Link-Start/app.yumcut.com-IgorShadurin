@@ -1,13 +1,22 @@
 import { prisma } from '@/server/db';
 import { ProjectStatus } from '@/shared/constants/status';
+import {
+  PROJECT_RELATED_TOKEN_TYPES,
+  extractProjectIdFromTokenMetadata,
+  toUsedTokensFromDelta,
+} from '@/server/admin/token-usage';
 
 type PaginationInput = {
   page?: number;
   pageSize?: number;
+  includeDeleted?: boolean;
 };
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
+const DEFAULT_SEARCH_LIMIT = 20;
+const MAX_SEARCH_LIMIT = 50;
+const GUEST_EMAIL_SUFFIX = '@guest.yumcut';
 
 function clampPageSize(pageSize?: number) {
   const base = typeof pageSize === 'number' && Number.isFinite(pageSize) ? Math.floor(pageSize) : DEFAULT_PAGE_SIZE;
@@ -19,39 +28,125 @@ function normalizePage(page?: number) {
   return Math.max(base, 1);
 }
 
+function clampSearchLimit(limit?: number) {
+  const base = typeof limit === 'number' && Number.isFinite(limit) ? Math.floor(limit) : DEFAULT_SEARCH_LIMIT;
+  return Math.min(Math.max(base, 1), MAX_SEARCH_LIMIT);
+}
+
+function normalizeUserSearchQuery(value: string) {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+type AdminUserRow = {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+  createdAt: Date;
+  tokenBalance: number;
+  isAdmin: boolean;
+  deleted: boolean;
+};
+
+export type AdminUserListItem = {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+  createdAt: string;
+  tokenBalance: number;
+  isAdmin: boolean;
+  deleted: boolean;
+};
+
+const ADMIN_USER_LIST_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  image: true,
+  createdAt: true,
+  tokenBalance: true,
+  isAdmin: true,
+  deleted: true,
+} as const;
+
+function serializeAdminUsers(items: AdminUserRow[]): AdminUserListItem[] {
+  return items.map((u) => ({
+    ...u,
+    createdAt: u.createdAt.toISOString(),
+  }));
+}
+
 export async function listUsers(pagination: PaginationInput = {}) {
   const take = clampPageSize(pagination.pageSize);
   const page = normalizePage(pagination.page);
   const skip = (page - 1) * take;
+  const includeDeleted = pagination.includeDeleted === true;
+  const where = includeDeleted ? undefined : { deleted: false };
 
   const [items, total] = await prisma.$transaction([
     prisma.user.findMany({
+      ...(where ? { where } : {}),
       orderBy: { createdAt: 'desc' },
       skip,
       take,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        image: true,
-        createdAt: true,
-        tokenBalance: true,
-        isAdmin: true,
-      },
+      select: ADMIN_USER_LIST_SELECT,
     }),
-    prisma.user.count(),
+    ...(where ? [prisma.user.count({ where })] : [prisma.user.count()]),
   ]);
 
   return {
-    items: items.map((u) => ({
-      ...u,
-      createdAt: u.createdAt.toISOString(),
-    })),
+    items: serializeAdminUsers(items as AdminUserRow[]),
     page,
     pageSize: take,
     total,
     totalPages: Math.max(Math.ceil(total / take), 1),
   };
+}
+
+export type SearchUsersInput = {
+  query: string;
+  limit?: number;
+  includeGuestUsers?: boolean;
+  includeDeleted?: boolean;
+};
+
+export async function searchUsersByEmailOrName(input: SearchUsersInput): Promise<AdminUserListItem[]> {
+  const query = normalizeUserSearchQuery(input.query || '');
+  if (query.length < 2) return [];
+
+  const take = clampSearchLimit(input.limit);
+  const includeGuestUsers = input.includeGuestUsers !== false;
+  const includeDeleted = input.includeDeleted === true;
+
+  const andFilters: Array<Record<string, unknown>> = [
+    {
+      OR: [
+        { email: { contains: query } },
+        { name: { contains: query } },
+      ],
+    },
+  ];
+
+  if (!includeDeleted) {
+    andFilters.push({ deleted: false });
+  }
+
+  if (!includeGuestUsers) {
+    andFilters.push({
+      email: { not: { endsWith: GUEST_EMAIL_SUFFIX } },
+    });
+  }
+
+  const where = andFilters.length === 1 ? andFilters[0] : { AND: andFilters };
+  const items = await prisma.user.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take,
+    select: ADMIN_USER_LIST_SELECT,
+  });
+
+  return serializeAdminUsers(items as AdminUserRow[]);
 }
 
 export interface AdminUserDetailResult {
@@ -62,6 +157,7 @@ export interface AdminUserDetailResult {
     image: string | null;
     createdAt: string;
     tokenBalance: number;
+    preferredLanguage: string;
     isAdmin: boolean;
     telegramAccount: {
       telegramId: string;
@@ -72,6 +168,7 @@ export interface AdminUserDetailResult {
       linkedAt: string;
     } | null;
   };
+  projectTokensUsed: number;
   tokenHistory: {
     items: Array<{
       id: string;
@@ -96,6 +193,7 @@ export interface AdminUserDetailResult {
       createdAt: string;
       updatedAt: string;
       finalVideoAvailable: boolean;
+      tokensUsed: number;
     }>;
     total: number;
     page: number;
@@ -121,6 +219,7 @@ export async function getUserDetail(userId: string, options: AdminUserDetailOpti
       image: true,
       createdAt: true,
       tokenBalance: true,
+      preferredLanguage: true,
       isAdmin: true,
       telegramAccount: {
         select: {
@@ -144,7 +243,7 @@ export async function getUserDetail(userId: string, options: AdminUserDetailOpti
   const projectPage = normalizePage(options.projectPage);
   const projectSkip = (projectPage - 1) * projectTake;
 
-  const [txItems, txTotal, projectItems, projectTotal] = await prisma.$transaction([
+  const [txItems, txTotal, projectItems, projectTotal, projectTokenRows] = await prisma.$transaction([
     prisma.tokenTransaction.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -173,7 +272,26 @@ export async function getUserDetail(userId: string, options: AdminUserDetailOpti
       },
     }),
     prisma.project.count({ where: { userId, deleted: false } }),
+    prisma.tokenTransaction.findMany({
+      where: {
+        userId,
+        type: { in: [...PROJECT_RELATED_TOKEN_TYPES] },
+      },
+      select: {
+        delta: true,
+        metadata: true,
+      },
+    }),
   ]);
+
+  const projectUsageByProjectId = new Map<string, number>();
+  let allProjectDelta = 0;
+  for (const row of projectTokenRows) {
+    allProjectDelta += row.delta;
+    const projectId = extractProjectIdFromTokenMetadata(row.metadata);
+    if (!projectId) continue;
+    projectUsageByProjectId.set(projectId, (projectUsageByProjectId.get(projectId) ?? 0) + row.delta);
+  }
 
   return {
     user: {
@@ -183,6 +301,7 @@ export async function getUserDetail(userId: string, options: AdminUserDetailOpti
       image: user.image,
       createdAt: user.createdAt.toISOString(),
       tokenBalance: user.tokenBalance,
+      preferredLanguage: user.preferredLanguage,
       isAdmin: user.isAdmin,
       telegramAccount: user.telegramAccount
         ? {
@@ -195,6 +314,7 @@ export async function getUserDetail(userId: string, options: AdminUserDetailOpti
           }
         : null,
     },
+    projectTokensUsed: toUsedTokensFromDelta(allProjectDelta),
     tokenHistory: {
       items: txItems.map((tx) => ({
         ...tx,
@@ -213,6 +333,7 @@ export async function getUserDetail(userId: string, options: AdminUserDetailOpti
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
         finalVideoAvailable: Boolean(p.finalVideoUrl || p.finalVideoPath || p.videos.length > 0),
+        tokensUsed: toUsedTokensFromDelta(projectUsageByProjectId.get(p.id) ?? 0),
       })),
       total: projectTotal,
       page: projectPage,

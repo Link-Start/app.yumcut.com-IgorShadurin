@@ -5,6 +5,9 @@ import { randomBytes } from 'crypto';
 import path from 'path';
 import { ProjectStatus } from '@/shared/constants/status';
 import type { TemplateCustomData } from '@/shared/templates/custom-data';
+import type { ContentTone } from '@/shared/constants/content-tone';
+import type { ProjectExperience } from '@/shared/constants/project-experience';
+import type { CharacterVideoGenerationMode, CharacterVideoQuality } from '@/shared/constants/character-video-quality';
 import { loadConfig } from './config';
 import { log } from './logger';
 
@@ -42,7 +45,7 @@ function shouldTrace(target: string, method?: string | null) {
     if (/\/api\/daemon\/projects\/.+\/status$/.test(target)) return true; // advance status
     if (/\/api\/daemon\/jobs\/.+\/status$/.test(target)) return true; // job done/failed
     if (/\/api\/daemon\/jobs$/.test(target)) return true; // create job
-    if (/\/api\/daemon\/jobs\/.+\/claim$/.test(target)) return true; // claim job
+    if (/\/api\/daemon\/jobs\/.+\/claim$/.test(target)) return verbose; // claim job
     if (/\/api\/daemon\/projects\/.+\/assets$/.test(target)) return verbose; // asset registration (optional)
   }
   // Read paths: enable only when verbose
@@ -149,6 +152,21 @@ async function requestJson<T>(target: string, init: RequestInit = {}) {
   return requestJsonWithBase<T>(cfg.apiBaseUrl, target, init, 'API');
 }
 
+export function isProjectUnavailableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /project not found/i.test(message) || /project unavailable/i.test(message);
+}
+
+export function isJobUnavailableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    /job not found/i.test(message) ||
+    /requested record was not found/i.test(message) ||
+    /no record was found for an update/i.test(message) ||
+    /p2025/i.test(message)
+  );
+}
+
 async function requestStorageJson<T>(target: string, init: RequestInit = {}) {
   return requestJsonWithBase<T>(cfg.storageBaseUrl, target, init, 'Storage API');
 }
@@ -171,6 +189,7 @@ async function uploadAsset(
   filePath: string,
   isFinal = false,
   languageCode?: string,
+  variant?: 'raw',
 ) {
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
   // Ensure the file exists before streaming
@@ -283,6 +302,7 @@ async function uploadAsset(
     isFinal?: boolean;
     localPath?: string;
     languageCode?: string;
+    variant?: 'raw';
   } = {
     type: kind,
     path: storageResponse.path,
@@ -292,6 +312,9 @@ async function uploadAsset(
   };
   if (languageCode) {
     payload.languageCode = languageCode;
+  }
+  if (kind === 'video' && variant) {
+    payload.variant = variant;
   }
   const registerEndpoint = `/api/daemon/projects/${projectId}/assets`;
   const registerRequestUrl = buildUrl(cfg.apiBaseUrl, registerEndpoint);
@@ -321,18 +344,20 @@ export type ProjectRow = {
   id: string;
   status: ProjectStatus;
   userId: string;
+  projectExperience?: ProjectExperience;
   createdAt: Date;
   updatedAt: Date;
 };
 
 export async function fetchEligibleProjects(limit: number): Promise<ProjectRow[]> {
-  const payload = await requestJson<{ projects: { id: string; status: ProjectStatus; userId: string; createdAt: string; updatedAt: string }[] }>(
+  const payload = await requestJson<{ projects: { id: string; status: ProjectStatus; userId: string; projectExperience?: ProjectExperience; createdAt: string; updatedAt: string }[] }>(
     `/api/daemon/projects/eligible?limit=${encodeURIComponent(String(limit))}`,
   );
   return payload.projects.map((p) => ({
     id: p.id,
     status: p.status,
     userId: p.userId,
+    projectExperience: p.projectExperience,
     createdAt: new Date(p.createdAt),
     updatedAt: new Date(p.updatedAt),
   }));
@@ -345,7 +370,9 @@ export async function getCreationSnapshot(projectId: string): Promise<{
   includeDefaultMusic: boolean;
   addOverlay: boolean;
   useExactTextAsScript: boolean;
+  projectExperience?: ProjectExperience;
   durationSeconds: number | null;
+  contentTone?: ContentTone;
   targetLanguage: string;
   languages?: string[];
   watermarkEnabled: boolean;
@@ -356,6 +383,11 @@ export async function getCreationSnapshot(projectId: string): Promise<{
   scriptAvoidanceGuidance: string;
   audioStyleGuidanceEnabled: boolean;
   audioStyleGuidance: string;
+  characterVideoQuality?: CharacterVideoQuality;
+  videoGeneration?: {
+    mode: CharacterVideoGenerationMode;
+    lipsyncPrompt?: string | null;
+  } | null;
   voiceId?: string | null;
   voiceAssignments?: Record<string, {
     voiceId: string | null;
@@ -419,9 +451,21 @@ export async function setStatus(projectId: string, status: ProjectStatus, messag
   try {
     await requestJson(`/api/daemon/projects/${projectId}/status`, { method: 'POST', body });
   } catch (errFirst) {
+    if (isProjectUnavailableError(errFirst)) {
+      log.info('Skipping status update for unavailable project', { projectId, status });
+      return;
+    }
     // One quick retry in case of transient timeout/proxy blip
     await new Promise((r) => setTimeout(r, 200));
-    await requestJson(`/api/daemon/projects/${projectId}/status`, { method: 'POST', body });
+    try {
+      await requestJson(`/api/daemon/projects/${projectId}/status`, { method: 'POST', body });
+    } catch (errSecond) {
+      if (isProjectUnavailableError(errSecond)) {
+        log.info('Skipping retried status update for unavailable project', { projectId, status });
+        return;
+      }
+      throw errSecond;
+    }
   }
 }
 
@@ -545,6 +589,10 @@ export async function setFinalVideo(projectId: string, filePath: string, languag
   await uploadAsset(projectId, 'video', filePath, true, languageCode ?? undefined);
 }
 
+export async function setRawVideo(projectId: string, filePath: string, languageCode?: string | null) {
+  await uploadAsset(projectId, 'video', filePath, false, languageCode ?? undefined, 'raw');
+}
+
 export type JobRow = {
   id: string;
   projectId: string;
@@ -578,9 +626,21 @@ export async function setJobStatus(id: string, status: 'queued' | 'running' | 'd
   try {
     await requestJson(`/api/daemon/jobs/${id}/status`, { method: 'POST', body });
   } catch (errFirst) {
+    if (isJobUnavailableError(errFirst)) {
+      log.info('Skipping status update for unavailable job', { jobId: id, status });
+      return;
+    }
     // One quick retry to avoid leaving jobs stuck as 'running' on transient failures
     await new Promise((r) => setTimeout(r, 200));
-    await requestJson(`/api/daemon/jobs/${id}/status`, { method: 'POST', body });
+    try {
+      await requestJson(`/api/daemon/jobs/${id}/status`, { method: 'POST', body });
+    } catch (errSecond) {
+      if (isJobUnavailableError(errSecond)) {
+        log.info('Skipping retried status update for unavailable job', { jobId: id, status });
+        return;
+      }
+      throw errSecond;
+    }
   }
 }
 

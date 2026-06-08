@@ -35,7 +35,10 @@ describe('character upload end-to-end', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ttlMs: 60_000 }),
     });
-    expect(uploadTokenRes.ok).toBe(true);
+    if (!uploadTokenRes.ok) {
+      const body = await uploadTokenRes.text();
+      throw new Error(`Upload token failed ${uploadTokenRes.status}: ${body}`);
+    }
     const uploadToken = await uploadTokenRes.json();
     expect(uploadToken.data).toBeTruthy();
     expect(uploadToken.signature).toBeTruthy();
@@ -54,7 +57,8 @@ describe('character upload end-to-end', () => {
     expect(storageRes.ok).toBe(true);
     const stored = await storageRes.json();
     expect(stored.path).toContain('/'); // path present
-    expect(stored.url).toMatch(/http:\/\/localhost:3333/);
+    expect(typeof stored.url).toBe('string');
+    expect(stored.url.startsWith(storage!.baseUrl)).toBe(true);
 
     const finalizeRes = await fetch(new URL('/api/characters/custom/upload', app!.baseUrl), {
       method: 'POST',

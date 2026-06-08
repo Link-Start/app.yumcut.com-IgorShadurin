@@ -18,6 +18,8 @@ describe('/api/cron/planned-emails auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     processPlannedEmails.mockResolvedValue({
+      plannedDue: 0,
+      plannedPending: 0,
       claimed: 0,
       sent: 0,
       rescheduled: 0,
@@ -41,9 +43,20 @@ describe('/api/cron/planned-emails auth', () => {
 
     const req = new NextRequest('http://localhost/api/cron/planned-emails?limit=15&lockStaleMinutes=7');
     const res = await route.GET(req);
+    const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(processPlannedEmails).toHaveBeenCalledWith({ limit: 15, lockStaleMinutes: 7 });
+    expect(body).toEqual({
+      ok: true,
+      plannedDue: 0,
+      plannedPending: 0,
+      claimed: 0,
+      sent: 0,
+      rescheduled: 0,
+      failed: 0,
+      skipped: 0,
+    });
   });
 
   it('rejects POST without valid service auth', async () => {
@@ -69,8 +82,19 @@ describe('/api/cron/planned-emails auth', () => {
       headers: { 'content-type': 'application/json' },
     });
     const res = await route.POST(req);
+    const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(processPlannedEmails).toHaveBeenCalledWith({ limit: 5, lockStaleMinutes: 12 });
+    expect(body).toEqual({
+      ok: true,
+      plannedDue: 0,
+      plannedPending: 0,
+      claimed: 0,
+      sent: 0,
+      rescheduled: 0,
+      failed: 0,
+      skipped: 0,
+    });
   });
 });

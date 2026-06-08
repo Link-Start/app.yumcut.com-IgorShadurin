@@ -12,7 +12,10 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
   const daemonId = await assertDaemonAuth(req);
   if (!daemonId) return forbidden('Invalid daemon credentials');
   const { projectId } = await params;
-  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true, currentDaemonId: true } });
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, deleted: false },
+    select: { id: true, currentDaemonId: true },
+  });
   if (!project) return notFound('Project not found');
   if (project.currentDaemonId && project.currentDaemonId !== daemonId) {
     return forbidden('Project locked by another daemon');
@@ -36,7 +39,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     return error('VALIDATION_ERROR', 'Invalid payload', 400, parsed.error.flatten());
   }
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  const project = await prisma.project.findFirst({ where: { id: projectId, deleted: false } });
   if (!project) return notFound('Project not found');
   if (project.currentDaemonId && project.currentDaemonId !== daemonId) {
     return forbidden('Project locked by another daemon');

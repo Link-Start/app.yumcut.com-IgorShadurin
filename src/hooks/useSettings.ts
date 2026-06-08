@@ -99,7 +99,7 @@ export function useSettings() {
           throw err;
         });
     },
-    [ctx?.settings, local]
+    [ctx, local]
   );
 
   return { settings: ctx?.settings ?? local, loading, error, update };

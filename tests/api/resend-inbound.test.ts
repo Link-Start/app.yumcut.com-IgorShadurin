@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 const verifyResendWebhook = vi.hoisted(() => vi.fn());
 const getReceivedEmail = vi.hoisted(() => vi.fn());
 const notifyAdminsWithMessage = vi.hoisted(() => vi.fn());
+const processInboundReplyBonus = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/config', () => ({
   config: {
@@ -20,12 +21,23 @@ vi.mock('@/server/telegram', () => ({
   notifyAdminsWithMessage,
 }));
 
+vi.mock('@/server/emails/reply-bonus', () => ({
+  processInboundReplyBonus,
+}));
+
 const route = await import('@/app/api/resend/inbound/route');
 
 describe('POST /api/resend/inbound', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     notifyAdminsWithMessage.mockResolvedValue(undefined);
+    processInboundReplyBonus.mockResolvedValue({
+      eligible: false,
+      granted: false,
+      alreadyGranted: false,
+      userMatched: false,
+      reason: 'no_signed_recipient',
+    });
   });
 
   function makeReq(body: string) {
@@ -67,6 +79,7 @@ describe('POST /api/resend/inbound', () => {
     expect(payload.forwardedToTelegram).toBe(true);
     expect(payload.snippetSource).toBe('api');
     expect(payload.enriched).toBe(true);
+    expect(payload.replyBonus.granted).toBe(false);
     expect(notifyAdminsWithMessage).toHaveBeenCalledWith(expect.stringContaining('Inbound text body'));
   });
 

@@ -2,18 +2,22 @@ import { z } from 'zod';
 import { LIMITS } from '@/server/limits';
 import { LANGUAGE_ENUM, LANGUAGE_CODES } from '@/shared/constants/languages';
 import { SCHEDULER_CADENCE_OPTIONS } from '@/shared/constants/publish-scheduler';
+import { CONTENT_TONES } from '@/shared/constants/content-tone';
 
 export const allowedSettingsKeys = [
   'includeDefaultMusic',
   'addOverlay',
   'includeCallToAction',
+  'projectEmailsEnabled',
   'autoApproveScript',
   'autoApproveAudio',
   'watermarkEnabled',
   'captionsEnabled',
+  'characterCreationSettings',
   'defaultDurationSeconds',
   'sidebarOpen',
   'defaultUseScript',
+  'characterContentTone',
   'targetLanguages',
   'scriptCreationGuidance',
   'scriptCreationGuidanceEnabled',
@@ -62,6 +66,13 @@ const characterSelectionValueSchema = z.union([
   }),
 ]);
 
+const characterCreationSettingsSchema = z.object({
+  addOverlay: z.boolean(),
+  watermarkEnabled: z.boolean(),
+  captionsEnabled: z.boolean(),
+  includeCallToAction: z.boolean(),
+});
+
 export const patchSettingsSchema = z.discriminatedUnion('key', [
   z.object({
     key: z.literal('defaultDurationSeconds'),
@@ -71,13 +82,16 @@ export const patchSettingsSchema = z.discriminatedUnion('key', [
     ]),
   }),
   z.object({ key: z.literal('defaultUseScript'), value: z.boolean() }),
+  z.object({ key: z.literal('characterContentTone'), value: z.enum(CONTENT_TONES) }),
   z.object({ key: z.literal('includeDefaultMusic'), value: z.boolean() }),
   z.object({ key: z.literal('addOverlay'), value: z.boolean() }),
   z.object({ key: z.literal('includeCallToAction'), value: z.boolean() }),
+  z.object({ key: z.literal('projectEmailsEnabled'), value: z.boolean() }),
   z.object({ key: z.literal('autoApproveScript'), value: z.boolean() }),
   z.object({ key: z.literal('autoApproveAudio'), value: z.boolean() }),
   z.object({ key: z.literal('watermarkEnabled'), value: z.boolean() }),
   z.object({ key: z.literal('captionsEnabled'), value: z.boolean() }),
+  z.object({ key: z.literal('characterCreationSettings'), value: characterCreationSettingsSchema }),
   z.object({ key: z.literal('sidebarOpen'), value: z.boolean() }),
   z.object({
     key: z.literal('targetLanguages'),

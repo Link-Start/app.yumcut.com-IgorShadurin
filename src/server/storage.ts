@@ -1,10 +1,12 @@
-import { issueSignedStorageCommand } from '@/lib/upload-signature';
+import { issueSignedDaemonUploadGrant, issueSignedStorageCommand } from '@/lib/upload-signature';
 import { config } from './config';
 
 let inferredPublicBase: string | undefined;
 let cachedMediaRoot: string | undefined;
 const STORAGE_DELETE_PREFIXES = ['characters/', 'audio/', 'image/', 'video/'];
 let cachedAppOrigin: string | null | undefined;
+const ADMIN_CATALOG_STORAGE_USER_ID = 'admin-character-catalog';
+const ADMIN_CATALOG_DAEMON_ID = 'app-admin-character-catalog';
 
 function normalizeBaseUrl(base: string) {
   return base.replace(/\/+$/, '');
@@ -95,6 +97,9 @@ export function toStoredMediaPath(input: string) {
   if (working.startsWith('/')) {
     working = working.replace(/^\/+/, '');
   }
+  if (working.startsWith('public/')) {
+    working = working.slice('public/'.length);
+  }
   const lowerWorking = working.toLowerCase();
   const disallowedPrefixes = ['media/', 'files/', 'project/', 'daemon/'];
   for (const prefix of disallowedPrefixes) {
@@ -119,6 +124,128 @@ function resolveStorageServiceBase() {
     }
   }
   return null;
+}
+
+function resolveStorageServiceAuthHeaders() {
+  const password = (process.env.DAEMON_API_PASSWORD || config.DAEMON_API_PASSWORD || '').trim();
+  if (!password) {
+    throw new Error('DAEMON_API_PASSWORD is required for storage uploads');
+  }
+  return {
+    'x-daemon-password': password,
+    'x-daemon-id': ADMIN_CATALOG_DAEMON_ID,
+  };
+}
+
+export function guessStorageContentType(fileName: string, fallback?: string | null): string {
+  const normalizedFallback = fallback?.trim();
+  if (normalizedFallback) return normalizedFallback;
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.m4v')) return 'video/x-m4v';
+  if (lower.endsWith('.mov')) return 'video/quicktime';
+  if (lower.endsWith('.mp3')) return 'audio/mpeg';
+  if (lower.endsWith('.mp4')) return 'video/mp4';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.wav')) return 'audio/wav';
+  if (lower.endsWith('.webm')) return 'video/webm';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'application/octet-stream';
+}
+
+export async function uploadCharacterAssetToStorage(input: {
+  file: File;
+  fileName: string;
+  kind: 'character-image' | 'video';
+}): Promise<{ path: string; url: string }> {
+  const base = resolveStorageServiceBase();
+  if (!base) {
+    throw new Error('Storage service base URL is not configured');
+  }
+
+  const contentType = guessStorageContentType(input.fileName, input.file.type);
+  const grant = issueSignedDaemonUploadGrant({
+    projectId: ADMIN_CATALOG_STORAGE_USER_ID,
+    kind: input.kind,
+    maxBytes: input.file.size,
+    mimeTypes: [contentType],
+  });
+
+  const form = new FormData();
+  form.set('data', grant.data);
+  form.set('signature', grant.signature);
+  form.set('file', input.file, input.fileName);
+
+  const response = await fetch(`${base}/api/storage/characters`, {
+    method: 'POST',
+    headers: {
+      ...resolveStorageServiceAuthHeaders(),
+      ...(resolveAppRequestOrigin() ? { origin: resolveAppRequestOrigin()! } : {}),
+    },
+    body: form,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`uploadCharacterAssetToStorage: storage service responded ${response.status}${text ? ` - ${text}` : ''}`);
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!payload || typeof payload.path !== 'string' || payload.path.trim().length === 0) {
+    throw new Error('uploadCharacterAssetToStorage: storage response missing path');
+  }
+
+  recordStoragePublicUrlHint(typeof payload.url === 'string' ? payload.url : null);
+  const path = toStoredMediaPath(payload.path);
+  return {
+    path,
+    url: normalizeMediaUrl(path) ?? path,
+  };
+}
+
+export async function prepareCharacterPreviewImageVariantInStorage(input: {
+  sourcePath: string;
+  height: number;
+}): Promise<{ path: string; url: string; width: number | null; height: number | null }> {
+  const base = resolveStorageServiceBase();
+  if (!base) {
+    throw new Error('Storage service base URL is not configured');
+  }
+
+  const command = issueSignedStorageCommand({
+    type: 'resize-character-image',
+    userId: ADMIN_CATALOG_STORAGE_USER_ID,
+    path: input.sourcePath,
+    height: input.height,
+  });
+
+  const response = await fetch(`${base}/api/storage/characters/preview-image`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(resolveAppRequestOrigin() ? { origin: resolveAppRequestOrigin()! } : {}),
+    },
+    body: JSON.stringify({ data: command.data, signature: command.signature }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`prepareCharacterPreviewImageVariantInStorage: storage service responded ${response.status}${text ? ` - ${text}` : ''}`);
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!payload || typeof payload.path !== 'string' || payload.path.trim().length === 0) {
+    throw new Error('prepareCharacterPreviewImageVariantInStorage: storage response missing path');
+  }
+
+  recordStoragePublicUrlHint(typeof payload.url === 'string' ? payload.url : null);
+  const path = toStoredMediaPath(payload.path);
+  return {
+    path,
+    url: normalizeMediaUrl(path) ?? path,
+    width: typeof payload.width === 'number' && Number.isFinite(payload.width) ? payload.width : null,
+    height: typeof payload.height === 'number' && Number.isFinite(payload.height) ? payload.height : null,
+  };
 }
 
 function resolveAppRequestOrigin() {
@@ -201,6 +328,10 @@ export async function deleteStoredMedia(paths: Array<string | null | undefined>,
     const text = await response.text().catch(() => '');
     throw new Error(`deleteStoredMedia: storage service responded ${response.status}${text ? ` - ${text}` : ''}`);
   }
+}
+
+export async function deleteStoredCatalogCharacterMedia(paths: Array<string | null | undefined>) {
+  await deleteStoredMedia(paths, { userId: ADMIN_CATALOG_STORAGE_USER_ID });
 }
 
 export async function removeCharacterImage(relativePath: string | null | undefined, options: { userId?: string } = {}) {

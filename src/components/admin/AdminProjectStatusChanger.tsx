@@ -13,14 +13,17 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { StatusIcon } from '@/components/common/StatusIcon';
 import type { ProjectLanguageProgressStateDTO } from '@/shared/types';
 import { getLanguageFlag, getLanguageLabel } from '@/shared/constants/languages';
+import type { ProjectExperience } from '@/shared/constants/project-experience';
+import { statusOptionsForExperience } from '@/shared/pipeline/project-pipeline';
 
 type Props = {
   projectId: string;
   current: ProjectStatus;
   languages: ProjectLanguageProgressStateDTO[];
+  projectExperience?: ProjectExperience;
 };
 
-export function AdminProjectStatusChanger({ projectId, current, languages }: Props) {
+export function AdminProjectStatusChanger({ projectId, current, languages, projectExperience }: Props) {
   const router = useRouter();
   const [value, setValue] = useState<ProjectStatus>(current);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -31,7 +34,7 @@ export function AdminProjectStatusChanger({ projectId, current, languages }: Pro
     setSelectedLanguages(new Set(languages.map((l) => l.languageCode)));
   }, [languages]);
 
-  const options = useMemo(() => Object.values(ProjectStatus) as ProjectStatus[], []);
+  const options = useMemo(() => statusOptionsForExperience(projectExperience), [projectExperience]);
   const currentLabel = statusLabel(current);
   const nextLabel = statusLabel(value);
   const dirty = value !== current;
@@ -67,12 +70,12 @@ export function AdminProjectStatusChanger({ projectId, current, languages }: Pro
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Select value={value} onValueChange={(v) => setValue(v as ProjectStatus)}>
-          <SelectTrigger className="w-72">
+          <SelectTrigger className="w-72 cursor-pointer">
             <SelectValue placeholder="Select status" />
           </SelectTrigger>
           <SelectContent>
             {options.map((s) => (
-              <SelectItem key={s} value={s}>
+              <SelectItem key={s} value={s} className="cursor-pointer">
                 <span className="flex items-center gap-2">
                   <StatusIcon status={s} size={14} />
                   <span>{STATUS_INFO[s]?.label || s}</span>

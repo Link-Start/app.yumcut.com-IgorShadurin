@@ -24,6 +24,13 @@ function transactionTypeLabel(type: string) {
     .join(' ');
 }
 
+function languageLabel(language: string) {
+  const normalized = language.trim().toLowerCase();
+  if (normalized === 'ru') return 'Russian (ru)';
+  if (normalized === 'en') return 'English (en)';
+  return language || '—';
+}
+
 function makeHref(userId: string, nextTxPage: number, nextProjectPage: number) {
   const params = new URLSearchParams();
   if (nextTxPage > 1) params.set('txPage', String(nextTxPage));
@@ -62,6 +69,9 @@ export default async function AdminUserDetailPage(props: {
           <p className="text-sm text-gray-500 dark:text-gray-300">Joined {formatDateTimeAdminLong(user.createdAt)}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Badge className="border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            Project usage {detail.projectTokensUsed.toLocaleString()} tokens
+          </Badge>
           {user.isAdmin ? <Badge variant="danger">Administrator</Badge> : null}
           <Badge className="border border-gray-300 bg-transparent text-gray-600 dark:border-gray-700 dark:text-gray-300">User ID {user.id}</Badge>
         </div>
@@ -82,6 +92,10 @@ export default async function AdminUserDetailPage(props: {
               <div className="flex items-center justify-between">
                 <span>Balance</span>
                 <span className="font-semibold text-gray-900 dark:text-gray-100">{user.tokenBalance.toLocaleString()} tokens</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Language</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{languageLabel(user.preferredLanguage)}</span>
               </div>
               {user.telegramAccount ? (
                 <div className="rounded-md border border-emerald-200/70 bg-emerald-50 p-3 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
@@ -147,6 +161,9 @@ export default async function AdminUserDetailPage(props: {
                       Created {formatDateTimeAdmin(project.createdAt)}
                       <span className="mx-1">•</span>
                       Updated {formatDateTimeAdmin(project.updatedAt)}
+                    </div>
+                    <div className="text-xs text-amber-700 dark:text-amber-300">
+                      Used {project.tokensUsed.toLocaleString()} tokens
                     </div>
                     {project.finalVideoAvailable ? (
                       <div className="text-xs font-medium text-emerald-600 dark:text-emerald-300">Final video available</div>

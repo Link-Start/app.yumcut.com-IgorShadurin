@@ -1,35 +1,23 @@
 import { ProjectStatus } from '@/shared/constants/status';
+import type { ProjectExperience } from '@/shared/constants/project-experience';
+import {
+  downstreamStatusesForExperience,
+  normalizeForPipelineOrdering,
+  STORY_PIPELINE_ORDER,
+} from '@/shared/pipeline/project-pipeline';
 
-export const PIPELINE_ORDER: ProjectStatus[] = [
-  ProjectStatus.ProcessScript,
-  ProjectStatus.ProcessAudio,
-  ProjectStatus.ProcessTranscription,
-  ProjectStatus.ProcessMetadata,
-  ProjectStatus.ProcessImagesGeneration,
-  ProjectStatus.ProcessVideoPartsGeneration,
-  ProjectStatus.ProcessVideoMain,
-];
+export const PIPELINE_ORDER: ProjectStatus[] = STORY_PIPELINE_ORDER;
 
-const statusOrder = new Map<ProjectStatus, number>(PIPELINE_ORDER.map((status, index) => [status, index]));
-
-export function normalizeForOrdering(status: ProjectStatus): ProjectStatus | null {
-  switch (status) {
-    case ProjectStatus.New:
-      return ProjectStatus.ProcessScript;
-    case ProjectStatus.ProcessScriptValidate:
-      return ProjectStatus.ProcessScript;
-    case ProjectStatus.ProcessAudioValidate:
-      return ProjectStatus.ProcessAudio;
-    default:
-      return statusOrder.has(status) ? status : null;
-  }
+export function normalizeForOrdering(
+  status: ProjectStatus,
+  projectExperience?: ProjectExperience | null,
+): ProjectStatus | null {
+  return normalizeForPipelineOrdering(status, projectExperience);
 }
 
-export function downstreamStatuses(status: ProjectStatus): ProjectStatus[] {
-  const normalized = normalizeForOrdering(status);
-  if (!normalized) return [];
-  const currentIndex = statusOrder.get(normalized);
-  if (typeof currentIndex !== 'number') return [];
-  return PIPELINE_ORDER.filter((candidate) => (statusOrder.get(candidate) ?? -1) > currentIndex);
+export function downstreamStatuses(
+  status: ProjectStatus,
+  projectExperience?: ProjectExperience | null,
+): ProjectStatus[] {
+  return downstreamStatusesForExperience(status, projectExperience);
 }
-

@@ -79,7 +79,7 @@ const DialogContent = React.forwardRef<
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("mb-3 flex items-center justify-between", className)} {...props} />
+  <div className={cn("mb-3 flex flex-col space-y-1.5 text-left", className)} {...props} />
 );
 
 const DialogTitle = DialogPrimitive.Title;

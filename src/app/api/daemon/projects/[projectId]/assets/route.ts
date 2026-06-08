@@ -23,7 +23,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
   const daemonId = await assertDaemonAuth(req);
   if (!daemonId) return forbidden('Invalid daemon credentials');
   const { projectId } = await params;
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  const project = await prisma.project.findFirst({ where: { id: projectId, deleted: false } });
   if (!project) return notFound('Project not found');
   if (project.currentDaemonId && project.currentDaemonId !== daemonId) {
     return forbidden('Project locked by another daemon');
@@ -38,7 +38,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     return error('VALIDATION_ERROR', 'Invalid payload', 400);
   }
 
-  const { type: kind, url, path, isFinal: parsedIsFinal = false, localPath, languageCode } = parsed.data;
+  const { type: kind, url, path, isFinal: parsedIsFinal = false, localPath, languageCode, variant } = parsed.data;
   recordStoragePublicUrlHint(url);
   const storedPath = toStoredMediaPath(url);
   const isFinal = kind === 'video' && Boolean(parsedIsFinal);
@@ -81,6 +81,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
             path: storedPath,
             publicUrl: responseUrl,
             isFinal: true,
+            variant: null,
             languageCode: normalizedLanguage,
           },
         }),
@@ -100,6 +101,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
           path: storedPath,
           publicUrl: responseUrl,
           isFinal: false,
+          variant: variant ?? null,
           languageCode: normalizedLanguage,
         },
       });

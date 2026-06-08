@@ -65,6 +65,7 @@ type VideoAsset = {
   path: string;
   publicUrl: string | null;
   isFinal: boolean;
+  variant?: string | null;
   languageCode?: string | null;
 };
 type ProjectStatusHistory = { id: string; projectId: string; status: string; message?: string | null; extra?: any; createdAt: Date };
@@ -94,6 +95,18 @@ type ProjectLanguageProgress = {
   failureReason: string | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+type TokenTransaction = {
+  id: string;
+  userId: string;
+  delta: number;
+  balanceAfter: number;
+  type: string;
+  description: string | null;
+  initiator: string | null;
+  metadata: unknown;
+  createdAt: Date;
 };
 
 type TemplateVoice = {
@@ -130,6 +143,7 @@ export function makeVirtualPrisma() {
     userCharacterVariations: new Map<string, UserCharacterVariation>(),
     scriptRequests: new Map<string, ScriptRequest>(),
     users: new Map<string, { id: string; email: string; deleted: boolean; name: string | null; image: string | null; tokenBalance?: number }>(),
+    tokenTransactions: new Map<string, TokenTransaction>(),
     daemons: new Map<string, { id: string; lastSeenAt: Date; createdAt: Date; updatedAt: Date }>(),
     templateVoices: [
       {
@@ -311,6 +325,19 @@ export function makeVirtualPrisma() {
       db.projects.set(p.id, p);
       return p;
     },
+    async updateMany({ where, data }: any) {
+      let count = 0;
+      for (const [id, p] of Array.from(db.projects.entries())) {
+        if (where?.id && p.id !== where.id) continue;
+        if (where?.currentDaemonId !== undefined && p.currentDaemonId !== where.currentDaemonId) continue;
+        if (where?.deleted !== undefined && p.deleted !== where.deleted) continue;
+        Object.assign(p, data);
+        p.updatedAt = now();
+        db.projects.set(id, p);
+        count += 1;
+      }
+      return { count };
+    },
   };
 
   function matchesProjectClause(job: Job, clause: any): boolean {
@@ -374,7 +401,18 @@ export function makeVirtualPrisma() {
       if (orderBy?.createdAt === 'asc') rows.sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime());
       if (orderBy?.createdAt === 'desc') rows.sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime());
       if (typeof take === 'number') rows = rows.slice(0, take);
-      if (select) return rows.map(r => { const o:any={}; for (const k of Object.keys(select)) o[k]=(r as any)[k]; return o; });
+      if (select) return rows.map(r => {
+        const o:any = {};
+        for (const k of Object.keys(select)) {
+          if (k === 'project' && select.project) {
+            const projectRecord = db.projects.get(r.projectId);
+            o.project = projectRecord ? { status: projectRecord.status } : null;
+          } else {
+            o[k] = (r as any)[k];
+          }
+        }
+        return o;
+      });
       return rows;
     },
     async findFirst({ where, orderBy }: any) {
@@ -418,15 +456,19 @@ export function makeVirtualPrisma() {
       return j;
     },
     async updateMany({ where, data }: any) {
-      const j = db.jobs.get(where.id);
-      if (!j) return { count: 0 };
-      if (where.status && j.status !== where.status) return { count: 0 };
-      if (where.project && !matchesProjectClause(j, where.project)) {
-        return { count: 0 };
+      let count = 0;
+      for (const [id, record] of Array.from(db.jobs.entries())) {
+        if (where?.id && record.id !== where.id) continue;
+        if (where?.projectId && record.projectId !== where.projectId) continue;
+        if (where?.type && record.type !== where.type) continue;
+        if (typeof where?.status === 'string' && record.status !== where.status) continue;
+        if (where?.status?.in && !(where.status.in as string[]).includes(record.status)) continue;
+        if (where?.project && !matchesProjectClause(record, where.project)) continue;
+        Object.assign(record, data);
+        db.jobs.set(id, record);
+        count += 1;
       }
-      Object.assign(j, data);
-      db.jobs.set(j.id, j);
-      return { count: 1 };
+      return { count };
     },
     async deleteMany({ where }: any) {
       let count = 0;
@@ -730,6 +772,7 @@ export function makeVirtualPrisma() {
         path: data.path,
         publicUrl: data.publicUrl ?? null,
         isFinal: !!data.isFinal,
+        variant: (data as any).variant ?? null,
         languageCode: (data as any).languageCode ?? null,
       };
       db.videoAssets.set(id, rec);
@@ -1044,6 +1087,70 @@ export function makeVirtualPrisma() {
     },
   };
 
+  const tokenTransaction = {
+    async findMany({ where, select }: any = {}) {
+      let rows = Array.from(db.tokenTransactions.values());
+      if (typeof where?.userId === 'string') {
+        rows = rows.filter((row) => row.userId === where.userId);
+      } else if (Array.isArray(where?.userId?.in)) {
+        const accepted = new Set(where.userId.in as string[]);
+        rows = rows.filter((row) => accepted.has(row.userId));
+      }
+      if (typeof where?.type === 'string') {
+        rows = rows.filter((row) => row.type === where.type);
+      } else if (Array.isArray(where?.type?.in)) {
+        const accepted = new Set(where.type.in as string[]);
+        rows = rows.filter((row) => accepted.has(row.type));
+      }
+      if (!select) return rows;
+      return rows.map((row) => {
+        const out: any = {};
+        for (const key of Object.keys(select)) out[key] = (row as any)[key];
+        return out;
+      });
+    },
+    async create({ data }: any) {
+      const id = data.id || randomUUID();
+      const record: TokenTransaction = {
+        id,
+        userId: data.userId,
+        delta: Number(data.delta ?? 0),
+        balanceAfter: Number(data.balanceAfter ?? 0),
+        type: String(data.type ?? ''),
+        description: data.description ?? null,
+        initiator: data.initiator ?? null,
+        metadata: data.metadata ?? null,
+        createdAt: now(),
+      };
+      db.tokenTransactions.set(id, record);
+      return record;
+    },
+    async count({ where }: any = {}) {
+      const rows = await tokenTransaction.findMany({ where });
+      return rows.length;
+    },
+    async updateMany({ where, data }: any = {}) {
+      const rows = await tokenTransaction.findMany({ where });
+      let count = 0;
+      for (const row of rows) {
+        const existing = db.tokenTransactions.get(row.id);
+        if (!existing) continue;
+        Object.assign(existing, data || {});
+        db.tokenTransactions.set(existing.id, existing);
+        count += 1;
+      }
+      return { count };
+    },
+    async deleteMany({ where }: any = {}) {
+      const rows = await tokenTransaction.findMany({ where });
+      let count = 0;
+      for (const row of rows) {
+        if (db.tokenTransactions.delete(row.id)) count += 1;
+      }
+      return { count };
+    },
+  };
+
   const daemon = {
     async upsert({ where, create, update }: any) {
       const id = where.id;
@@ -1087,6 +1194,7 @@ export function makeVirtualPrisma() {
         userCharacter,
         userCharacterVariation,
         user,
+        tokenTransaction,
         templateVoice,
         scriptRequest,
         userSettings: {
@@ -1116,6 +1224,7 @@ export function makeVirtualPrisma() {
     userCharacter,
     userCharacterVariation,
     user,
+    tokenTransaction,
     templateVoice,
     $transaction,
     scriptRequest,

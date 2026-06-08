@@ -1,0 +1,586 @@
+{
+  "groups": [
+    {
+      "id": "brainrot",
+      "title": {
+        "en": "Brainrot",
+        "ru": "Brainrot"
+      },
+      "subtitle": {
+        "en": "Viral short-form characters with chaotic social energy",
+        "ru": "Вирусные персонажи для хаотичного short-form контента"
+      },
+      "description": {
+        "en": "A high-volume category for meme-first storytelling, rapid hooks, and attention-driven social clips.",
+        "ru": "Категория для мемного сторителлинга, быстрых хуков и роликов с максимальным удержанием внимания."
+      },
+      "characters": [
+        {
+          "id": "ada-mentor",
+          "slug": "ada-mentor",
+          "name": "Ada Mentor",
+          "bio": "Precise host for educational narratives.",
+          "imageUrl": "/characters/me-1.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "ada-mentor host voice hidden metadata sample",
+            "ru": "ada-mentor скрытый поиск персонаж host voice"
+          },
+          "weight": 10
+        },
+        {
+          "id": "comics-reporter",
+          "slug": "comics-reporter",
+          "name": "Comics Reporter",
+          "bio": "Punchy host for comic-style stories.",
+          "imageUrl": "/characters/cat-1.jpeg",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "comics-reporter narrator style hidden metadata sample",
+            "ru": "comics-reporter скрытый поиск персонаж narrator style"
+          },
+          "weight": 9
+        },
+        {
+          "id": "crime-analyst",
+          "slug": "crime-analyst",
+          "name": "Crime Analyst",
+          "bio": "Investigative voice for deep stories.",
+          "imageUrl": "/characters/it-girl-3-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "crime-analyst persona template hidden metadata sample",
+            "ru": "crime-analyst скрытый поиск персонаж persona template"
+          },
+          "weight": 8
+        },
+        {
+          "id": "noir-editor",
+          "slug": "noir-editor",
+          "name": "Noir Editor",
+          "bio": "Documentary tone with dramatic pacing.",
+          "imageUrl": "/characters/it-guy-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "noir-editor avatar scene hidden metadata sample",
+            "ru": "noir-editor скрытый поиск персонаж avatar scene"
+          },
+          "weight": 7
+        },
+        {
+          "id": "cyber-host",
+          "slug": "cyber-host",
+          "name": "Cyber Host",
+          "bio": "Future-tech presenter for trends.",
+          "imageUrl": "/characters/it-guy-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "cyber-host voice format hidden metadata sample",
+            "ru": "cyber-host скрытый поиск персонаж voice format"
+          },
+          "weight": 6
+        },
+        {
+          "id": "retro-artist",
+          "slug": "retro-artist",
+          "name": "Retro Artist",
+          "bio": "Playful style for light storytelling.",
+          "imageUrl": "/characters/cat-2.jpeg",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "retro-artist style video hidden metadata sample",
+            "ru": "retro-artist скрытый поиск персонаж style video"
+          },
+          "weight": 5
+        },
+        {
+          "id": "anime-guide",
+          "slug": "anime-guide",
+          "name": "Anime Guide",
+          "bio": "Dramatic stylized character for reveals.",
+          "imageUrl": "/characters/it-girl-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "anime-guide template host hidden metadata sample",
+            "ru": "anime-guide скрытый поиск персонаж template host"
+          },
+          "weight": 4
+        },
+        {
+          "id": "horror-curator",
+          "slug": "horror-curator",
+          "name": "Horror Curator",
+          "bio": "Low-light suspense presenter.",
+          "imageUrl": "/characters/me-2.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "horror-curator scene narrator hidden metadata sample",
+            "ru": "horror-curator скрытый поиск персонаж scene narrator"
+          },
+          "weight": 3
+        },
+        {
+          "id": "doodle-coach",
+          "slug": "doodle-coach",
+          "name": "Doodle Coach",
+          "bio": "Casual teacher for simple tutorials.",
+          "imageUrl": "/characters/it-girl-2-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "doodle-coach format persona hidden metadata sample",
+            "ru": "doodle-coach скрытый поиск персонаж format persona"
+          },
+          "weight": 2
+        },
+        {
+          "id": "plastic-showrunner",
+          "slug": "plastic-showrunner",
+          "name": "Plastic Showrunner",
+          "bio": "Bright visual host for playful demos.",
+          "imageUrl": "/characters/it-girl-3-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "plastic-showrunner video avatar hidden metadata sample",
+            "ru": "plastic-showrunner скрытый поиск персонаж video avatar"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "brainrot viral story hidden metadata sample",
+        "ru": "brainrot скрытый поиск метаданные пример viral"
+      },
+      "weight": 10
+    },
+    {
+      "id": "ibrainrot",
+      "title": {
+        "en": "iBrainrot",
+        "ru": "iBrainrot"
+      },
+      "subtitle": {
+        "en": "Premium variants for polished viral storytelling",
+        "ru": "Премиум-варианты для более polished вирусного контента"
+      },
+      "description": {
+        "en": "A compact category with stylized premium characters for cleaner edits and stronger visual branding.",
+        "ru": "Компактная категория со стилизованными премиум-персонажами для более чистого монтажа и сильного визуального брендинга."
+      },
+      "characters": [
+        {
+          "id": "retro-news",
+          "slug": "retro-news",
+          "name": "Retro News",
+          "bio": "Archive-style narrator for timeline stories.",
+          "imageUrl": "/characters/it-girl-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "retro-news narrator style hidden metadata sample",
+            "ru": "retro-news скрытый поиск персонаж narrator style"
+          },
+          "weight": 2
+        },
+        {
+          "id": "creepy-comic",
+          "slug": "creepy-comic",
+          "name": "Creepy Comic",
+          "bio": "Exaggerated visuals for viral reactions.",
+          "imageUrl": "/characters/it-girl-2-height.png",
+          "hiddenSearchText": {
+            "en": "creepy-comic persona template hidden metadata sample",
+            "ru": "creepy-comic скрытый поиск персонаж persona template"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "ibrainrot trend hook hidden metadata sample",
+        "ru": "ibrainrot скрытый поиск метаданные пример trend"
+      },
+      "weight": 9
+    },
+    {
+      "id": "history",
+      "title": {
+        "en": "History",
+        "ru": "История"
+      },
+      "subtitle": {
+        "en": "Historical explainers and biography-style shorts",
+        "ru": "Исторические разборы и биографические шорты"
+      },
+      "description": {
+        "en": "Use this category for educational storytelling, historical timelines, and biography videos.",
+        "ru": "Используйте эту категорию для образовательного сторителлинга, исторических таймлайнов и биографий."
+      },
+      "characters": [
+        {
+          "id": "ada-mentor",
+          "slug": "ada-mentor",
+          "name": "Ada Mentor",
+          "bio": "Precise host for educational narratives.",
+          "imageUrl": "/characters/me-1.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "ada-mentor persona template hidden metadata sample",
+            "ru": "ada-mentor скрытый поиск персонаж persona template"
+          },
+          "weight": 2
+        },
+        {
+          "id": "retro-news",
+          "slug": "retro-news",
+          "name": "Retro News",
+          "bio": "Archive-style narrator for timeline stories.",
+          "imageUrl": "/characters/it-girl-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "retro-news avatar scene hidden metadata sample",
+            "ru": "retro-news скрытый поиск персонаж avatar scene"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "history shorts engagement hidden metadata sample",
+        "ru": "history скрытый поиск метаданные пример shorts"
+      },
+      "weight": 8
+    },
+    {
+      "id": "crime",
+      "title": {
+        "en": "Crime",
+        "ru": "Криминал"
+      },
+      "subtitle": {
+        "en": "Investigation stories with dark atmosphere",
+        "ru": "Истории-расследования с тёмной атмосферой"
+      },
+      "description": {
+        "en": "Built for true-crime style narratives, dramatic reveals, and documentary pacing.",
+        "ru": "Подходит для true-crime повествования, драматичных развязок и документальной подачи."
+      },
+      "characters": [
+        {
+          "id": "crime-analyst",
+          "slug": "crime-analyst",
+          "name": "Crime Analyst",
+          "bio": "Investigative voice for deep stories.",
+          "imageUrl": "/characters/it-girl-3-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "crime-analyst avatar scene hidden metadata sample",
+            "ru": "crime-analyst скрытый поиск персонаж avatar scene"
+          },
+          "weight": 2
+        },
+        {
+          "id": "noir-editor",
+          "slug": "noir-editor",
+          "name": "Noir Editor",
+          "bio": "Documentary tone with dramatic pacing.",
+          "imageUrl": "/characters/it-guy-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "noir-editor voice format hidden metadata sample",
+            "ru": "noir-editor скрытый поиск персонаж voice format"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "crime story niche hidden metadata sample",
+        "ru": "crime скрытый поиск метаданные пример story"
+      },
+      "weight": 7
+    },
+    {
+      "id": "horror",
+      "title": {
+        "en": "Horror",
+        "ru": "Хоррор"
+      },
+      "subtitle": {
+        "en": "Suspense and creepy visual storytelling",
+        "ru": "Саспенс и жуткий визуальный сторителлинг"
+      },
+      "description": {
+        "en": "For mystery, fear, and dark hooks that keep viewers watching.",
+        "ru": "Для мистики, тревоги и тёмных хуков, которые удерживают зрителя."
+      },
+      "characters": [
+        {
+          "id": "horror-curator",
+          "slug": "horror-curator",
+          "name": "Horror Curator",
+          "bio": "Low-light suspense presenter.",
+          "imageUrl": "/characters/me-2.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "horror-curator voice format hidden metadata sample",
+            "ru": "horror-curator скрытый поиск персонаж voice format"
+          },
+          "weight": 2
+        },
+        {
+          "id": "creepy-comic",
+          "slug": "creepy-comic",
+          "name": "Creepy Comic",
+          "bio": "Exaggerated visuals for viral reactions.",
+          "imageUrl": "/characters/it-girl-2-height.png",
+          "hiddenSearchText": {
+            "en": "creepy-comic style video hidden metadata sample",
+            "ru": "creepy-comic скрытый поиск персонаж style video"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "horror hook audience hidden metadata sample",
+        "ru": "horror скрытый поиск метаданные пример hook"
+      },
+      "weight": 6
+    },
+    {
+      "id": "tech",
+      "title": {
+        "en": "Tech",
+        "ru": "Технологии"
+      },
+      "subtitle": {
+        "en": "Product breakdowns and trend explainers",
+        "ru": "Разборы продуктов и трендов"
+      },
+      "description": {
+        "en": "Use this category for software demos, startup stories, and product-led videos.",
+        "ru": "Используйте категорию для демо софта, историй стартапов и продуктовых видео."
+      },
+      "characters": [
+        {
+          "id": "cyber-host",
+          "slug": "cyber-host",
+          "name": "Cyber Host",
+          "bio": "Future-tech presenter for trends.",
+          "imageUrl": "/characters/it-guy-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "cyber-host style video hidden metadata sample",
+            "ru": "cyber-host скрытый поиск персонаж style video"
+          },
+          "weight": 2
+        },
+        {
+          "id": "doodle-coach",
+          "slug": "doodle-coach",
+          "name": "Doodle Coach",
+          "bio": "Casual teacher for simple tutorials.",
+          "imageUrl": "/characters/it-girl-2-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "doodle-coach template host hidden metadata sample",
+            "ru": "doodle-coach скрытый поиск персонаж template host"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "tech engagement creator hidden metadata sample",
+        "ru": "tech скрытый поиск метаданные пример engagement"
+      },
+      "weight": 5
+    },
+    {
+      "id": "comics",
+      "title": {
+        "en": "Comics",
+        "ru": "Комиксы"
+      },
+      "subtitle": {
+        "en": "Punchy comic-energy visual narratives",
+        "ru": "Яркие визуальные истории в стиле комиксов"
+      },
+      "description": {
+        "en": "Fast, bold, and expressive style for entertaining narrative clips.",
+        "ru": "Быстрый, яркий и выразительный стиль для развлекательных нарративных роликов."
+      },
+      "characters": [
+        {
+          "id": "comics-reporter",
+          "slug": "comics-reporter",
+          "name": "Comics Reporter",
+          "bio": "Punchy host for comic-style stories.",
+          "imageUrl": "/characters/cat-1.jpeg",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "comics-reporter template host hidden metadata sample",
+            "ru": "comics-reporter скрытый поиск персонаж template host"
+          },
+          "weight": 2
+        },
+        {
+          "id": "retro-artist",
+          "slug": "retro-artist",
+          "name": "Retro Artist",
+          "bio": "Playful style for light storytelling.",
+          "imageUrl": "/characters/cat-2.jpeg",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "retro-artist scene narrator hidden metadata sample",
+            "ru": "retro-artist скрытый поиск персонаж scene narrator"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "comics niche content hidden metadata sample",
+        "ru": "comics скрытый поиск метаданные пример niche"
+      },
+      "weight": 4
+    },
+    {
+      "id": "anime",
+      "title": {
+        "en": "Anime",
+        "ru": "Аниме"
+      },
+      "subtitle": {
+        "en": "Stylized dramatic visuals and pop pacing",
+        "ru": "Стилизованная драматичная визуалка и поп-ритм"
+      },
+      "description": {
+        "en": "Perfect for expressive scripts and high-emotion social stories.",
+        "ru": "Подходит для выразительных сценариев и эмоциональных историй для соцсетей."
+      },
+      "characters": [
+        {
+          "id": "anime-guide",
+          "slug": "anime-guide",
+          "name": "Anime Guide",
+          "bio": "Dramatic stylized character for reveals.",
+          "imageUrl": "/characters/it-girl-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "anime-guide scene narrator hidden metadata sample",
+            "ru": "anime-guide скрытый поиск персонаж scene narrator"
+          },
+          "weight": 2
+        },
+        {
+          "id": "plastic-showrunner",
+          "slug": "plastic-showrunner",
+          "name": "Plastic Showrunner",
+          "bio": "Bright visual host for playful demos.",
+          "imageUrl": "/characters/it-girl-3-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "plastic-showrunner format persona hidden metadata sample",
+            "ru": "plastic-showrunner скрытый поиск персонаж format persona"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "anime audience viral hidden metadata sample",
+        "ru": "anime скрытый поиск метаданные пример audience"
+      },
+      "weight": 3
+    },
+    {
+      "id": "edu",
+      "title": {
+        "en": "Education",
+        "ru": "Обучение"
+      },
+      "subtitle": {
+        "en": "Simple explainers and tutorial-driven format",
+        "ru": "Понятные объяснения и формат туториалов"
+      },
+      "description": {
+        "en": "Focused on clarity-first scripts and practical educational value.",
+        "ru": "Сфокусировано на понятных сценариях и практической образовательной пользе."
+      },
+      "characters": [
+        {
+          "id": "ada-mentor",
+          "slug": "ada-mentor",
+          "name": "Ada Mentor",
+          "bio": "Precise host for educational narratives.",
+          "imageUrl": "/characters/me-1.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "ada-mentor format persona hidden metadata sample",
+            "ru": "ada-mentor скрытый поиск персонаж format persona"
+          },
+          "weight": 2
+        },
+        {
+          "id": "doodle-coach",
+          "slug": "doodle-coach",
+          "name": "Doodle Coach",
+          "bio": "Casual teacher for simple tutorials.",
+          "imageUrl": "/characters/it-girl-2-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "doodle-coach video avatar hidden metadata sample",
+            "ru": "doodle-coach скрытый поиск персонаж video avatar"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "edu creator trend hidden metadata sample",
+        "ru": "edu скрытый поиск метаданные пример creator"
+      },
+      "weight": 2
+    },
+    {
+      "id": "retro",
+      "title": {
+        "en": "Retro",
+        "ru": "Ретро"
+      },
+      "subtitle": {
+        "en": "Classic visual vibes for nostalgia content",
+        "ru": "Классическая визуальная подача для ностальгичного контента"
+      },
+      "description": {
+        "en": "For stories where old-school feeling and cinematic nostalgia matter.",
+        "ru": "Для историй, где важны олдскульная атмосфера и кинематографичная ностальгия."
+      },
+      "characters": [
+        {
+          "id": "retro-news",
+          "slug": "retro-news",
+          "name": "Retro News",
+          "bio": "Archive-style narrator for timeline stories.",
+          "imageUrl": "/characters/it-girl-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "retro-news video avatar hidden metadata sample",
+            "ru": "retro-news скрытый поиск персонаж video avatar"
+          },
+          "weight": 2
+        },
+        {
+          "id": "noir-editor",
+          "slug": "noir-editor",
+          "name": "Noir Editor",
+          "bio": "Documentary tone with dramatic pacing.",
+          "imageUrl": "/characters/it-guy-1-height.png",
+          "videoUrl": "/template/basic/preview.mp4",
+          "hiddenSearchText": {
+            "en": "noir-editor host voice hidden metadata sample",
+            "ru": "noir-editor скрытый поиск персонаж host voice"
+          },
+          "weight": 1
+        }
+      ],
+      "hiddenSearchText": {
+        "en": "retro content shorts hidden metadata sample",
+        "ru": "retro скрытый поиск метаданные пример content"
+      },
+      "weight": 1
+    }
+  ]
+}

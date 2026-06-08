@@ -52,10 +52,10 @@ export function logAppleSubscriptionEvent(event: string, payload?: LogPayload) {
   const timestamp = new Date().toISOString();
   if (payload) {
     const augmented = { timestamp, ...payload };
-    // eslint-disable-next-line no-console
+     
     console.info(`[apple-subscription] ${event}`, sanitizeObject(augmented));
   } else {
-    // eslint-disable-next-line no-console
+     
     console.info(`[apple-subscription] ${event}`, { timestamp });
   }
 }

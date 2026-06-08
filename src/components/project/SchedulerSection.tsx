@@ -16,7 +16,7 @@ import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 
 export function SchedulerSection({ projectId }: { projectId: string }) {
   const { language } = useAppLanguage();
-  const tr = (en: string): string => {
+  const tr = useCallback((en: string): string => {
     if (language !== 'ru') return en;
     const map: Record<string, string> = {
       'Failed to load scheduler settings': 'Не удалось загрузить настройки планировщика',
@@ -73,7 +73,7 @@ export function SchedulerSection({ projectId }: { projectId: string }) {
       'Revoke': 'Отозвать',
     };
     return map[en] ?? en;
-  };
+  }, [language]);
 
   const [state, setState] = useState<SchedulerStateDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -135,7 +135,7 @@ export function SchedulerSection({ projectId }: { projectId: string }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [applyState]);
+  }, [applyState, tr]);
 
   const languages = useMemo(() => LANGUAGES.map((lang) => ({ ...lang, codeLower: lang.code.toLowerCase() })), []);
   const languageLabelMap = useMemo(() => {

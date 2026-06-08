@@ -19,7 +19,8 @@ const COLUMN_CHAR_LIMITS: Record<string, number> = {
   // History/message
   message: 191,
   // Character models
-  description: 191,
+  description: 300,
+  bio: 300,
 };
 
 function attachLimitHint(base: string, column?: string) {

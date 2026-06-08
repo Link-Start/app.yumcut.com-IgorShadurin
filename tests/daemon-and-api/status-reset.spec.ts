@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import path from 'path';
-import { mkdir, rm, writeFile } from 'fs/promises';
+import { access, mkdir, rm, writeFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { ProjectStatus } from '@/shared/constants/status';
 import { startAppApiServer, startStorageApiServer } from './helpers/app-server';
@@ -18,6 +18,7 @@ describe('Admin status resets', () => {
   let storage: StorageInstance | null = null;
   let workspaceRoot: string;
   let logSpies: Array<ReturnType<typeof vi.spyOn>> = [];
+  let previousProjectsWorkspace: string | undefined;
 
   beforeEach(async () => {
     delete (globalThis as any).__vtPrisma;
@@ -30,6 +31,8 @@ describe('Admin status resets', () => {
     ];
     workspaceRoot = path.resolve('tests/daemon-and-api/workspaces', `workspace-${randomUUID()}`);
     await mkdir(workspaceRoot, { recursive: true });
+    previousProjectsWorkspace = process.env.DAEMON_PROJECTS_WORKSPACE;
+    process.env.DAEMON_PROJECTS_WORKSPACE = workspaceRoot;
     const mediaRoot = path.join(workspaceRoot, 'media');
     storage = await startStorageApiServer({ daemonPassword: DAEMON_PASSWORD, mediaRoot });
     app = await startAppApiServer({
@@ -44,6 +47,11 @@ describe('Admin status resets', () => {
     try { if (app) await app.close(); } catch {}
     try { if (storage) await storage.close(); } catch {}
     try { await rm(workspaceRoot, { recursive: true, force: true }); } catch {}
+    if (previousProjectsWorkspace === undefined) {
+      delete process.env.DAEMON_PROJECTS_WORKSPACE;
+    } else {
+      process.env.DAEMON_PROJECTS_WORKSPACE = previousProjectsWorkspace;
+    }
     for (const spy of logSpies) {
       spy.mockRestore();
     }
@@ -125,6 +133,25 @@ it('replays downstream pipeline stages after admin status rollback by default', 
     expect(newEntries).toContain(ProjectStatus.ProcessVideoMain);
     expect(newEntries[newEntries.length - 1]).toBe(ProjectStatus.Done);
 }, 45000);
+
+  it('invalidates cached transcript blocks when rolling back before metadata', async () => {
+    const projectId = await createProject();
+    const metadataPath = path.join(workspaceRoot, projectId, 'workspace', 'en', 'metadata', 'transcript-blocks.json');
+    await mkdir(path.dirname(metadataPath), { recursive: true });
+    await writeFile(metadataPath, '{"blocks":[{"text":"stale"}]}', 'utf8');
+
+    const adminRes = await fetch(new URL(`/api/admin/projects/${projectId}/status`, app!.baseUrl), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'auth=test' },
+      body: JSON.stringify({ status: ProjectStatus.ProcessMetadata }),
+    });
+    if (!adminRes.ok) {
+      const failureBody = await adminRes.text().catch(() => '<no-body>');
+      throw new Error(`Admin status update failed (${adminRes.status}): ${failureBody}`);
+    }
+
+    await expect(access(metadataPath)).rejects.toThrow();
+  });
 
   it('clears failures only for selected languages when languagesToReset is provided', async () => {
     const projectId = await createProject(['en', 'es']);

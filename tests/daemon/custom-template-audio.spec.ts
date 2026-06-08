@@ -17,6 +17,7 @@ const getScriptText = vi.fn();
 const markLanguageFailure = vi.fn();
 const createJob = vi.fn();
 const generateVoiceovers = vi.fn();
+const clampCharacterAudioDuration = vi.fn();
 
 describe('custom template audio auto-approval', () => {
   let tmpRoot: string;
@@ -51,6 +52,9 @@ describe('custom template audio auto-approval', () => {
     vi.doMock('../../scripts/daemon/helpers/prompt-to-wav', () => ({
       generateVoiceovers,
     }));
+    vi.doMock('../../scripts/daemon/helpers/character-audio-duration', () => ({
+      clampCharacterAudioDuration,
+    }));
     const configModule = await import('../../scripts/daemon/helpers/config');
     configModule.__resetDaemonConfigForTests();
     const config = configModule.loadConfig();
@@ -66,6 +70,7 @@ describe('custom template audio auto-approval', () => {
     markLanguageFailure.mockReset();
     createJob.mockReset();
     generateVoiceovers.mockReset();
+    clampCharacterAudioDuration.mockReset();
   });
 
   afterEach(async () => {
@@ -135,6 +140,7 @@ describe('custom template audio auto-approval', () => {
       'Transcribing voiceovers',
       expect.objectContaining({ audioLanguage: 'en' }),
     );
+    expect(clampCharacterAudioDuration).not.toHaveBeenCalled();
     expect(createJob).not.toHaveBeenCalled();
   });
 
@@ -203,21 +209,108 @@ describe('custom template audio auto-approval', () => {
       };
     };
 
-    const runCase = async (provider: 'minimax' | 'inworld' | 'elevenlabs', expectedStyle: string | null) => {
+    const runCase = async (provider: 'minimax' | 'inworld' | 'elevenlabs', expectedStyleFragment: string | null) => {
       generateVoiceovers.mockClear();
       addAudioCandidate.mockClear();
       await handleAudioPhase({ projectId: `project-${provider}`, cfg: buildCfg(provider), jobPayload: {} });
       expect(generateVoiceovers).toHaveBeenCalledTimes(1);
-      expect(generateVoiceovers).toHaveBeenCalledWith(
-        expect.objectContaining({
-          voiceProvider: provider,
-          style: expectedStyle,
-        }),
-      );
+      const firstCallArgs = generateVoiceovers.mock.calls[0]?.[0];
+      expect(firstCallArgs).toEqual(expect.objectContaining({ voiceProvider: provider }));
+      if (expectedStyleFragment === null) {
+        expect(firstCallArgs?.style ?? null).toBeNull();
+      } else {
+        expect(firstCallArgs?.style).toContain(expectedStyleFragment);
+      }
     };
 
     await runCase('minimax', null);
     await runCase('inworld', null);
     await runCase('elevenlabs', 'Smoky tone please');
+  });
+
+  it('clamps character audio before registering the uploaded candidate', async () => {
+    const projectId = 'project-character-audio';
+    getLanguageProgress.mockResolvedValue({
+      progress: [
+        { languageCode: 'en', disabled: false },
+      ],
+    });
+    getScriptText.mockResolvedValue('Character script body');
+    const outputPath = path.join(tmpRoot, 'take-1.wav');
+    const processedPath = path.join(tmpRoot, 'take-1.character-20s-attempt-1.wav');
+    await fs.writeFile(outputPath, 'audio-bytes');
+    await fs.writeFile(processedPath, 'processed-audio-bytes');
+    generateVoiceovers.mockResolvedValue({
+      runDirectory: path.join(tmpRoot, 'voice-run'),
+      outputs: [{ path: outputPath, take: 1 }],
+      error: null,
+    });
+    clampCharacterAudioDuration.mockResolvedValue({
+      path: processedPath,
+      originalDurationSeconds: 20.001,
+      finalDurationSeconds: 19.97,
+      processed: true,
+      attempts: 1,
+    });
+    addAudioCandidate.mockImplementation(async (_projectId: string, filePath: string, languageCode: string) => ({
+      id: 'audio-en',
+      path: `/storage/${path.basename(filePath)}`,
+      url: `https://cdn/${path.basename(filePath)}`,
+      localPath: filePath,
+      languageCode,
+    }));
+
+    const cfg: any = {
+      userId: 'user-1',
+      projectExperience: 'character',
+      targetLanguage: 'en',
+      languages: ['en'],
+      autoApproveAudio: true,
+      voiceAssignments: {
+        en: {
+          voiceId: 'voice-en',
+          templateVoiceId: null,
+          title: null,
+          speed: null,
+          gender: null,
+          voiceProvider: 'minimax',
+          source: 'project',
+        },
+      },
+      voiceProviders: {
+        'voice-en': 'minimax',
+      },
+      template: null,
+      characterSelection: {
+        type: 'global',
+      },
+    };
+
+    await handleAudioPhase({ projectId, cfg, jobPayload: {} });
+
+    expect(clampCharacterAudioDuration).toHaveBeenCalledWith({
+      projectId,
+      languageCode: 'en',
+      inputPath: outputPath,
+    });
+    expect(addAudioCandidate).toHaveBeenCalledWith(projectId, processedPath, 'en');
+    expect(setStatus).toHaveBeenCalledWith(
+      projectId,
+      expect.anything(),
+      'Transcribing voiceovers',
+      expect.objectContaining({
+        finalVoiceoverLocalPaths: { en: processedPath },
+        audioLocalPath: processedPath,
+      }),
+    );
+    expect(createJob).toHaveBeenCalledWith(
+      projectId,
+      'user-1',
+      'transcription',
+      expect.objectContaining({
+        languageCode: 'en',
+        audioLocalPath: processedPath,
+      }),
+    );
   });
 });

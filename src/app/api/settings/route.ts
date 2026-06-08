@@ -21,6 +21,15 @@ import { normalizeLanguageVoiceMap } from '@/shared/voices/language-voice-map';
 import { ensureSchedulerPreferences } from '@/server/publishing/preferences';
 import { getAdminVoiceProviderSettings } from '@/server/admin/voice-providers';
 import { buildVoiceProviderSet } from '@/shared/constants/voice-providers';
+import {
+  DEFAULT_CHARACTER_CREATION_SETTINGS,
+  normalizeCharacterCreationSettings,
+} from '@/shared/constants/character-creation-settings';
+import { normalizeContentTone } from '@/shared/constants/content-tone';
+import {
+  HAS_CHARACTER_CREATION_SETTINGS_FIELD,
+  resolveCharacterCreationSettings,
+} from '@/server/settings/character-creation';
 
 export const GET = withApiError(async function GET() {
   const adminVoiceProviders = await getAdminVoiceProviderSettings();
@@ -35,15 +44,18 @@ export const GET = withApiError(async function GET() {
       includeDefaultMusic: true,
       addOverlay: true,
       includeCallToAction: true,
+      projectEmailsEnabled: true,
       autoApproveScript: true,
       autoApproveAudio: true,
       watermarkEnabled: true,
       captionsEnabled: true,
+      characterCreationSettings: DEFAULT_CHARACTER_CREATION_SETTINGS,
       projectCreationEnabled: projectCreationSettings.enabled,
       projectCreationDisabledReason: projectCreationSettings.disabledReason,
       defaultDurationSeconds: null,
       sidebarOpen: false,
       defaultUseScript: false,
+      characterContentTone: 'neutral',
       targetLanguages: ['en'],
       languageVoicePreferences: {},
       scriptCreationGuidanceEnabled: false,
@@ -97,10 +109,12 @@ export const GET = withApiError(async function GET() {
     includeDefaultMusic: settings.includeDefaultMusic,
     addOverlay: settings.addOverlay,
     includeCallToAction: (settings as any)?.includeCallToAction ?? true,
+    projectEmailsEnabled: (settings as any)?.projectEmailsEnabled ?? true,
     autoApproveScript: settings.autoApproveScript,
     autoApproveAudio: settings.autoApproveAudio,
     watermarkEnabled: (settings as any)?.watermarkEnabled ?? true,
     captionsEnabled: (settings as any)?.captionsEnabled ?? true,
+    characterCreationSettings: resolveCharacterCreationSettings(settings),
     projectCreationEnabled: projectCreationSettings.enabled,
     projectCreationDisabledReason: projectCreationSettings.disabledReason,
     defaultDurationSeconds: settings.defaultDurationSec,
@@ -109,6 +123,7 @@ export const GET = withApiError(async function GET() {
       ? ((settings as any).sidebarOpen ?? (settings as any).sidebarOpenMain ?? true)
       : false,
     defaultUseScript: (settings as any).defaultUseScript ?? false,
+    characterContentTone: normalizeContentTone((settings as any).characterContentTone),
     targetLanguages: normalizedLanguages,
     languageVoicePreferences: sanitizedLanguageVoices,
     scriptCreationGuidanceEnabled: (settings as any).scriptCreationGuidanceEnabled ?? false,
@@ -147,6 +162,7 @@ export const PATCH = withApiError(async function PATCH(req: NextRequest) {
   const updateData: any = {};
   if (key === 'defaultDurationSeconds') updateData.defaultDurationSec = value;
   else if (key === 'defaultUseScript') updateData.defaultUseScript = value;
+  else if (key === 'characterContentTone') updateData.characterContentTone = normalizeContentTone(value);
   else if (key === 'targetLanguages') {
     const normalized = normalizeLanguageList(value, DEFAULT_LANGUAGE);
     updateData.targetLanguages = normalized;
@@ -159,7 +175,19 @@ export const PATCH = withApiError(async function PATCH(req: NextRequest) {
   else if (key === 'audioStyleGuidanceEnabled') updateData.audioStyleGuidanceEnabled = value;
   else if (key === 'watermarkEnabled') updateData.watermarkEnabled = value;
   else if (key === 'captionsEnabled') updateData.captionsEnabled = value;
+  else if (key === 'characterCreationSettings') {
+    const normalizedCharacterSettings = normalizeCharacterCreationSettings(value ?? null);
+    if (HAS_CHARACTER_CREATION_SETTINGS_FIELD) {
+      updateData.characterCreationSettings = normalizedCharacterSettings;
+    } else {
+      updateData.addOverlay = normalizedCharacterSettings.addOverlay;
+      updateData.watermarkEnabled = normalizedCharacterSettings.watermarkEnabled;
+      updateData.captionsEnabled = normalizedCharacterSettings.captionsEnabled;
+      updateData.includeCallToAction = normalizedCharacterSettings.includeCallToAction;
+    }
+  }
   else if (key === 'includeCallToAction') updateData.includeCallToAction = value;
+  else if (key === 'projectEmailsEnabled') updateData.projectEmailsEnabled = value;
   else if (key === 'characterSelection') {
     if (value === null) {
       updateData.preferredCharacter = null;
@@ -239,6 +267,9 @@ export const PATCH = withApiError(async function PATCH(req: NextRequest) {
   if (key === 'defaultUseScript') {
     return ok({ defaultUseScript: (updated as any).defaultUseScript });
   }
+  if (key === 'characterContentTone') {
+    return ok({ characterContentTone: normalizeContentTone((updated as any).characterContentTone) });
+  }
   if (key === 'scriptCreationGuidance') {
     return ok({ scriptCreationGuidance: (updated as any).scriptCreationGuidance ?? '' });
   }
@@ -290,11 +321,17 @@ export const PATCH = withApiError(async function PATCH(req: NextRequest) {
   if (key === 'watermarkEnabled') {
     return ok({ watermarkEnabled: !!(updated as any).watermarkEnabled });
   }
-  if (key === 'captionsEnabled') {
-    return ok({ captionsEnabled: !!(updated as any).captionsEnabled });
-  }
+    if (key === 'captionsEnabled') {
+      return ok({ captionsEnabled: !!(updated as any).captionsEnabled });
+    }
+    if (key === 'characterCreationSettings') {
+      return ok({ characterCreationSettings: resolveCharacterCreationSettings(updated) });
+    }
   if (key === 'includeCallToAction') {
     return ok({ includeCallToAction: !!(updated as any).includeCallToAction });
+  }
+  if (key === 'projectEmailsEnabled') {
+    return ok({ projectEmailsEnabled: !!(updated as any).projectEmailsEnabled });
   }
   return ok({ [key]: value } as any);
 }, 'Failed to update settings');

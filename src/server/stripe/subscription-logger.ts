@@ -33,10 +33,10 @@ export function logStripeSubscriptionEvent(event: string, payload?: LogPayload) 
 
   const timestamp = new Date().toISOString();
   if (payload) {
-    // eslint-disable-next-line no-console
+     
     console.info(`[stripe-subscription] ${event}`, sanitize({ timestamp, ...payload }));
     return;
   }
-  // eslint-disable-next-line no-console
+   
   console.info(`[stripe-subscription] ${event}`, { timestamp });
 }

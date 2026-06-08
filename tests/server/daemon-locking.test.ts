@@ -119,4 +119,43 @@ describe('daemon assignment locking', () => {
     const blockRes = await route.POST(blockReq);
     expect(blockRes.status).toBe(403);
   });
+
+  it('does not expose or claim stale image jobs for character projects', async () => {
+    const prisma = makeVirtualPrisma();
+    vi.doMock('@/server/db', () => ({ prisma }));
+    const queueRoute = await import('@/app/api/daemon/jobs/queue/route');
+    const claimRoute = await import('@/app/api/daemon/jobs/[jobId]/claim/route');
+
+    const project = await prisma.project.create({
+      data: { userId: 'u1', title: 'Character Demo', status: ProjectStatus.ProcessImagesGeneration },
+    });
+    await prisma.job.create({
+      data: {
+        userId: 'u1',
+        projectId: project.id,
+        type: 'script',
+        status: 'done',
+        payload: { projectExperience: 'character' },
+      },
+    });
+    const staleImagesJob = await prisma.job.create({
+      data: { userId: 'u1', projectId: project.id, type: 'images', status: 'queued', payload: {} },
+    });
+
+    const queueReq = makeRequest('http://localhost/api/daemon/jobs/queue?limit=5', {
+      method: 'GET',
+      headers: new Headers({ 'x-daemon-password': API_PASSWORD, 'x-daemon-id': 'daemon-a' }),
+    });
+    const queueRes = await queueRoute.GET(queueReq);
+    const queueBody = await queueRes.json();
+    expect(queueBody.jobs).toHaveLength(0);
+
+    const claimReq = makeRequest('http://localhost/api/daemon/jobs/stale/claim', {
+      method: 'POST',
+      headers: new Headers({ 'x-daemon-password': API_PASSWORD, 'x-daemon-id': 'daemon-a' }),
+    });
+    const claimRes = await claimRoute.POST(claimReq, { params: Promise.resolve({ jobId: staleImagesJob.id }) });
+    const claimBody = await claimRes.json();
+    expect(claimBody.claimed).toBe(false);
+  });
 });

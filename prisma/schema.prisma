@@ -14,6 +14,12 @@ model User {
   image                     String?
   emailVerified             DateTime?
   preferredLanguage         String                     @default("en") @db.VarChar(8)
+  emailReplyBonusGrantedAt  DateTime?
+  emailReplyBonusSourceId   String?                    @db.VarChar(191)
+  subscriptionWinbackBonusPending          Boolean     @default(false)
+  subscriptionWinbackBonusPendingAt        DateTime?
+  subscriptionWinbackBonusGrantedAt        DateTime?
+  subscriptionWinbackBonusGrantedSourceId  String?     @db.VarChar(191)
   createdAt                 DateTime                   @default(now())
   tokenBalance              Int                        @default(0)
   isAdmin                   Boolean                    @default(false)
@@ -48,6 +54,7 @@ model User {
   plannedEmails             PlannedEmail[]
   subscriptionPurchases     SubscriptionPurchase[]
   guestProfile              GuestProfile?
+  favoriteCharacters        UserFavoriteCharacter[]
 }
 
 model UserSettings {
@@ -55,13 +62,16 @@ model UserSettings {
   includeDefaultMusic            Boolean @default(true)
   addOverlay                     Boolean @default(true)
   includeCallToAction            Boolean @default(true)
+  projectEmailsEnabled           Boolean @default(true)
   autoApproveScript              Boolean @default(true)
   autoApproveAudio               Boolean @default(true)
   watermarkEnabled               Boolean @default(true)
   captionsEnabled                Boolean @default(true)
+  characterCreationSettings      Json?
   defaultDurationSec             Int?
   sidebarOpen                    Boolean @default(true)
   defaultUseScript               Boolean @default(false)
+  characterContentTone           String? @db.VarChar(16)
   targetLanguages                Json?
   languageVoicePreferences       Json?
   scriptCreationGuidanceEnabled  Boolean @default(false)
@@ -116,6 +126,7 @@ model Project {
   voiceProvider            String?                    @db.VarChar(32)
   languageVoiceAssignments Json?
   languageVoiceProviders   Json?
+  contentTone              String                     @default("neutral") @db.VarChar(16)
   // Optional link to a project group (groups aggregate settings for projects)
   groupId                  String?                    @db.Char(36)
   group                    ProjectGroup?              @relation(fields: [groupId], references: [id])
@@ -241,12 +252,14 @@ model VideoAsset {
   path         String
   publicUrl    String?  @db.VarChar(512)
   isFinal      Boolean  @default(false)
+  variant      String?  @db.VarChar(16)
   languageCode String?  @db.VarChar(16)
   createdAt    DateTime @default(now())
   project      Project  @relation(fields: [projectId], references: [id])
 
   @@index([projectId])
   @@index([projectId, languageCode])
+  @@index([projectId, variant])
 }
 
 model Job {
@@ -276,22 +289,106 @@ model Daemon {
 }
 
 model Character {
-  id          String               @id @default(uuid()) @db.Char(36)
-  title       String
-  description String?
-  variations  CharacterVariation[]
+  id                   String                      @id @default(uuid()) @db.Char(36)
+  title                String
+  description          String?                     @db.VarChar(300)
+  slug                 String?                     @unique @db.VarChar(191)
+  name                 String?                     @db.VarChar(191)
+  tagline              String?                     @db.VarChar(255)
+  bio                  String?                     @db.VarChar(300)
+  searchTextEn         String?                     @db.Text
+  searchTextRu         String?                     @db.Text
+  priority             Int                         @default(0)
+  previewVideoUrl      String?                     @db.VarChar(512)
+  previewVideoHasAudio Boolean                     @default(true)
+  isCatalogPublic      Boolean                     @default(false)
+  defaultVoiceId       String?                     @db.VarChar(128)
+  defaultVoiceProvider String?                     @db.VarChar(32)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  variations           CharacterVariation[]
+  categories           CharacterCategoryCharacter[]
+  favoritedBy          UserFavoriteCharacter[]
+
+  @@index([isCatalogPublic, priority, createdAt])
 }
 
 model CharacterVariation {
   id          String    @id @default(uuid()) @db.Char(36)
   characterId String    @db.Char(36)
   title       String
-  description String?
+  description String?   @db.VarChar(300)
   prompt      String?
   imagePath   String?   @db.VarChar(512)
+  emptyImagePath String? @db.VarChar(512)
+  priority    Int       @default(0)
   character   Character @relation(fields: [characterId], references: [id])
+  imageVariants CharacterImageVariant[]
 
   @@index([characterId])
+  @@index([characterId, priority])
+}
+
+model CharacterImageVariant {
+  id                   String             @id @default(uuid()) @db.Char(36)
+  characterVariationId String             @db.Char(36)
+  kind                 String             @db.VarChar(32)
+  height               Int
+  width                Int?
+  path                 String             @db.VarChar(512)
+  url                  String?            @db.VarChar(512)
+  status               String             @default("ready") @db.VarChar(16)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  variation            CharacterVariation @relation(fields: [characterVariationId], references: [id], onDelete: Cascade)
+
+  @@unique([characterVariationId, kind, height])
+  @@index([kind, height])
+}
+
+model UserFavoriteCharacter {
+  userId      String    @db.Char(36)
+  characterId String    @db.Char(36)
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@id([userId, characterId])
+  @@index([userId, createdAt])
+  @@index([characterId, createdAt])
+}
+
+model CharacterCategory {
+  id            String                      @id @default(uuid()) @db.Char(36)
+  slug          String                      @unique @db.VarChar(191)
+  titleEn       String                      @db.VarChar(191)
+  titleRu       String                      @db.VarChar(191)
+  subtitleEn    String?                     @db.VarChar(255)
+  subtitleRu    String?                     @db.VarChar(255)
+  descriptionEn String?                     @db.Text
+  descriptionRu String?                     @db.Text
+  searchTextEn  String?                     @db.Text
+  searchTextRu  String?                     @db.Text
+  priority      Int                         @default(0)
+  isActive      Boolean                     @default(true)
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
+  characters    CharacterCategoryCharacter[]
+
+  @@index([isActive, priority, createdAt])
+}
+
+model CharacterCategoryCharacter {
+  categoryId  String            @db.Char(36)
+  characterId String            @db.Char(36)
+  priority    Int               @default(0)
+  createdAt   DateTime          @default(now())
+  category    CharacterCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  character   Character         @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@id([categoryId, characterId])
+  @@index([characterId, priority])
+  @@index([categoryId, priority])
 }
 
 model UserCharacter {

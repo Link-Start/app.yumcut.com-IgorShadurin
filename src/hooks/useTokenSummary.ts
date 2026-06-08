@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Api } from '@/lib/api-client';
 import type { TokenSummaryDTO } from '@/shared/types';
 import { useTokenContext } from '@/components/providers/TokenProvider';
 
 export function useTokenSummary() {
+  const { status } = useSession();
   const ctx = useTokenContext();
   const contextSummary = ctx?.summary ?? null;
   const setSummary = ctx?.setSummary;
@@ -19,6 +21,10 @@ export function useTokenSummary() {
   }, [contextSummary]);
 
   const refresh = useCallback(async () => {
+    if (status !== 'authenticated') {
+      setLoading(false);
+      return null;
+    }
     setLoading(true);
     try {
       const data = await Api.getTokenSummary();
@@ -32,9 +38,16 @@ export function useTokenSummary() {
     } finally {
       setLoading(false);
     }
-  }, [setSummary]);
+  }, [setSummary, status]);
 
   useEffect(() => {
+    if (status === 'unauthenticated') {
+      setLoading(false);
+      return;
+    }
+    if (status !== 'authenticated') {
+      return;
+    }
     if (contextSummary) return;
     let cancelled = false;
     refresh().catch(() => {
@@ -43,7 +56,7 @@ export function useTokenSummary() {
     return () => {
       cancelled = true;
     };
-  }, [contextSummary, refresh]);
+  }, [contextSummary, refresh, status]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

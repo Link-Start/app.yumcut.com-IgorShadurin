@@ -36,8 +36,8 @@ describe('daemon + real APIs (health only)', () => {
     process.env.DAEMON_API_PASSWORD = password;
     // Provide DATABASE_URL early to avoid config warnings during route import
     process.env.DATABASE_URL = db.url;
-    app = await startAppApiServer({ daemonPassword: password, mediaRoot });
     storage = await startStorageApiServer({ daemonPassword: password, mediaRoot });
+    app = await startAppApiServer({ daemonPassword: password, mediaRoot, storagePublicUrl: storage.baseUrl });
     const envContent = buildDaemonEnvContent({
       apiBaseUrl: app.baseUrl,
       storageBaseUrl: storage.baseUrl,
@@ -96,7 +96,7 @@ describe('daemon + real APIs (health only)', () => {
       await new Promise((r) => setTimeout(r, 300));
     }
     if (!appOk || !storageOk) {
-      // eslint-disable-next-line no-console
+       
       console.warn('Health check failed', { appOk, storageOk, appBase: app!.baseUrl, storageBase: storage!.baseUrl });
     }
     expect(appOk || storageOk).toBe(true);

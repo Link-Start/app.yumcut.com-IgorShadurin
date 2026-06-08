@@ -13,8 +13,39 @@ import { authenticateApiRequest } from '@/server/api-user';
 import { normalizeLanguageVoiceMap } from '@/shared/voices/language-voice-map';
 import { normalizeTemplateCustomData } from '@/shared/templates/custom-data';
 import { getAdminImageEditorSettings } from '@/server/admin/image-editor';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
+import { normalizeContentTone } from '@/shared/constants/content-tone';
+import { defaultCharacterVideoGeneration } from '@/shared/constants/video-generation';
+import { calculateProjectTokenCost, TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
+import {
+  CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE,
+  normalizeCharacterVideoGenerationMode,
+  normalizeCharacterVideoQuality,
+  qualityForVideoGenerationMode,
+} from '@/shared/constants/character-video-quality';
 
 type Params = { projectId: string };
+
+const PROJECT_RELATED_TOKEN_TYPES = [
+  TOKEN_TRANSACTION_TYPES.projectCreation,
+  TOKEN_TRANSACTION_TYPES.scriptRevision,
+  TOKEN_TRANSACTION_TYPES.audioRegeneration,
+  TOKEN_TRANSACTION_TYPES.imageRegeneration,
+  TOKEN_TRANSACTION_TYPES.imageRegenerationRefund,
+  TOKEN_TRANSACTION_TYPES.projectFailureRefund,
+] as const;
+
+const PROJECT_ACTION_TOKEN_TYPES = [
+  TOKEN_TRANSACTION_TYPES.scriptRevision,
+  TOKEN_TRANSACTION_TYPES.audioRegeneration,
+  TOKEN_TRANSACTION_TYPES.imageRegeneration,
+  TOKEN_TRANSACTION_TYPES.imageRegenerationRefund,
+] as const;
+
+function toUsedTokensFromDelta(sumDelta: number | null | undefined): number {
+  const normalized = typeof sumDelta === 'number' && Number.isFinite(sumDelta) ? sumDelta : 0;
+  return Math.max(0, -normalized);
+}
 
 export const GET = withApiError(async function GET(req: NextRequest, { params }: { params: Promise<Params> }) {
   const auth = await authenticateApiRequest(req);
@@ -47,6 +78,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       }),
       getAdminImageEditorSettings(),
     ]);
+    const projectExperience = normalizeProjectExperience((initialJob?.payload as any)?.projectExperience);
 
     const languages = normalizeLanguageList(
       (p as any)?.languages
@@ -67,7 +99,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       isFinal?: boolean | null;
       createdAt?: Date | string | null;
     }> | undefined;
-    const videos = (p as any).videos as Array<{ id: string; path: string; publicUrl?: string | null; isFinal?: boolean; languageCode?: string | null }> | undefined;
+    const videos = (p as any).videos as Array<{ id: string; path: string; publicUrl?: string | null; isFinal?: boolean; variant?: string | null; languageCode?: string | null }> | undefined;
     const primaryScriptRecord = scripts?.find((s) => s.languageCode === primaryLanguage) ?? scripts?.[0] ?? null;
 
     const languageVariants = languages.map((languageCode, index) => {
@@ -107,6 +139,14 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         ?? (isPrimary ? (videos ?? []).find((v) => v.isFinal && !v.languageCode) : undefined);
       const finalVideoPath = finalVideoRecord ? (finalVideoRecord.publicUrl || normalizeMediaUrl(finalVideoRecord.path)) : null;
       const finalVideoUrl = finalVideoRecord ? finalVideoRecord.publicUrl || null : null;
+      const rawVideoRecord = projectExperience === 'character'
+        ? (
+            (videos ?? []).find((v) => v.languageCode === languageCode && v.variant === 'raw')
+            ?? (isPrimary ? (videos ?? []).find((v) => v.variant === 'raw' && !v.languageCode) : undefined)
+          )
+        : null;
+      const rawVideoPath = rawVideoRecord ? (rawVideoRecord.publicUrl || normalizeMediaUrl(rawVideoRecord.path)) : null;
+      const rawVideoUrl = rawVideoRecord ? rawVideoRecord.publicUrl || null : null;
 
       return {
         languageCode,
@@ -117,8 +157,46 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         finalVoiceoverUrl,
         finalVideoPath,
         finalVideoUrl,
+        rawVideoPath,
+        rawVideoUrl,
       };
     });
+
+    type ProjectTokenTransactionRow = { type: string; delta: number; metadata: unknown };
+    const projectRelatedTokenTransactions: ProjectTokenTransactionRow[] = (prisma as any).tokenTransaction?.findMany
+      ? await (prisma as any).tokenTransaction.findMany({
+          where: {
+            userId: p.userId,
+            type: { in: [...PROJECT_RELATED_TOKEN_TYPES] },
+            metadata: {
+              path: '$.projectId',
+              equals: p.id,
+            },
+          },
+          select: {
+            type: true,
+            delta: true,
+            metadata: true,
+          },
+        }) as ProjectTokenTransactionRow[]
+      : [];
+    const projectDeltaFromLedger = projectRelatedTokenTransactions.reduce((sum, tx) => sum + tx.delta, 0);
+    const hasExplicitProjectCreationCharge = projectRelatedTokenTransactions.some(
+      (tx) => tx.type === TOKEN_TRANSACTION_TYPES.projectCreation,
+    );
+    const actionDeltaForProject = projectRelatedTokenTransactions.reduce((sum, tx) => {
+      if (!(PROJECT_ACTION_TOKEN_TYPES as readonly string[]).includes(tx.type)) return sum;
+      return sum + tx.delta;
+    }, 0);
+    const actionTokensUsed = toUsedTokensFromDelta(actionDeltaForProject);
+    const estimatedCreationTokens = calculateProjectTokenCost(
+      typeof (initialJob?.payload as any)?.durationSeconds === 'number'
+        ? (initialJob?.payload as any).durationSeconds
+        : null,
+    ) * Math.max(languages.length, 1);
+    const tokensUsed = hasExplicitProjectCreationCharge
+      ? toUsedTokensFromDelta(projectDeltaFromLedger)
+      : Math.max(0, estimatedCreationTokens + actionTokensUsed);
 
     const status = p.status as ProjectStatus;
     const latestLog = p.statusLog[0];
@@ -181,17 +259,21 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
 
     // Optionally enrich character selection titles
     let characterTitle: string | null = null;
+    let characterSlug: string | null = null;
     let variationTitle: string | null = null;
     let characterImageUrl: string | null = null;
+    let characterPreviewVideoUrl: string | null = null;
     let selectionStatus: 'ready' | 'processing' | 'failed' | null = null;
   let autoGenerated = false;
   if (p.selection?.characterId) {
     const char = await prisma.character.findUnique({ where: { id: p.selection.characterId } });
     const varr = p.selection.characterVariationId ? await prisma.characterVariation.findUnique({ where: { id: p.selection.characterVariationId } }) : null;
     characterTitle = char?.title || null;
+    characterSlug = char?.slug || null;
+    characterPreviewVideoUrl = normalizeMediaUrl((char as any)?.previewVideoUrl ?? null);
     variationTitle = varr?.title || null;
     if (varr?.imagePath) {
-      characterImageUrl = varr.imagePath.startsWith('/') ? varr.imagePath : `/${varr.imagePath}`;
+      characterImageUrl = normalizeMediaUrl(varr.imagePath);
     }
     selectionStatus = 'ready';
   } else if (p.selection?.userCharacterId) {
@@ -219,6 +301,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         characterTitle,
         variationTitle,
         imageUrl: characterImageUrl,
+        previewVideoUrl: characterPreviewVideoUrl,
         generated: autoGenerated,
         status: selectionStatus,
       };
@@ -227,10 +310,12 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         type: 'global',
         source: 'global',
         characterId: p.selection.characterId,
+        characterSlug,
         variationId: p.selection.characterVariationId,
         characterTitle,
         variationTitle,
         imageUrl: characterImageUrl,
+        previewVideoUrl: characterPreviewVideoUrl,
         status: 'ready' as const,
       };
     } else if ((initialJob?.payload as any)?.characterSelection) {
@@ -238,6 +323,28 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         ...(initialJob?.payload as any).characterSelection,
       };
     }
+    const payloadVideoGeneration = (initialJob?.payload as any)?.videoGeneration;
+    const payloadVideoGenerationMode = normalizeCharacterVideoGenerationMode(payloadVideoGeneration?.mode);
+    const characterVideoQuality = projectExperience === 'character'
+      ? (payloadVideoGenerationMode
+        ? qualityForVideoGenerationMode(payloadVideoGenerationMode)
+        : normalizeCharacterVideoQuality((initialJob?.payload as any)?.characterVideoQuality))
+      : undefined;
+    const resolvedVideoGenerationMode = projectExperience === 'character'
+      ? (payloadVideoGenerationMode ?? CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE[characterVideoQuality ?? 'high'])
+      : null;
+    const resolvedVideoGeneration = resolvedVideoGenerationMode
+      ? {
+          mode: resolvedVideoGenerationMode,
+          ...(resolvedVideoGenerationMode === 'lipsync_runware'
+            ? {
+                lipsyncPrompt: typeof payloadVideoGeneration?.lipsyncPrompt === 'string' && payloadVideoGeneration.lipsyncPrompt.trim()
+                  ? payloadVideoGeneration.lipsyncPrompt.trim()
+                  : defaultCharacterVideoGeneration().lipsyncPrompt,
+              }
+            : {}),
+        }
+      : null;
     const creation: any = initialJob?.payload ? {
       durationSeconds: (initialJob.payload as any).durationSeconds ?? null,
       useExactTextAsScript: (initialJob.payload as any).useExactTextAsScript ?? null,
@@ -263,6 +370,10 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         ?? (p as any)?.languageVoiceAssignments
         ?? null,
       ),
+      characterVideoQuality,
+      videoGeneration: resolvedVideoGeneration,
+      projectExperience,
+      contentTone: normalizeContentTone((initialJob.payload as any)?.contentTone ?? (p as any)?.contentTone),
       characterSelection: characterSelectionPayload ? withCharacterSelectionLabels(characterSelectionPayload) : null,
     } : undefined;
 
@@ -303,6 +414,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       imageEditorEnabled: adminImageEditor.enabled,
       templateImages: templateImageMetadata,
       creation,
+      tokensUsed,
       template: p.template ? {
         id: p.template.id,
         title: p.template.title,
@@ -327,6 +439,32 @@ export const DELETE = withApiError(async function DELETE(req: NextRequest, { par
   const project = await prisma.project.findFirst({ where: { id: projectId, userId, deleted: false } });
   if (!project) return notFound('Project not found');
 
-  await prisma.project.update({ where: { id: project.id }, data: { deleted: true, deletedAt: new Date() } });
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.project.update({
+      where: { id: project.id },
+      data: {
+        status: ProjectStatus.Cancelled,
+        deleted: true,
+        deletedAt: now,
+        currentDaemonId: null,
+        currentDaemonLockedAt: null,
+      },
+    }),
+    prisma.job.updateMany({
+      where: {
+        projectId: project.id,
+        status: { in: ['queued', 'running'] },
+      },
+      data: { status: 'paused' },
+    }),
+    prisma.projectStatusHistory.create({
+      data: {
+        projectId: project.id,
+        status: ProjectStatus.Cancelled,
+        message: 'User deleted project. Tokens are not refunded.',
+      },
+    }),
+  ]);
   return ok({ ok: true });
 }, 'Failed to delete project');

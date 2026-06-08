@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 
-// eslint-disable-next-line import/no-named-as-default
 import {
   issueSignedUploadGrant,
   verifySignedUploadGrant,
@@ -74,6 +73,19 @@ describe('storage command signature helpers', () => {
     const payload = verifySignedStorageCommand(command.data, command.signature);
     expect(payload.type).toBe('delete-user-media');
     expect(payload.paths).toEqual(['audio/foo.wav', 'video/bar.mp4']);
+  });
+
+  it('supports resize character image commands', () => {
+    const command = issueSignedStorageCommand({
+      type: 'resize-character-image',
+      userId: 'admin-character-catalog',
+      path: 'characters/2026/05/14/source.webp',
+      height: 896,
+    });
+    const payload = verifySignedStorageCommand(command.data, command.signature);
+    expect(payload.type).toBe('resize-character-image');
+    expect(payload.path).toBe('characters/2026/05/14/source.webp');
+    expect(payload.height).toBe(896);
   });
 
   it('rejects expired commands', () => {

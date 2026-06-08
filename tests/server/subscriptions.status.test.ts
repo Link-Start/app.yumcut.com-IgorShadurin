@@ -10,10 +10,20 @@ vi.mock('@/server/db', () => ({
   },
 }));
 
-const { getUserSubscriptionStatus } = await import('@/server/subscriptions');
+const { getUserSubscriptionStatus, isStripeSubscriptionEnvironment } = await import('@/server/subscriptions');
 
 beforeEach(() => {
   subscriptionFindFirst.mockReset();
+});
+
+describe('isStripeSubscriptionEnvironment', () => {
+  it('recognizes only Stripe subscription environments', () => {
+    expect(isStripeSubscriptionEnvironment('StripeLive')).toBe(true);
+    expect(isStripeSubscriptionEnvironment('StripeTest')).toBe(true);
+    expect(isStripeSubscriptionEnvironment('Production')).toBe(false);
+    expect(isStripeSubscriptionEnvironment('Sandbox')).toBe(false);
+    expect(isStripeSubscriptionEnvironment(null)).toBe(false);
+  });
 });
 
 describe('getUserSubscriptionStatus', () => {

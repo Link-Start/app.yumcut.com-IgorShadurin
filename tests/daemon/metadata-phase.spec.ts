@@ -219,4 +219,64 @@ describe('metadata phase', () => {
     const statusPayload = setStatusMock.mock.calls.at(-1);
     expect(statusPayload?.[1]).toBe(ProjectStatus.ProcessCaptionsVideo);
   });
+
+  it('sends character projects directly to video parts when captions are disabled', async () => {
+    const projectId = 'proj-character';
+    const cfg = {
+      targetLanguage: 'en',
+      languages: ['en'],
+      captionsEnabled: false,
+      projectExperience: 'character',
+    } as any;
+    const daemonConfig = {
+      scriptWorkspaceV2: path.join(baseDir, 'scripts'),
+      scriptMode: 'fast',
+    } as any;
+    const progressStore = (getLanguageProgressMock as any).__store as Map<string, any>;
+    progressStore.set('en', {
+      languageCode: 'en',
+      transcriptionDone: true,
+      captionsDone: false,
+      videoPartsDone: false,
+      finalVideoDone: false,
+      disabled: false,
+      failedStep: null,
+      failureReason: null,
+    });
+
+    await handleMetadataPhase({ projectId, cfg, daemonConfig });
+
+    const statusPayload = setStatusMock.mock.calls.at(-1);
+    expect(statusPayload?.[1]).toBe(ProjectStatus.ProcessVideoPartsGeneration);
+  });
+
+  it('keeps story projects on the image route when captions are disabled', async () => {
+    const projectId = 'proj-story';
+    const cfg = {
+      targetLanguage: 'en',
+      languages: ['en'],
+      captionsEnabled: false,
+      projectExperience: 'story',
+    } as any;
+    const daemonConfig = {
+      scriptWorkspaceV2: path.join(baseDir, 'scripts'),
+      scriptMode: 'fast',
+    } as any;
+    const progressStore = (getLanguageProgressMock as any).__store as Map<string, any>;
+    progressStore.set('en', {
+      languageCode: 'en',
+      transcriptionDone: true,
+      captionsDone: false,
+      videoPartsDone: false,
+      finalVideoDone: false,
+      disabled: false,
+      failedStep: null,
+      failureReason: null,
+    });
+
+    await handleMetadataPhase({ projectId, cfg, daemonConfig });
+
+    const statusPayload = setStatusMock.mock.calls.at(-1);
+    expect(statusPayload?.[1]).toBe(ProjectStatus.ProcessImagesGeneration);
+  });
 });

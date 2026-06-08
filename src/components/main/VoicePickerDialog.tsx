@@ -16,6 +16,12 @@ import { voiceSupportsLanguage } from '@/shared/voices/client-utils';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
 import { localizeVoiceOption } from '@/components/main/voice-translations';
+import type { ProjectExperience } from '@/shared/constants/project-experience';
+import {
+  getExcludedVoiceProvidersFromRules,
+  VOICE_PROVIDER_AVAILABILITY_RULES,
+  type ScriptInputMode,
+} from '@/shared/voices/provider-availability-policy';
 
 const AUTO_VALUE = '__auto__';
 type ProviderFilter = 'all' | VoiceProviderId;
@@ -116,6 +122,10 @@ type VoicePickerDialogProps = {
   onOpenChange: (open: boolean) => void;
   selectedVoiceId: string | null;
   onSelect: (voiceId: string | null) => Promise<void> | void;
+  availabilityContext?: {
+    projectExperience: ProjectExperience;
+    mode: ScriptInputMode;
+  };
 };
 
 function normalizeVoiceProvider(value: string | null | undefined): string {
@@ -137,10 +147,17 @@ function formatVoiceSummary(voice: VoiceOption, copy: VoicePickerCopy): string {
   return parts.join(' · ');
 }
 
-export function VoicePickerDialog({ open, languageCode, onOpenChange, selectedVoiceId, onSelect }: VoicePickerDialogProps) {
+export function VoicePickerDialog({
+  open,
+  languageCode,
+  onOpenChange,
+  selectedVoiceId,
+  onSelect,
+  availabilityContext,
+}: VoicePickerDialogProps) {
   const { language: appLanguage } = useAppLanguage();
   const copy = COPY[appLanguage];
-  const { voices, loading, getByExternalId, getAutoVoice } = useVoices();
+  const { voices, providerAvailabilityRules, loading, getByExternalId, getAutoVoice } = useVoices();
   const { playingId, isPlaying, togglePlay, stop } = useVoicePreview();
   const activeLanguage = (languageCode ?? DEFAULT_LANGUAGE) as TargetLanguageCode;
   const languageLabel = LANGUAGE_LABELS_BY_UI[appLanguage][activeLanguage] ?? getLanguageLabel(activeLanguage);
@@ -169,8 +186,23 @@ export function VoicePickerDialog({ open, languageCode, onOpenChange, selectedVo
 
   const languageCompatibleVoices = useMemo(() => {
     if (!voices.length) return [];
-    return voices.filter((voice) => voiceSupportsLanguage(voice, activeLanguage));
-  }, [voices, activeLanguage]);
+    const excludedProviders = availabilityContext
+      ? getExcludedVoiceProvidersFromRules(
+          providerAvailabilityRules.length > 0 ? providerAvailabilityRules : VOICE_PROVIDER_AVAILABILITY_RULES,
+          {
+            projectExperience: availabilityContext.projectExperience,
+            mode: availabilityContext.mode,
+            languageCode: activeLanguage,
+          },
+        )
+      : null;
+    return voices.filter((voice) => {
+      if (!voiceSupportsLanguage(voice, activeLanguage)) return false;
+      const provider = normalizeVoiceProvider(voice.voiceProvider);
+      if (!provider || !excludedProviders) return true;
+      return !excludedProviders.has(provider as VoiceProviderId);
+    });
+  }, [voices, providerAvailabilityRules, activeLanguage, availabilityContext]);
 
   const filteredVoices = useMemo(() => {
     if (providerFilter === 'all') return languageCompatibleVoices;
@@ -190,6 +222,13 @@ export function VoicePickerDialog({ open, languageCode, onOpenChange, selectedVo
     }
     return availability;
   }, [languageCompatibleVoices]);
+
+  useEffect(() => {
+    if (providerFilter === 'all') return;
+    if (!providerAvailability[providerFilter]) {
+      setProviderFilter('all');
+    }
+  }, [providerAvailability, providerFilter]);
 
   const currentSelection = useMemo(() => {
     if (!selectedVoiceId) return null;

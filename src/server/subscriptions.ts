@@ -3,10 +3,11 @@ import { prisma } from './db';
 import { config } from './config';
 import { grantTokens } from './tokens';
 import { TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
-import { getSubscriptionConfig } from '@/shared/constants/subscriptions';
+import { getSubscriptionConfig, resolveSubscriptionGrantByProductId } from '@/shared/constants/subscriptions';
 import { decodeSignedTransactionPayload } from './app-store/signed-data-verifier';
 import { logAppleSubscriptionEvent } from './app-store/subscription-logger';
 import { notifyAdminsOfSubscriptionPurchase } from './telegram';
+import { grantSubscriptionWinbackBonusOnResubscribe } from './subscription-winback';
 
 const APPLE_PRODUCTION_VERIFY_URL = 'https://buy.itunes.apple.com/verifyReceipt';
 const APPLE_SANDBOX_VERIFY_URL = 'https://sandbox.itunes.apple.com/verifyReceipt';
@@ -46,6 +47,7 @@ export type ProcessServerSubscriptionPurchaseInput = {
   purchaseDate: Date;
   expiresDate?: Date | null;
   environment: string;
+  tokensOverride?: number | null;
   payload?: Prisma.JsonValue;
   source?: PurchaseSource;
 };
@@ -57,6 +59,7 @@ type PurchaseDescriptor = {
   purchaseDate: Date;
   expiresDate?: Date | null;
   environment: string;
+  tokensOverride?: number | null;
   payload: Prisma.JsonValue;
 };
 
@@ -77,6 +80,10 @@ export type UserSubscriptionStatus = {
   lastTransactionId: string | null;
   environment: string | null;
 };
+
+export function isStripeSubscriptionEnvironment(environment: string | null | undefined) {
+  return environment === 'StripeLive' || environment === 'StripeTest';
+}
 
 export class SubscriptionError extends Error {
   constructor(message: string, public readonly status: number = 400) {
@@ -171,6 +178,7 @@ export async function processServerSubscriptionPurchase(
     purchaseDate: input.purchaseDate,
     expiresDate: input.expiresDate ?? null,
     environment: input.environment,
+    tokensOverride: input.tokensOverride ?? null,
     payload:
       input.payload ??
       ({
@@ -290,10 +298,12 @@ async function processSignedTransactions(userId: string, signedTransactions: str
 }
 
 async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, source: PurchaseSource) {
-  const productConfig = getSubscriptionConfig(descriptor.productId);
-  if (!productConfig) {
+  const productGrant = resolveSubscriptionGrantByProductId(descriptor.productId);
+  if (!productGrant) {
     throw new SubscriptionError(`Unsupported subscription product: ${descriptor.productId}`);
   }
+  const productConfig = productGrant.product;
+  const subscriptionTokens = descriptor.tokensOverride ?? productGrant.tokens;
 
   const existing = await prisma.subscriptionPurchase.findUnique({
     where: { transactionId: descriptor.transactionId },
@@ -371,7 +381,7 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
     };
   }
 
-  const balance = await prisma.$transaction(async (tx) => {
+  const purchaseOutcome = await prisma.$transaction(async (tx) => {
     await tx.subscriptionPurchase.create({
       data: {
         userId,
@@ -388,7 +398,7 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
     const newBalance = await grantTokens(
       {
         userId,
-        amount: productConfig.tokens,
+        amount: subscriptionTokens,
         type: TOKEN_TRANSACTION_TYPES.subscriptionCredit,
         description: `Subscription ${productConfig.label}`,
         metadata: {
@@ -399,7 +409,19 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
       tx,
     );
 
-    return newBalance;
+    const winbackBonus = await grantSubscriptionWinbackBonusOnResubscribe(
+      {
+        userId,
+        sourceTransactionId: descriptor.transactionId,
+        productId: descriptor.productId,
+      },
+      tx,
+    );
+
+    return {
+      balance: winbackBonus.granted ? (winbackBonus.balance ?? newBalance) : newBalance,
+      winbackBonusGranted: winbackBonus.tokensGranted,
+    };
   });
 
   const user = await prisma.user.findUnique({
@@ -407,10 +429,12 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
     select: { email: true, name: true },
   });
 
+  const totalTokensGranted = subscriptionTokens + purchaseOutcome.winbackBonusGranted;
+
   const result = {
     alreadyProcessed: false,
-    tokensGranted: productConfig.tokens,
-    balance,
+    tokensGranted: totalTokensGranted,
+    balance: purchaseOutcome.balance,
     productId: descriptor.productId,
     transactionId: descriptor.transactionId,
     expiresAt: descriptor.expiresDate?.toISOString() ?? null,
@@ -422,8 +446,10 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
     productId: descriptor.productId,
     transactionId: descriptor.transactionId,
     originalTransactionId: descriptor.originalTransactionId,
-    tokensGranted: productConfig.tokens,
-    balance,
+    tokensGranted: totalTokensGranted,
+    subscriptionTokensGranted: subscriptionTokens,
+    winbackBonusGranted: purchaseOutcome.winbackBonusGranted,
+    balance: purchaseOutcome.balance,
     environment: descriptor.environment,
     expiresAt: descriptor.expiresDate?.toISOString() ?? null,
   });
@@ -434,14 +460,14 @@ async function finalizePurchase(userId: string, descriptor: PurchaseDescriptor, 
     userName: user?.name ?? null,
     productId: descriptor.productId,
     productLabel: productConfig.label,
-    tokensGranted: productConfig.tokens,
+    tokensGranted: totalTokensGranted,
     transactionId: descriptor.transactionId,
     originalTransactionId: descriptor.originalTransactionId,
     environment: descriptor.environment,
-    balance,
+    balance: purchaseOutcome.balance,
     source,
   }).catch((err) => {
-    // eslint-disable-next-line no-console
+     
     console.error('Failed to send subscription purchase notification', err);
   });
 

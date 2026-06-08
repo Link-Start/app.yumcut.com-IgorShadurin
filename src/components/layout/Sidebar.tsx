@@ -23,15 +23,21 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
   const { data: session } = useSession();
   const isAdmin = !!(session?.user as any)?.isAdmin;
   const pathname = usePathname();
+  const hideGuestCreepyComicNav = pathname === '/character/creepy-comic' && !session?.user;
   const { settings, update } = useSettings();
 
   useEffect(() => {
+    if (!session?.user || hideGuestCreepyComicNav) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     Api.getProjects()
       .then((r: any) => setItems(r))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [hideGuestCreepyComicNav, session?.user]);
 
   // Listen for project deletions to remove from the list immediately
   useEffect(() => {
@@ -94,6 +100,10 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
   const collapseLabel = language === 'ru' ? 'Свернуть боковую панель' : 'Collapse sidebar';
   const expandLabel = language === 'ru' ? 'Развернуть боковую панель' : 'Expand sidebar';
   const noProjectsLabel = language === 'ru' ? 'Пока нет проектов' : 'No projects for now';
+
+  if (hideGuestCreepyComicNav) {
+    return null;
+  }
 
   return (
     <aside

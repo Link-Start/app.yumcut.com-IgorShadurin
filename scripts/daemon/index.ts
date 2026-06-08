@@ -2,7 +2,7 @@
 import { loadConfig } from './helpers/config';
 import type { DaemonConfig } from './helpers/config';
 import { log } from './helpers/logger';
-import { fetchEligibleProjects, setStatus, setJobStatus, verifyServicesAccess } from './helpers/db';
+import { fetchEligibleProjects, isJobUnavailableError, setStatus, setJobStatus, verifyServicesAccess } from './helpers/db';
 import { ensureAssetsAvailable } from './helpers/assets';
 import { executeJob } from './helpers/executor';
 import { claimNextJobs, ensureJobsForProjects } from './helpers/jobs';
@@ -78,6 +78,11 @@ try {
       description: 'Workspace for the shorts metadata scripts (v2 pipeline).',
     },
     {
+      key: 'DAEMON_CHARACTERS_WORKSPACE',
+      value: cfg.charactersWorkspace,
+      description: 'Workspace for character tooling (`npm run lipsync:runware`).',
+    },
+    {
       key: 'DAEMON_PROJECTS_WORKSPACE',
       value: cfg.projectsWorkspace,
       description: 'Root directory where the daemon stores per-project artifacts.',
@@ -98,6 +103,7 @@ try {
   process.exit(1);
 }
 let interval: NodeJS.Timeout | null = null;
+let tickInProgress = false;
 
 // Track projects in flight to limit concurrency
 const inFlight = new Map<string, { startedAt: number; timer: NodeJS.Timeout; jobId: string; type: string }>();
@@ -105,6 +111,27 @@ const inFlight = new Map<string, { startedAt: number; timer: NodeJS.Timeout; job
 function makeUrl(base: string, path: string) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return new URL(normalizedPath, base).toString();
+}
+
+async function setJobStatusSafely(
+  jobId: string,
+  status: 'done' | 'failed',
+  reason: string,
+): Promise<void> {
+  try {
+    await setJobStatus(jobId, status);
+  } catch (error: unknown) {
+    if (isJobUnavailableError(error)) {
+      log.warn('Skip job status update because job is unavailable', {
+        jobId,
+        status,
+        reason,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    throw error;
+  }
 }
 
 async function startTask(job: { id: string; projectId: string; type: string; payload: Record<string, unknown> | null }) {
@@ -135,17 +162,17 @@ async function startTask(job: { id: string; projectId: string; type: string; pay
     if (inFlight.has(job.projectId)) {
       log.error('Task timeout', { projectId: job.projectId, timeoutMs: cfg.taskTimeoutMs });
       try { await setStatus(job.projectId, ProjectStatus.Error, 'Task timeout'); } catch {}
-      try { await setJobStatus(job.id, 'failed'); } catch {}
+      try { await setJobStatusSafely(job.id, 'failed', 'task-timeout'); } catch {}
     }
   }, cfg.taskTimeoutMs);
   inFlight.set(job.projectId, { startedAt, timer, jobId: job.id, type: job.type });
 
   try {
     const ok = await executeJob(job);
-    await setJobStatus(job.id, ok ? 'done' : 'failed');
+    await setJobStatusSafely(job.id, ok ? 'done' : 'failed', 'task-completed');
   } catch (e: any) {
     log.error('Unhandled task error', { projectId: job.projectId, error: e?.message || String(e) });
-    try { await setJobStatus(job.id, 'failed'); } catch {}
+    try { await setJobStatusSafely(job.id, 'failed', 'task-exception'); } catch {}
   } finally {
     clearTimeout(timer);
     inFlight.delete(job.projectId);
@@ -153,9 +180,17 @@ async function startTask(job: { id: string; projectId: string; type: string; pay
 }
 
 async function tick() {
-  const capacity = cfg.maxConcurrency - inFlight.size;
-  // log.info('Scheduler tick', { capacity, inFlight: inFlight.size });
+  if (tickInProgress) {
+    if (isVerboseScheduler()) {
+      log.info('Scheduler tick skipped while previous tick is still running', {
+        inFlight: inFlight.size,
+      });
+    }
+    return;
+  }
+  tickInProgress = true;
   try {
+    const capacity = cfg.maxConcurrency - inFlight.size;
     if (capacity <= 0) return;
     const candidates = await fetchEligibleProjects(capacity);
     if (isVerboseScheduler()) {
@@ -172,6 +207,8 @@ async function tick() {
     }
   } catch (e: any) {
     log.error('Tick error', { error: e?.message || String(e) });
+  } finally {
+    tickInProgress = false;
   }
 }
 

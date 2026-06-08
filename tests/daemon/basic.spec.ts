@@ -79,6 +79,34 @@ describe('daemon basic', () => {
     expect(ok).toBe(true);
   }, 10000);
 
+  it('does not overlap scheduler ticks while an API request is still running', async () => {
+    let activeEligibleRequests = 0;
+    let maxActiveEligibleRequests = 0;
+    let totalEligibleRequests = 0;
+    api.set('GET /api/daemon/projects/eligible', async (_req, res) => {
+      totalEligibleRequests += 1;
+      activeEligibleRequests += 1;
+      maxActiveEligibleRequests = Math.max(maxActiveEligibleRequests, activeEligibleRequests);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      activeEligibleRequests -= 1;
+      const body = JSON.stringify({ projects: [] });
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('content-length', Buffer.byteLength(body));
+      res.end(body);
+    });
+
+    daemon = startDaemon(envFilePath);
+
+    const observedMultipleTicks = await waitFor(() => totalEligibleRequests >= 2, 3000, 25);
+    if (!observedMultipleTicks) {
+      console.error('Daemon stdout (scheduler overlap)', daemon?.stdout || '<empty>');
+      console.error('Daemon stderr (scheduler overlap)', daemon?.stderr || '<empty>');
+    }
+    expect(observedMultipleTicks).toBe(true);
+    expect(maxActiveEligibleRequests).toBe(1);
+  }, 5000);
+
   it('claims a script job and writes initial script archive', async () => {
     const projectId = `p_${randomUUID()}`;
     const prompt = 'Hello from test prompt';

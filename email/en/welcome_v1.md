@@ -1,9 +1,10 @@
-# Welcome to YumCut
+# personal message for {{name}}
 
-Hey {{name}},
+hey {{name}},
 
-Welcome to YumCut.
-You can create your first video in just a few clicks.
-If you want help or feedback, just reply to this email.
+want {{bonus_tokens}} tokens for video creation?
+reply with what you want to make in YumCut, or any question you have. I'll add {{bonus_tokens}} tokens to your balance after your reply.
 
-- YumCut team
+- Igor
+
+Sent from my iPhone

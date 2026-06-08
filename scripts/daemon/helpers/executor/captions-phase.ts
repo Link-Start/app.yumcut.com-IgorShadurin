@@ -10,6 +10,7 @@ import type { CreationSnapshot } from './types';
 import { resolveProjectLanguagesFromSnapshot } from './project-utils';
 import { createHandledError } from './error';
 import { ensureProjectScaffold, ensureLanguageWorkspace, ensureLanguageLogDir } from '../language-workspace';
+import { nextPipelineStatus } from '@/shared/pipeline/project-pipeline';
 
 type CaptionsPhaseArgs = {
   projectId: string;
@@ -35,8 +36,10 @@ export async function handleCaptionsPhase({ projectId, cfg, daemonConfig }: Capt
       const entry = progress.progress.find((row) => row.languageCode === code);
       return !entry || !entry.captionsDone;
     });
+    const completedNextStatus = nextPipelineStatus(ProjectStatus.ProcessCaptionsVideo, cfg.projectExperience)
+      ?? ProjectStatus.ProcessImagesGeneration;
     if (pendingLanguages.length === 0) {
-      await setStatus(projectId, ProjectStatus.ProcessImagesGeneration, 'Captions overlay generated', {
+      await setStatus(projectId, completedNextStatus, 'Captions overlay generated', {
         captionsWorkspace: agentWorkspace,
         captionsLanguages: activeLanguages,
         failedLanguages: Array.from(disabledLanguages),
@@ -117,7 +120,7 @@ export async function handleCaptionsPhase({ projectId, cfg, daemonConfig }: Capt
         failedLanguages: failedLanguageList,
       });
     } else {
-      await setStatus(projectId, ProjectStatus.ProcessImagesGeneration, 'Captions overlay generated', {
+      await setStatus(projectId, completedNextStatus, 'Captions overlay generated', {
         captionsWorkspace: agentWorkspace,
         captionsLogs: captionLogs,
         captionsLanguages: activeProgress.map((row) => row.languageCode),

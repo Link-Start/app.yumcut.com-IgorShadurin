@@ -1,5 +1,7 @@
 import http from 'http';
 import fs from 'fs';
+import path from 'path';
+import { generateKeyPairSync } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { findFreePort } from './ports';
 import { vi } from 'vitest';
@@ -13,11 +15,48 @@ function getSharedPrisma() {
   return g.__vtPrisma;
 }
 
+function isUsableKeyConfig(value: string | undefined): boolean {
+  if (!value || value.trim().length === 0) return false;
+  const trimmed = value.trim();
+  if (trimmed.includes('-----BEGIN') && trimmed.includes('-----END')) {
+    return true;
+  }
+  const resolvedPath = path.resolve(trimmed);
+  try {
+    fs.accessSync(resolvedPath, fs.constants.R_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureUploadSigningKeys() {
+  if (isUsableKeyConfig(process.env.UPLOAD_SIGNING_PRIVATE_KEY) && isUsableKeyConfig(process.env.UPLOAD_SIGNING_PUBLIC_KEY)) {
+    return;
+  }
+  if (!process.env.UPLOAD_SIGNING_PRIVATE_KEY) {
+    try { process.env.UPLOAD_SIGNING_PRIVATE_KEY = fs.readFileSync('keys/upload_private.pem', 'utf8'); } catch {}
+  }
+  if (!process.env.UPLOAD_SIGNING_PUBLIC_KEY) {
+    try { process.env.UPLOAD_SIGNING_PUBLIC_KEY = fs.readFileSync('keys/upload_public.pem', 'utf8'); } catch {}
+  }
+  if (isUsableKeyConfig(process.env.UPLOAD_SIGNING_PRIVATE_KEY) && isUsableKeyConfig(process.env.UPLOAD_SIGNING_PUBLIC_KEY)) {
+    return;
+  }
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+  });
+  process.env.UPLOAD_SIGNING_PRIVATE_KEY = privateKey;
+  process.env.UPLOAD_SIGNING_PUBLIC_KEY = publicKey;
+}
+
 type ServerCall = { method: string; path: string };
 type AppServerState = {
   statuses: { projectId: string; status: string; message?: string | null; extra?: any }[];
   jobStatuses: { jobId: string; status: string; projectId?: string }[];
-  assets: { projectId: string; kind: 'audio' | 'image' | 'video'; isFinal?: boolean }[];
+  assets: { projectId: string; kind: 'audio' | 'image' | 'video'; isFinal?: boolean; variant?: string | null }[];
   scripts: { projectId: string; length: number }[];
 };
 type ServerInstance = { baseUrl: string; calls: ServerCall[]; state: AppServerState; close: () => Promise<void> };
@@ -33,12 +72,7 @@ export async function startAppApiServer(opts: { daemonPassword: string, userId?:
   const storageBase = opts.storagePublicUrl || process.env.TEST_STORAGE_BASE_URL || 'http://localhost:3333';
   process.env.STORAGE_PUBLIC_URL = storageBase;
   process.env.NEXT_PUBLIC_STORAGE_BASE_URL = storageBase;
-  if (!process.env.UPLOAD_SIGNING_PRIVATE_KEY) {
-    try { process.env.UPLOAD_SIGNING_PRIVATE_KEY = fs.readFileSync('keys/upload_private.pem', 'utf8'); } catch {}
-  }
-  if (!process.env.UPLOAD_SIGNING_PUBLIC_KEY) {
-    try { process.env.UPLOAD_SIGNING_PUBLIC_KEY = fs.readFileSync('keys/upload_public.pem', 'utf8'); } catch {}
-  }
+  ensureUploadSigningKeys();
 
   // Mock prisma + auth/tokens/telegram before importing routes
   const prisma = getSharedPrisma();
@@ -216,7 +250,7 @@ export async function startAppApiServer(opts: { daemonPassword: string, userId?:
         try {
           const parsed = JSON.parse(body.toString('utf8'));
           if (parsed && typeof parsed.type === 'string') {
-            state.assets.push({ projectId, kind: parsed.type, isFinal: !!parsed.isFinal });
+            state.assets.push({ projectId, kind: parsed.type, isFinal: !!parsed.isFinal, variant: typeof parsed.variant === 'string' ? parsed.variant : null });
           }
         } catch {}
         const request = new NextRequest(new Request(new URL(url.pathname, baseUrl), { method: 'POST', headers: req.headers as any, body: body as any } as any));
@@ -328,15 +362,142 @@ export async function startAppApiServer(opts: { daemonPassword: string, userId?:
 }
 
 export async function startStorageApiServer(opts: { daemonPassword: string, mediaRoot?: string, storagePublicUrl?: string, storageAllowedOrigins?: string }): Promise<ServerInstance> {
-  const baseUrl = (opts.storagePublicUrl && opts.storagePublicUrl.trim()) || process.env.TEST_STORAGE_BASE_URL || 'http://localhost:3333';
+  const requestedBase = (opts.storagePublicUrl && opts.storagePublicUrl.trim()) || '';
+  const parsed = requestedBase ? new URL(requestedBase) : null;
+  const host = parsed?.hostname === 'localhost' ? '127.0.0.1' : (parsed?.hostname || '127.0.0.1');
+  const port = parsed?.port ? Number(parsed.port) : await findFreePort();
+  const baseUrl = `${parsed?.protocol || 'http:'}//${host}:${port}`;
   const calls: ServerCall[] = [];
   process.env.DAEMON_API_PASSWORD = opts.daemonPassword;
   if (opts.mediaRoot) process.env.MEDIA_ROOT = opts.mediaRoot;
   process.env.NEXT_PUBLIC_STORAGE_BASE_URL = baseUrl;
   process.env.STORAGE_PUBLIC_URL = baseUrl;
   process.env.STORAGE_ALLOWED_ORIGINS = opts.storageAllowedOrigins || process.env.STORAGE_ALLOWED_ORIGINS || 'http://localhost:3001,http://localhost:3000';
-  // No local server; rely on the real storage instance.
-  return { baseUrl, calls, state: { statuses: [], jobStatuses: [], assets: [], scripts: [] }, close: async () => {} };
+  const state = { statuses: [], jobStatuses: [], assets: [], scripts: [] };
+  const mediaFiles = new Map<string, { body: Buffer; contentType: string }>();
+
+  const server = http.createServer(async (req, res) => {
+    if (!req.url || !req.method) { res.statusCode = 404; res.end(''); return; }
+    const url = new URL(req.url, baseUrl);
+    calls.push({ method: req.method, path: url.pathname });
+    if (req.method === 'GET' && url.pathname.startsWith('/api/media/')) {
+      const mediaPath = url.pathname.replace(/^\/api\/media\//, '');
+      const hit = mediaFiles.get(mediaPath);
+      if (!hit) {
+        res.statusCode = 404;
+        res.end('');
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader('content-type', hit.contentType || 'application/octet-stream');
+      res.end(hit.body);
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/storage/user-images') {
+      const body = await readBody(req);
+      const request = new Request(new URL(url.pathname, baseUrl), {
+        method: 'POST',
+        headers: req.headers as any,
+        body: body as any,
+      });
+      const form = await request.formData();
+      const file = form.get('file');
+      const fileName = typeof (file as any)?.name === 'string' ? (file as any).name : 'user-image.bin';
+      const cleanedName = path.basename(fileName);
+      const storedPath = `user-images/${Date.now()}-${cleanedName}`;
+      const fileBytes = file instanceof File ? Buffer.from(await file.arrayBuffer()) : Buffer.alloc(0);
+      const fileType = file instanceof File && typeof file.type === 'string' && file.type.trim().length > 0
+        ? file.type
+        : 'application/octet-stream';
+      mediaFiles.set(storedPath, { body: fileBytes, contentType: fileType });
+      const publicUrl = `${baseUrl}/api/media/${storedPath}`;
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ path: storedPath, url: publicUrl }));
+      return;
+    }
+    const daemonPassword = String(req.headers['x-daemon-password'] || '');
+    const daemonId = String(req.headers['x-daemon-id'] || '');
+    const authorized = daemonPassword === opts.daemonPassword && daemonId.length > 0;
+    if (!authorized) {
+      res.statusCode = 403;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ error: { message: 'Forbidden' } }));
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/storage/health') {
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ ok: true, now: new Date().toISOString() }));
+      return;
+    }
+    if (req.method === 'POST' && /\/api\/storage\/projects\/[^/]+\/assets$/.test(url.pathname)) {
+      const projectId = url.pathname.split('/')[4] || 'unknown';
+      const body = await readBody(req);
+      const request = new Request(new URL(url.pathname, baseUrl), {
+        method: 'POST',
+        headers: req.headers as any,
+        body: body as any,
+      });
+      const form = await request.formData();
+      const type = String(form.get('type') || '').toLowerCase();
+      const languageCode = String(form.get('languageCode') || '').trim().toLowerCase();
+      const isFinal = String(form.get('isFinal') || '').trim().toLowerCase() === 'true';
+      const file = form.get('file');
+      const fileName = typeof (file as any)?.name === 'string' ? (file as any).name : 'asset.bin';
+      const cleanedName = path.basename(fileName);
+      const fileBytes = file instanceof File ? Buffer.from(await file.arrayBuffer()) : Buffer.alloc(0);
+      const fileType = file instanceof File && typeof file.type === 'string' && file.type.trim().length > 0
+        ? file.type
+        : 'application/octet-stream';
+      const kind = type === 'video' ? 'video' : (type === 'image' ? 'image' : 'audio');
+      const stamp = Date.now();
+      const suffix = languageCode ? `-${languageCode}` : '';
+      const storedPath = `projects/${projectId}/${kind}/${stamp}${suffix}-${cleanedName}`;
+      mediaFiles.set(storedPath, { body: fileBytes, contentType: fileType });
+      const publicUrl = `${baseUrl}/api/media/${storedPath}`;
+      const payload = kind === 'video'
+        ? { kind, path: storedPath, url: publicUrl, isFinal }
+        : { kind, path: storedPath, url: publicUrl };
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify(payload));
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/storage/characters') {
+      const body = await readBody(req);
+      const request = new Request(new URL(url.pathname, baseUrl), {
+        method: 'POST',
+        headers: req.headers as any,
+        body: body as any,
+      });
+      const form = await request.formData();
+      const file = form.get('file');
+      const fileName = typeof (file as any)?.name === 'string' ? (file as any).name : 'character.bin';
+      const cleanedName = path.basename(fileName);
+      const storedPath = `characters/${Date.now()}-${cleanedName}`;
+      const fileBytes = file instanceof File ? Buffer.from(await file.arrayBuffer()) : Buffer.alloc(0);
+      const fileType = file instanceof File && typeof file.type === 'string' && file.type.trim().length > 0
+        ? file.type
+        : 'application/octet-stream';
+      mediaFiles.set(storedPath, { body: fileBytes, contentType: fileType });
+      const publicUrl = `${baseUrl}/api/media/${storedPath}`;
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ path: storedPath, url: publicUrl }));
+      return;
+    }
+    res.statusCode = 404;
+    res.end('');
+  });
+
+  await new Promise<void>((resolve) => server.listen(port, host, resolve));
+  return {
+    baseUrl,
+    calls,
+    state,
+    close: () => new Promise((r) => server.close(() => r())),
+  };
 }
 
 async function readBody(req: http.IncomingMessage): Promise<Buffer> {

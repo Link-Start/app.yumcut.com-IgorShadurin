@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Api } from '@/lib/api-client';
 
 type ProjectItem = any;
@@ -13,6 +14,7 @@ type ProjectsContextValue = {
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
 
 export function ProjectsProvider({ children }: { children: React.ReactNode }) {
+  const { status } = useSession();
   const [items, setItems] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,9 +27,17 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Prefetch immediately on first client render to avoid popover delay
+    if (status === 'unauthenticated') {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    if (status !== 'authenticated') {
+      return;
+    }
+    // Prefetch immediately on first authenticated client render to avoid popover delay
     refresh();
-  }, [refresh]);
+  }, [refresh, status]);
 
   useEffect(() => {
     // Keep in sync with app-level events
@@ -68,4 +78,3 @@ export function useProjects() {
   if (!ctx) return { items: [] as ProjectItem[], loading: true, refresh: () => {} } satisfies ProjectsContextValue;
   return ctx;
 }
-

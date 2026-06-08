@@ -350,6 +350,7 @@ export function ProjectSettingsBar({ creation, template }: Props) {
                   {!templatePreviewLoaded ? (
                     <div className="absolute inset-0 skeleton" />
                   ) : null}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={template.previewImageUrl}
                     alt={`${templateTitle} ${t.templatePreviewSuffix}`}
@@ -434,6 +435,7 @@ export function ProjectSettingsBar({ creation, template }: Props) {
                 </div>
                 <div className="overflow-hidden rounded-md border border-white/20 bg-white/5">
                   <div className="relative aspect-[9/16] w-full">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={characterImageUrl}
                       alt={characterTooltipTitle || t.characterPreviewAlt}
@@ -573,6 +575,7 @@ export function ProjectSettingsBar({ creation, template }: Props) {
             )}
           >
             <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={characterImageUrl}
                 alt={characterTooltipTitle || t.characterPreviewAlt}

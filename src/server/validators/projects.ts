@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import { LIMITS } from '@/server/limits';
 import { LANGUAGE_CODES, LANGUAGE_ENUM } from '@/shared/constants/languages';
+import { PROJECT_EXPERIENCES } from '@/shared/constants/project-experience';
+import { CONTENT_TONES } from '@/shared/constants/content-tone';
+import { CHARACTER_PROJECT_TARGET_DURATION_SECONDS } from '@/shared/constants/character-project';
+import {
+  CHARACTER_VIDEO_GENERATION_MODES,
+  CHARACTER_VIDEO_QUALITIES,
+  CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE,
+  normalizeCharacterVideoGenerationMode,
+} from '@/shared/constants/character-video-quality';
 const scriptTextSchema = z
   .string()
   .trim()
@@ -21,6 +30,11 @@ export const characterSelectionSchema = z.union([
 ]);
 
 const languageVoiceIdSchema = z.string().min(1).max(128);
+const videoGenerationSchema = z.object({
+  mode: z.enum(CHARACTER_VIDEO_GENERATION_MODES),
+  lipsyncPrompt: z.string().trim().min(1).max(LIMITS.promptMax).optional(),
+}).strict();
+
 const languageVoiceRecordSchema = z.record(z.string(), languageVoiceIdSchema).superRefine((val, ctx) => {
   if (!val || typeof val !== 'object') return;
   for (const key of Object.keys(val)) {
@@ -47,9 +61,16 @@ export const createProjectSchema = z.object({
     .min(1, { message: 'Script cannot be empty' })
     .max(LIMITS.rawScriptMax, { message: `Script must be at most ${LIMITS.rawScriptMax} characters` })
     .optional(),
-  // Allow custom seconds in [30, 1800] (30s .. 30m)
-  durationSeconds: z.number().int().min(30, { message: 'Minimum duration is 30 seconds' }).max(1800, { message: 'Maximum duration is 30 minutes' }).optional(),
+  // Allow custom seconds in [1, 1800]; experience-specific minimum is validated in superRefine.
+  durationSeconds: z.number().int().min(1, { message: 'Minimum duration is 1 second' }).max(1800, { message: 'Maximum duration is 30 minutes' }).optional(),
   characterSelection: characterSelectionSchema.optional(),
+  characterSlug: z
+    .string()
+    .trim()
+    .min(1, { message: 'Character slug cannot be empty' })
+    .max(191, { message: 'Character slug is too long' })
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'Character slug format is invalid' })
+    .optional(),
   useExactTextAsScript: z.boolean().optional(),
   templateId: z.string().uuid().optional(),
   voiceId: z.string().max(128).optional().or(z.literal('')).transform((v) => v || undefined),
@@ -58,11 +79,45 @@ export const createProjectSchema = z.object({
     .min(1, { message: 'Select at least one language' })
     .optional(),
   languageVoices: languageVoiceRecordSchema.optional(),
+  videoGeneration: videoGenerationSchema.optional(),
+  characterVideoQuality: z.enum(CHARACTER_VIDEO_QUALITIES).optional(),
+  projectExperience: z.enum(PROJECT_EXPERIENCES).optional(),
+  contentTone: z.enum(CONTENT_TONES).optional(),
+  includeDefaultMusic: z.boolean().optional(),
+  addOverlay: z.boolean().optional(),
+  includeCallToAction: z.boolean().optional(),
+  watermarkEnabled: z.boolean().optional(),
+  captionsEnabled: z.boolean().optional(),
 }).superRefine((val, ctx) => {
+  if (val.characterVideoQuality && val.videoGeneration?.mode) {
+    const mode = normalizeCharacterVideoGenerationMode(val.videoGeneration.mode);
+    const expectedMode = CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE[val.characterVideoQuality];
+    if (mode && mode !== expectedMode) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'characterVideoQuality conflicts with videoGeneration.mode',
+        path: ['characterVideoQuality'],
+      });
+    }
+  }
+
   // If not using exact script mode, duration is required
   if (!val.useExactTextAsScript && (val.durationSeconds == null)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Duration is required', path: ['durationSeconds'] });
+    return;
   }
+
+  if (val.durationSeconds == null) return;
+  const isCharacter = val.projectExperience === 'character';
+  const minimumDuration = isCharacter ? CHARACTER_PROJECT_TARGET_DURATION_SECONDS : 30;
+  if (val.durationSeconds < minimumDuration) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Minimum duration is ${minimumDuration} seconds`,
+      path: ['durationSeconds'],
+    });
+  }
+
 });
 
 export const approveScriptSchema = z.union([

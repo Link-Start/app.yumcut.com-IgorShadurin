@@ -10,6 +10,10 @@ import { ProjectStatus } from '@/shared/constants/status';
 import { notifyProjectStatusChange } from '@/server/telegram';
 import { normalizeLanguageList, DEFAULT_LANGUAGE } from '@/shared/constants/languages';
 import { storeTemplateImageMetadata } from '@/server/projects/helpers';
+import { TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
+import { PROJECT_RELATED_TOKEN_TYPES, extractProjectIdFromTokenMetadata, toUsedTokensFromDelta } from '@/server/admin/token-usage';
+import { normalizeMediaUrl } from '@/server/storage';
+import { sendProjectReadyEmail } from '@/server/emails/project-lifecycle';
 
 type Params = { projectId: string };
 
@@ -59,11 +63,12 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     status === ProjectStatus.Error ||
     status === ProjectStatus.Cancelled;
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  const project = await prisma.project.findFirst({ where: { id: projectId, deleted: false } });
   if (!project) return notFound('Project not found');
   if (project.currentDaemonId && project.currentDaemonId !== daemonId) {
     return forbidden('Project locked by another daemon');
   }
+  const previousStatus = project.status;
 
   const normalizedLanguages = normalizeLanguageList((project as any)?.languages ?? (project as any)?.targetLanguage ?? DEFAULT_LANGUAGE, DEFAULT_LANGUAGE);
   const templateImageMetadataRaw = (extra as any)?.templateImageMetadata;
@@ -92,6 +97,7 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     }
   }
   await prisma.$transaction(async (tx) => {
+    let refundedTokens = 0;
     const primaryLanguage = normalizedLanguages[0] ?? DEFAULT_LANGUAGE;
     const finalVoiceovers = extra && typeof (extra as any).finalVoiceovers === 'object' && (extra as any).finalVoiceovers !== null
       ? (extra as any).finalVoiceovers as Record<string, string>
@@ -143,11 +149,18 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
       await storeTemplateImageMetadata(tx, projectId, normalizedTemplateImages);
     }
 
+    if (status === ProjectStatus.Error) {
+      refundedTokens = await refundProjectTokensOnFailure(tx, {
+        projectId,
+        userId: project.userId,
+      });
+    }
+
     await tx.projectStatusHistory.create({
-      data: { projectId, status, message: message ?? undefined, extra: extra as any },
+      data: { projectId, status, message: buildStatusMessage(message, refundedTokens), extra: extra as any },
     });
     if (shouldReleaseDaemon) {
-      await tx.project.update({
+      await tx.project.updateMany({
         where: { id: projectId, currentDaemonId: daemonId },
         data: { currentDaemonId: null, currentDaemonLockedAt: null },
       });
@@ -161,6 +174,51 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     }
   } catch (err) {
     console.error('Failed to send Telegram notification', err);
+  }
+
+  if (status === ProjectStatus.Done && previousStatus !== ProjectStatus.Done) {
+    try {
+      const updatedProject = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: {
+          id: true,
+          title: true,
+          finalVideoUrl: true,
+          finalVideoPath: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              preferredLanguage: true,
+              settings: {
+                select: { projectEmailsEnabled: true },
+              },
+            },
+          },
+        },
+      });
+
+      const videoFromExtra = pickFinalVideoUrlFromStatusExtra(extra, normalizedLanguages);
+      const finalVideoUrl = updatedProject
+        ? (updatedProject.finalVideoUrl || normalizeMediaUrl(updatedProject.finalVideoPath) || videoFromExtra)
+        : videoFromExtra;
+
+      if (updatedProject?.user) {
+        await sendProjectReadyEmail({
+          userId: updatedProject.user.id,
+          email: updatedProject.user.email,
+          name: updatedProject.user.name,
+          preferredLanguage: updatedProject.user.preferredLanguage,
+          projectId: updatedProject.id,
+          projectTitle: updatedProject.title,
+          finalVideoUrl,
+          projectEmailsEnabled: updatedProject.user.settings?.projectEmailsEnabled ?? true,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to send project ready email', err);
+    }
   }
 
   return ok({ ok: true });
@@ -228,6 +286,23 @@ function shouldNotifyStatus(status: ProjectStatus, extra: unknown, languages: st
   }
 }
 
+function pickFinalVideoUrlFromStatusExtra(extra: unknown, languages: string[]): string | null {
+  const payload = extra as Record<string, unknown> | undefined;
+  if (!payload) return null;
+  const direct = typeof payload.finalVideoUrl === 'string' ? payload.finalVideoUrl.trim() : '';
+  if (direct) return direct;
+
+  const map = payload.finalVideoPaths;
+  if (!map || typeof map !== 'object') return null;
+  const record = map as Record<string, string>;
+  for (const language of languages) {
+    const value = typeof record[language] === 'string' ? record[language].trim() : '';
+    if (value) return value;
+  }
+  const fallback = Object.values(record).find((value) => typeof value === 'string' && value.trim().length > 0);
+  return typeof fallback === 'string' ? fallback : null;
+}
+
 function normalizeTemplateImageMetadata(entries: TemplateImageMetadataInput[]): NormalizedTemplateImageMetadata[] {
   const seenImages = new Set<string>();
   const seenAssets = new Set<string>();
@@ -259,4 +334,64 @@ function normalizeOptional(value?: string | null): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function buildStatusMessage(message: string | null | undefined, refundedTokens: number): string | undefined {
+  const base = message?.trim() || '';
+  if (refundedTokens <= 0) return base || undefined;
+  const refundMessage = `Refunded ${refundedTokens.toLocaleString()} tokens to user balance due to project failure.`;
+  if (!base) return refundMessage;
+  return `${base} ${refundMessage}`;
+}
+
+async function refundProjectTokensOnFailure(
+  tx: any,
+  params: { projectId: string; userId: string },
+): Promise<number> {
+  const rows = await tx.tokenTransaction.findMany({
+    where: {
+      userId: params.userId,
+      type: { in: [...PROJECT_RELATED_TOKEN_TYPES, TOKEN_TRANSACTION_TYPES.projectFailureRefund] },
+    },
+    select: {
+      delta: true,
+      metadata: true,
+    },
+  });
+
+  const projectDelta = rows.reduce((sum: number, row: { delta: number; metadata: unknown }) => {
+    if (extractProjectIdFromTokenMetadata(row.metadata) !== params.projectId) return sum;
+    return sum + row.delta;
+  }, 0);
+
+  const refundableTokens = toUsedTokensFromDelta(projectDelta);
+  if (refundableTokens <= 0) return 0;
+
+  const user = await tx.user.findUnique({
+    where: { id: params.userId },
+    select: { tokenBalance: true },
+  });
+  const currentBalance = typeof user?.tokenBalance === 'number' ? user.tokenBalance : 0;
+  const balanceAfter = currentBalance + refundableTokens;
+
+  await tx.user.update({
+    where: { id: params.userId },
+    data: { tokenBalance: balanceAfter },
+  });
+
+  await tx.tokenTransaction.create({
+    data: {
+      userId: params.userId,
+      delta: refundableTokens,
+      balanceAfter,
+      type: TOKEN_TRANSACTION_TYPES.projectFailureRefund,
+      description: 'Project failed refund',
+      initiator: 'system:project-failure-refund',
+      metadata: {
+        projectId: params.projectId,
+      },
+    },
+  });
+
+  return refundableTokens;
 }

@@ -13,6 +13,10 @@ import { patchSettingsSchema } from '@/server/validators/settings';
 import { DEFAULT_LANGUAGE, normalizeLanguageList } from '@/shared/constants/languages';
 import { normalizeLanguageVoiceMap } from '@/shared/voices/language-voice-map';
 import {
+  HAS_CHARACTER_CREATION_SETTINGS_FIELD,
+  resolveCharacterCreationSettings,
+} from '@/server/settings/character-creation';
+import {
   parseStoredCharacterSelection,
   resolveCharacterSelectionSnapshot,
   serializeStoredCharacterSelection,
@@ -20,6 +24,8 @@ import {
 import { ensureSchedulerPreferences } from '@/server/publishing/preferences';
 import { getAdminVoiceProviderSettings } from '@/server/admin/voice-providers';
 import { buildVoiceProviderSet } from '@/shared/constants/voice-providers';
+import { normalizeCharacterCreationSettings } from '@/shared/constants/character-creation-settings';
+import { normalizeContentTone } from '@/shared/constants/content-tone';
 
 export const GET = withApiError(async function GET(req: NextRequest) {
   const auth = await authenticateApiRequest(req);
@@ -58,15 +64,18 @@ export const GET = withApiError(async function GET(req: NextRequest) {
     includeDefaultMusic: settings.includeDefaultMusic,
     addOverlay: settings.addOverlay,
     includeCallToAction: (settings as any)?.includeCallToAction ?? true,
+    projectEmailsEnabled: (settings as any)?.projectEmailsEnabled ?? true,
     autoApproveScript: settings.autoApproveScript,
     autoApproveAudio: settings.autoApproveAudio,
     watermarkEnabled: (settings as any)?.watermarkEnabled ?? true,
     captionsEnabled: (settings as any)?.captionsEnabled ?? true,
+    characterCreationSettings: resolveCharacterCreationSettings(settings),
     defaultDurationSeconds: settings.defaultDurationSec,
     sidebarOpen: activeCount > 0
       ? ((settings as any).sidebarOpen ?? (settings as any).sidebarOpenMain ?? true)
       : false,
     defaultUseScript: (settings as any).defaultUseScript ?? false,
+    characterContentTone: normalizeContentTone((settings as any).characterContentTone),
     targetLanguages: normalizedLanguages,
     languageVoicePreferences: sanitizedLanguageVoices,
     scriptCreationGuidanceEnabled: (settings as any).scriptCreationGuidanceEnabled ?? false,
@@ -102,13 +111,26 @@ export const PATCH = withApiError(async function PATCH(req: NextRequest) {
   const updateData: Record<string, any> = {};
   if (key === 'defaultDurationSeconds') updateData.defaultDurationSec = value ?? null;
   else if (key === 'defaultUseScript') updateData.defaultUseScript = value;
+  else if (key === 'characterContentTone') updateData.characterContentTone = normalizeContentTone(value);
   else if (key === 'includeDefaultMusic') updateData.includeDefaultMusic = value;
   else if (key === 'addOverlay') updateData.addOverlay = value;
   else if (key === 'includeCallToAction') updateData.includeCallToAction = value;
+  else if (key === 'projectEmailsEnabled') updateData.projectEmailsEnabled = value;
   else if (key === 'autoApproveScript') updateData.autoApproveScript = value;
   else if (key === 'autoApproveAudio') updateData.autoApproveAudio = value;
   else if (key === 'watermarkEnabled') updateData.watermarkEnabled = value;
   else if (key === 'captionsEnabled') updateData.captionsEnabled = value;
+  else if (key === 'characterCreationSettings') {
+    const normalizedCharacterSettings = normalizeCharacterCreationSettings(value ?? null);
+    if (HAS_CHARACTER_CREATION_SETTINGS_FIELD) {
+      updateData.characterCreationSettings = normalizedCharacterSettings;
+    } else {
+      updateData.addOverlay = normalizedCharacterSettings.addOverlay;
+      updateData.watermarkEnabled = normalizedCharacterSettings.watermarkEnabled;
+      updateData.captionsEnabled = normalizedCharacterSettings.captionsEnabled;
+      updateData.includeCallToAction = normalizedCharacterSettings.includeCallToAction;
+    }
+  }
   else if (key === 'targetLanguages') updateData.targetLanguages = value;
   else if (key === 'scriptCreationGuidance') updateData.scriptCreationGuidance = value;
   else if (key === 'scriptCreationGuidanceEnabled') updateData.scriptCreationGuidanceEnabled = value;
@@ -186,6 +208,9 @@ export const PATCH = withApiError(async function PATCH(req: NextRequest) {
       );
       return ok({ targetLanguages: normalized });
     }
+    if (key === 'characterContentTone') {
+      return ok({ characterContentTone: normalizeContentTone((updated as any).characterContentTone) });
+    }
     if (key === 'schedulerDefaultTimes' || key === 'schedulerCadence') {
       const prefs = ensureSchedulerPreferences((updated as any)?.schedulerDefaultTimes, (updated as any)?.schedulerCadence);
       return ok({
@@ -213,8 +238,14 @@ export const PATCH = withApiError(async function PATCH(req: NextRequest) {
     if (key === 'captionsEnabled') {
       return ok({ captionsEnabled: !!(updated as any).captionsEnabled });
     }
+    if (key === 'characterCreationSettings') {
+      return ok({ characterCreationSettings: resolveCharacterCreationSettings(updated) });
+    }
     if (key === 'includeCallToAction') {
       return ok({ includeCallToAction: !!(updated as any).includeCallToAction });
+    }
+    if (key === 'projectEmailsEnabled') {
+      return ok({ projectEmailsEnabled: !!(updated as any).projectEmailsEnabled });
     }
     if (key === 'scriptCreationGuidance') {
       return ok({ scriptCreationGuidance: (updated as any).scriptCreationGuidance ?? '' });

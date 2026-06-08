@@ -12,10 +12,10 @@ if (typeof process !== 'undefined' && !process.env.MOCK_TRANSLATION) {
 if (typeof process !== 'undefined' && process.env.QUIET_TEST_LOGS !== '0') {
   const noop = () => {};
   // Preserve error logging for failures.
-  // eslint-disable-next-line no-console
+   
   console.debug = noop;
-  // eslint-disable-next-line no-console
+   
   console.info = noop;
-  // eslint-disable-next-line no-console
+   
   console.warn = noop;
 }

@@ -8,10 +8,13 @@ export function useProject(projectId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
   const lastStatusRef = useRef<string | null>(null);
+  const fetchSeqRef = useRef(0);
 
   const fetchOne = useCallback(async () => {
+    const seq = ++fetchSeqRef.current;
     try {
       const res = await Api.getProject(projectId);
+      if (seq !== fetchSeqRef.current) return;
       setData(res);
       const nextStatus = (res as any)?.status ?? null;
       const shouldBroadcast = typeof nextStatus === 'string' && lastStatusRef.current !== nextStatus;
@@ -23,19 +26,21 @@ export function useProject(projectId: string) {
       }
       setError(null);
     } catch (e) {
+      if (seq !== fetchSeqRef.current) return;
       setError(e);
     } finally {
+      if (seq !== fetchSeqRef.current) return;
       setLoading(false);
     }
   }, [projectId]);
 
   useEffect(() => {
+    setData(null);
+    setError(null);
+    setLoading(true);
+    lastStatusRef.current = null;
     fetchOne();
   }, [fetchOne]);
-
-  useEffect(() => {
-    lastStatusRef.current = null;
-  }, [projectId]);
 
   const fetchStatus = useCallback(async () => {
     try {
