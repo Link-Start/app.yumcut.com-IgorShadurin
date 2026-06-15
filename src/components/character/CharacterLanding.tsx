@@ -771,7 +771,7 @@ export function CharacterLanding({
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder={copy.searchPlaceholder}
-              className="h-10 pl-9"
+              className="h-10 rounded-full pl-9"
               aria-label={copy.searchPlaceholder}
             />
           </div>
