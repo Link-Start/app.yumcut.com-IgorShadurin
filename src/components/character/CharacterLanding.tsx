@@ -24,7 +24,8 @@ import {
   type MainPageGroupCharacter,
   type MainPageTopLevelMode,
 } from './main-page-groups';
-const CATEGORY_PREVIEW_CELLS = 9;
+const CATEGORY_PREVIEW_CELLS = 4;
+const CATEGORY_PREVIEW_SECTIONS = 6;
 const MAX_CHARACTERS_PER_CATEGORY_PAGE = 18;
 const STORIES_PREVIEW_IMAGES = [
   '/template/basic/preview.jpg',
@@ -111,6 +112,15 @@ type LandingCopy = {
   go: string;
 };
 
+function buildPreviewSections(images: string[]): string[][] {
+  const source = images.length > 0 ? images : ['/template/basic/preview.jpg'];
+  return Array.from({ length: CATEGORY_PREVIEW_SECTIONS }, (_, sectionIndex) => (
+    Array.from({ length: CATEGORY_PREVIEW_CELLS }, (_, cellIndex) => (
+      source[(sectionIndex * CATEGORY_PREVIEW_CELLS + cellIndex) % source.length] ?? source[0]!
+    ))
+  ));
+}
+
 function GroupGridPreview({
   images,
   alt,
@@ -118,13 +128,12 @@ function GroupGridPreview({
   images: string[];
   alt: string;
 }) {
-  const previewImages = useMemo(() => {
-    const source = images.length > 0 ? images.slice(0, CATEGORY_PREVIEW_CELLS) : ['/template/basic/preview.jpg'];
-    return Array.from({ length: CATEGORY_PREVIEW_CELLS }, (_, index) => source[index] ?? null);
-  }, [images]);
+  const previewImages = useMemo(() => (
+    Array.from({ length: CATEGORY_PREVIEW_CELLS }, (_, index) => images[index] ?? null)
+  ), [images]);
 
   return (
-    <div className="grid h-full w-full grid-cols-3 gap-0.5 bg-gray-200 dark:bg-gray-800">
+    <div className="grid h-full w-full grid-cols-2 gap-0.5 bg-gray-200 dark:bg-gray-800">
       {previewImages.map((imageUrl, index) => (
         <div key={`${imageUrl ?? 'empty'}-${index}`} className="relative overflow-hidden bg-gray-100 dark:bg-gray-900">
           {imageUrl ? (
@@ -143,6 +152,36 @@ function GroupGridPreview({
               )}
             />
           )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GroupHoverGridPreview({
+  images,
+  alt,
+  activeSection,
+}: {
+  images: string[];
+  alt: string;
+  activeSection: number | null;
+}) {
+  const previewSections = useMemo(() => buildPreviewSections(images), [images]);
+  const activeIndex = activeSection ?? 0;
+
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-gray-100 dark:bg-gray-900">
+      {previewSections.map((sectionImages, index) => (
+        <div
+          key={`${alt}-preview-section-${index}`}
+          className={cn(
+            'absolute inset-0 transition-all duration-300 ease-out',
+            index === activeIndex ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.015]',
+          )}
+          aria-hidden={index !== activeIndex}
+        >
+          <GroupGridPreview images={sectionImages} alt={`${alt} preview ${index + 1}`} />
         </div>
       ))}
     </div>
@@ -246,6 +285,7 @@ function GroupCategoryCard({
   onSelect: () => void;
   language: 'en' | 'ru';
 }) {
+  const [activeSection, setActiveSection] = useState<number | null>(null);
   const title = pickLocalizedText(group.title, language);
   const slideshowImages = useMemo(() => group.characters.map((character) => character.imageUrl), [group.characters]);
 
@@ -253,6 +293,18 @@ function GroupCategoryCard({
     <button
       type="button"
       onClick={onSelect}
+      onMouseMove={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        const relativeX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+        const nextSection = Math.min(
+          CATEGORY_PREVIEW_SECTIONS - 1,
+          Math.floor((relativeX / rect.width) * CATEGORY_PREVIEW_SECTIONS),
+        );
+        setActiveSection((currentSection) => (currentSection === nextSection ? currentSection : nextSection));
+      }}
+      onMouseLeave={() => setActiveSection(null)}
+      onBlur={() => setActiveSection(null)}
       className="block w-full cursor-pointer text-left focus-visible:outline-none"
       aria-pressed={selected}
       aria-label={`Open ${title} group`}
@@ -267,9 +319,9 @@ function GroupCategoryCard({
         )}
       >
         <div className="relative aspect-[9/16] w-full">
-          <GroupGridPreview images={slideshowImages} alt={title} />
+          <GroupHoverGridPreview images={slideshowImages} alt={title} activeSection={activeSection} />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
-          <div className="absolute bottom-3 left-3 right-3 text-white">
+          <div className="pointer-events-none absolute bottom-3 left-3 right-3 text-white">
             <h3 className="truncate text-sm font-semibold leading-none">{title}</h3>
           </div>
         </div>
