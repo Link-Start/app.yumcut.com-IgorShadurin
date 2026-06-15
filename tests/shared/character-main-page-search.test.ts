@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   filterMainPageGroupsForSearch,
   findMainPageMatchingCharacters,
+  mainPageStoriesMatchesSearch,
   normalizeMainPageSearchQuery,
+  normalizeMainPageTopLevelMode,
   resolveMainPageLandingView,
+  resolveInitialMainPageTopLevelMode,
   type MainPageGroup,
 } from '@/components/character/main-page-groups';
 
@@ -66,6 +69,29 @@ describe('character main page search', () => {
       hasExpandedGroup: true,
       hasSingleGroup: false,
     })).toBe('search');
+  });
+
+  it('normalizes top-level landing modes', () => {
+    expect(normalizeMainPageTopLevelMode('stories')).toBe('stories');
+    expect(normalizeMainPageTopLevelMode('brainrot')).toBe('brainrot');
+    expect(normalizeMainPageTopLevelMode('cats')).toBeNull();
+  });
+
+  it('infers brainrot mode for legacy openCategory links', () => {
+    expect(resolveInitialMainPageTopLevelMode({
+      openMode: undefined,
+      hasOpenCategory: true,
+    })).toBe('brainrot');
+    expect(resolveInitialMainPageTopLevelMode({
+      openMode: 'stories',
+      hasOpenCategory: true,
+    })).toBe('stories');
+  });
+
+  it('matches story searches against the top-level Stories category', () => {
+    expect(mainPageStoriesMatchesSearch(normalizeMainPageSearchQuery('old story'), 'en')).toBe(true);
+    expect(mainPageStoriesMatchesSearch(normalizeMainPageSearchQuery('сценарий'), 'ru')).toBe(true);
+    expect(mainPageStoriesMatchesSearch(normalizeMainPageSearchQuery('canine'), 'en')).toBe(false);
   });
 
   it('finds matching characters outside the currently expanded category', () => {

@@ -8,19 +8,35 @@ import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button-1';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from '@/components/ui/pagination';
+import { PromptInput } from '@/components/main/PromptInput';
 import { CharacterPreviewCard } from './CharacterPreviewCard';
 import {
   filterMainPageGroupsForSearch,
   findMainPageMatchingCharacters,
   getMainPageGroupById,
+  mainPageStoriesMatchesSearch,
   normalizeMainPageSearchQuery,
   pickLocalizedText,
   resolveMainPageLandingView,
+  resolveInitialMainPageTopLevelMode,
+  type LocalizedText,
   type MainPageGroup,
   type MainPageGroupCharacter,
+  type MainPageTopLevelMode,
 } from './main-page-groups';
-const CATEGORY_PREVIEW_SECTIONS = 10;
+const CATEGORY_PREVIEW_CELLS = 9;
 const MAX_CHARACTERS_PER_CATEGORY_PAGE = 18;
+const STORIES_PREVIEW_IMAGES = [
+  '/template/basic/preview.jpg',
+  '/template/v2-comics/preview.jpg',
+  '/template/noir/preview.jpg',
+  '/template/anime/preview.jpg',
+  '/template/horror/preview.jpg',
+  '/template/doodling/preview.jpg',
+  '/template/ww1/preview.jpg',
+  '/template/3d/preview.jpg',
+  '/template/cyberpunk/preview.jpg',
+];
 
 const COPY = {
   en: {
@@ -35,6 +51,10 @@ const COPY = {
     matchingCharactersLabel: 'Matching characters',
     noResults: 'No categories or characters found.',
     categoriesBack: 'Categories',
+    storiesTitle: 'Stories',
+    storiesSubtitle: 'Classic story videos',
+    brainrotTitle: 'Brainrot',
+    brainrotSubtitle: 'Character videos',
     previous: 'Previous',
     next: 'Next',
     page: 'Page',
@@ -54,6 +74,10 @@ const COPY = {
     matchingCharactersLabel: 'Найденные персонажи',
     noResults: 'Категории или персонажи не найдены.',
     categoriesBack: 'Категории',
+    storiesTitle: 'Истории',
+    storiesSubtitle: 'Классические сюжетные видео',
+    brainrotTitle: 'Brainrot',
+    brainrotSubtitle: 'Видео с персонажами',
     previous: 'Назад',
     next: 'Вперёд',
     page: 'Страница',
@@ -75,6 +99,10 @@ type LandingCopy = {
   matchingCharactersLabel: string;
   noResults: string;
   categoriesBack: string;
+  storiesTitle: string;
+  storiesSubtitle: string;
+  brainrotTitle: string;
+  brainrotSubtitle: string;
   previous: string;
   next: string;
   page: string;
@@ -83,41 +111,39 @@ type LandingCopy = {
   go: string;
 };
 
-function buildSectionPreviewImages(images: string[]): string[] {
-  const safeImages = images.length > 0 ? images : ['/template/basic/preview.jpg'];
-  const source = safeImages.slice(0, CATEGORY_PREVIEW_SECTIONS);
-  return Array.from(
-    { length: CATEGORY_PREVIEW_SECTIONS },
-    (_, index) => source[index % source.length] ?? source[0]!,
-  );
-}
-
-function GroupSectionPreview({
+function GroupGridPreview({
   images,
   alt,
-  activeSection,
 }: {
   images: string[];
   alt: string;
-  activeSection: number | null;
 }) {
-  const sectionImages = useMemo(() => buildSectionPreviewImages(images), [images]);
-  const activeIndex = activeSection ?? 0;
+  const previewImages = useMemo(() => {
+    const source = images.length > 0 ? images.slice(0, CATEGORY_PREVIEW_CELLS) : ['/template/basic/preview.jpg'];
+    return Array.from({ length: CATEGORY_PREVIEW_CELLS }, (_, index) => source[index] ?? null);
+  }, [images]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-gray-100 dark:bg-gray-900">
-      {sectionImages.map((imageUrl, index) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={`${imageUrl}-${index}`}
-          src={imageUrl}
-          alt={alt}
-          loading="lazy"
-          className={cn(
-            'absolute inset-0 h-full w-full object-cover transition-all duration-300 ease-out',
-            index === activeIndex ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.02]',
+    <div className="grid h-full w-full grid-cols-3 gap-0.5 bg-gray-200 dark:bg-gray-800">
+      {previewImages.map((imageUrl, index) => (
+        <div key={`${imageUrl ?? 'empty'}-${index}`} className="relative overflow-hidden bg-gray-100 dark:bg-gray-900">
+          {imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageUrl}
+              alt={`${alt} preview ${index + 1}`}
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div
+              className={cn(
+                'h-full w-full',
+                index % 2 === 0 ? 'bg-gray-100 dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-950',
+              )}
+            />
           )}
-        />
+        </div>
       ))}
     </div>
   );
@@ -178,6 +204,37 @@ function parsePositiveInteger(value: string | null | undefined): number | null {
   return floored > 0 ? floored : null;
 }
 
+function makePreviewCharacter(id: string, imageUrl: string): MainPageGroupCharacter {
+  return {
+    id,
+    slug: id,
+    name: id,
+    bio: '',
+    hiddenSearchText: { en: '', ru: '' },
+    imageUrl,
+    creationsCount: 0,
+    favoritesCount: 0,
+    isFavorited: false,
+  };
+}
+
+function makeTopLevelGroup(input: {
+  id: MainPageTopLevelMode;
+  title: LocalizedText;
+  subtitle: LocalizedText;
+  images: string[];
+}): MainPageGroup {
+  const images = input.images.length > 0 ? input.images : ['/template/basic/preview.jpg'];
+  return {
+    id: input.id,
+    title: input.title,
+    subtitle: input.subtitle,
+    description: input.subtitle,
+    hiddenSearchText: input.subtitle,
+    characters: images.map((imageUrl, index) => makePreviewCharacter(`${input.id}-preview-${index}`, imageUrl)),
+  };
+}
+
 function GroupCategoryCard({
   group,
   selected,
@@ -189,17 +246,13 @@ function GroupCategoryCard({
   onSelect: () => void;
   language: 'en' | 'ru';
 }) {
-  const [activeSection, setActiveSection] = useState<number | null>(null);
   const title = pickLocalizedText(group.title, language);
-  const subtitle = pickLocalizedText(group.subtitle, language);
   const slideshowImages = useMemo(() => group.characters.map((character) => character.imageUrl), [group.characters]);
 
   return (
     <button
       type="button"
       onClick={onSelect}
-      onMouseLeave={() => setActiveSection(null)}
-      onBlur={() => setActiveSection(null)}
       className="block w-full cursor-pointer text-left focus-visible:outline-none"
       aria-pressed={selected}
       aria-label={`Open ${title} group`}
@@ -214,16 +267,7 @@ function GroupCategoryCard({
         )}
       >
         <div className="relative aspect-[9/16] w-full">
-          <GroupSectionPreview images={slideshowImages} alt={title} activeSection={activeSection} />
-          <div className="absolute inset-0 z-10 grid grid-cols-10">
-            {Array.from({ length: CATEGORY_PREVIEW_SECTIONS }, (_, index) => (
-              <span
-                key={`${group.id}-preview-section-${index}`}
-                className="h-full w-full"
-                onMouseEnter={() => setActiveSection(index)}
-              />
-            ))}
-          </div>
+          <GroupGridPreview images={slideshowImages} alt={title} />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
           <div className="absolute bottom-3 left-3 right-3 text-white">
             <h3 className="truncate text-sm font-semibold leading-none">{title}</h3>
@@ -236,15 +280,23 @@ function GroupCategoryCard({
 
 export function CharacterLanding({
   groups,
+  initialOpenMode = null,
   initialOpenCategoryId = null,
 }: {
   groups: MainPageGroup[];
+  initialOpenMode?: MainPageTopLevelMode | null;
   initialOpenCategoryId?: string | null;
 }) {
   const { language } = useAppLanguage();
   const copy = COPY[language];
   const singleGroupId = groups.length === 1 ? groups[0]?.id ?? null : null;
   const hasSingleGroup = singleGroupId !== null;
+  const [openMode, setOpenMode] = useState<MainPageTopLevelMode | null>(
+    () => resolveInitialMainPageTopLevelMode({
+      openMode: initialOpenMode,
+      hasOpenCategory: getMainPageGroupById(groups, initialOpenCategoryId) !== null,
+    }),
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [favoriteStateBySlug, setFavoriteStateBySlug] = useState<Record<string, { isFavorited: boolean; favoritesCount: number }>>({});
   const [favoriteSubmittingBySlug, setFavoriteSubmittingBySlug] = useState<Record<string, boolean>>({});
@@ -254,6 +306,37 @@ export function CharacterLanding({
   const [expandedGroupPage, setExpandedGroupPage] = useState(1);
   const normalizedSearch = normalizeMainPageSearchQuery(searchQuery);
   const isSearchActive = normalizedSearch.length > 0;
+  const storyMatchesSearch = mainPageStoriesMatchesSearch(normalizedSearch, language);
+
+  const topLevelGroups = useMemo(() => {
+    const brainrotImages = groups.flatMap((group) => group.characters.map((character) => character.imageUrl));
+    return [
+      makeTopLevelGroup({
+        id: 'stories',
+        title: { en: COPY.en.storiesTitle, ru: COPY.ru.storiesTitle },
+        subtitle: { en: COPY.en.storiesSubtitle, ru: COPY.ru.storiesSubtitle },
+        images: STORIES_PREVIEW_IMAGES,
+      }),
+      makeTopLevelGroup({
+        id: 'brainrot',
+        title: { en: COPY.en.brainrotTitle, ru: COPY.ru.brainrotTitle },
+        subtitle: { en: COPY.en.brainrotSubtitle, ru: COPY.ru.brainrotSubtitle },
+        images: brainrotImages,
+      }),
+    ];
+  }, [groups]);
+
+  const filteredTopLevelGroups = useMemo(() => {
+    if (!normalizedSearch) return topLevelGroups;
+    return topLevelGroups.filter((group) => {
+      if (group.id === 'stories') {
+        return storyMatchesSearch;
+      }
+      return groups.some((catalogGroup) => (
+        filterMainPageGroupsForSearch([catalogGroup], normalizedSearch, language).length > 0
+      ));
+    });
+  }, [groups, language, normalizedSearch, storyMatchesSearch, topLevelGroups]);
 
   useEffect(() => {
     const next: Record<string, { isFavorited: boolean; favoritesCount: number }> = {};
@@ -327,14 +410,19 @@ export function CharacterLanding({
 
   const resolveExpandedStateFromSearchParams = useCallback((searchParams: URLSearchParams) => {
     const explicitGroupId = getMainPageGroupById(groups, searchParams.get('openCategory'))?.id ?? null;
-    const groupId = explicitGroupId ?? singleGroupId;
+    const nextOpenMode = resolveInitialMainPageTopLevelMode({
+      openMode: searchParams.get('openMode'),
+      hasOpenCategory: explicitGroupId !== null,
+    });
+    const groupId = nextOpenMode === 'brainrot' ? (explicitGroupId ?? singleGroupId) : null;
     if (!groupId) {
-      return { groupId: null, page: 1 };
+      return { openMode: nextOpenMode, groupId: null, page: 1 };
     }
     const group = getMainPageGroupById(groups, groupId);
     const totalPages = Math.max(1, Math.ceil((group?.characters.length ?? 0) / MAX_CHARACTERS_PER_CATEGORY_PAGE));
     const parsedPage = parsePositiveInteger(searchParams.get('page')) ?? 1;
     return {
+      openMode: nextOpenMode,
       groupId,
       page: Math.min(parsedPage, totalPages),
     };
@@ -352,24 +440,42 @@ export function CharacterLanding({
     )
     : null;
   const landingView = resolveMainPageLandingView({
-    isSearchActive,
+    isSearchActive: false,
     hasExpandedGroup: expandedGroup !== null,
     hasSingleGroup,
   });
-  const showSearchOrCategoriesView = landingView === 'search' || landingView === 'categories';
-  const showExpandedGroupView = landingView === 'expanded' && expandedGroup !== null;
-  const showBackToCategories = expandedGroup !== null && !hasSingleGroup && !isSearchActive;
+  const showTopLevelCategoriesView = !isSearchActive && openMode === null;
+  const showSearchView = isSearchActive;
+  const showStoriesView = !isSearchActive && openMode === 'stories';
+  const showBrainrotCategoryView = !isSearchActive && openMode === 'brainrot' && landingView === 'categories';
+  const showExpandedGroupView = !isSearchActive && openMode === 'brainrot' && landingView === 'expanded' && expandedGroup !== null;
+  const showBackButton = !isSearchActive && openMode !== null;
 
-  const syncExpandedStateToUrl = useCallback((nextGroupId: string | null, nextPage: number, mode: 'push' | 'replace') => {
+  const syncExpandedStateToUrl = useCallback((
+    nextOpenMode: MainPageTopLevelMode | null,
+    nextGroupId: string | null,
+    nextPage: number,
+    mode: 'push' | 'replace',
+  ) => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
 
-    if (!nextGroupId) {
+    if (!nextOpenMode) {
+      url.searchParams.delete('openMode');
+      url.searchParams.delete('openCategory');
+      url.searchParams.delete('page');
+    } else if (nextOpenMode === 'stories') {
+      url.searchParams.set('openMode', 'stories');
       url.searchParams.delete('openCategory');
       url.searchParams.delete('page');
     } else {
-      url.searchParams.set('openCategory', nextGroupId);
-      if (nextPage > 1) {
+      url.searchParams.set('openMode', 'brainrot');
+      if (nextGroupId) {
+        url.searchParams.set('openCategory', nextGroupId);
+      } else {
+        url.searchParams.delete('openCategory');
+      }
+      if (nextGroupId && nextPage > 1) {
         url.searchParams.set('page', String(nextPage));
       } else {
         url.searchParams.delete('page');
@@ -397,7 +503,8 @@ export function CharacterLanding({
   }, [resolveExpandedStateFromSearchParams]);
 
   useEffect(() => {
-    const { groupId, page } = readExpandedStateFromUrl();
+    const { openMode, groupId, page } = readExpandedStateFromUrl();
+    setOpenMode(openMode);
     setExpandedGroupId(groupId);
     setExpandedGroupPage(page);
   }, [readExpandedStateFromUrl]);
@@ -405,7 +512,8 @@ export function CharacterLanding({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handlePopState = () => {
-      const { groupId, page } = readExpandedStateFromUrl();
+      const { openMode, groupId, page } = readExpandedStateFromUrl();
+      setOpenMode(openMode);
       setExpandedGroupId(groupId);
       setExpandedGroupPage(page);
     };
@@ -423,16 +531,17 @@ export function CharacterLanding({
     if (expandedGroupPage > expandedGroupTotalPages) {
       const nextPage = expandedGroupTotalPages;
       setExpandedGroupPage(nextPage);
-      syncExpandedStateToUrl(expandedGroup.id, nextPage, 'replace');
+      syncExpandedStateToUrl(openMode, expandedGroup.id, nextPage, 'replace');
     }
-  }, [expandedGroup, expandedGroupPage, expandedGroupTotalPages, syncExpandedStateToUrl]);
+  }, [expandedGroup, expandedGroupPage, expandedGroupTotalPages, openMode, syncExpandedStateToUrl]);
 
   const openExpandedGroup = useCallback((groupId: string) => {
     const validGroupId = getMainPageGroupById(groups, groupId)?.id ?? null;
     if (!validGroupId) return;
+    setOpenMode('brainrot');
     setExpandedGroupId(validGroupId);
     setExpandedGroupPage(1);
-    syncExpandedStateToUrl(validGroupId, 1, 'push');
+    syncExpandedStateToUrl('brainrot', validGroupId, 1, 'push');
   }, [groups, syncExpandedStateToUrl]);
 
   const handleCategorySelect = useCallback((groupId: string) => {
@@ -447,14 +556,39 @@ export function CharacterLanding({
     const clampedPage = Math.min(Math.max(1, Math.floor(nextPage)), expandedGroupTotalPages);
     if (clampedPage === safeExpandedGroupPage) return;
     setExpandedGroupPage(clampedPage);
-    syncExpandedStateToUrl(expandedGroup.id, clampedPage, 'push');
+    syncExpandedStateToUrl('brainrot', expandedGroup.id, clampedPage, 'push');
   }, [expandedGroup, expandedGroupTotalPages, safeExpandedGroupPage, syncExpandedStateToUrl]);
 
   const collapseExpandedGroup = () => {
-    if (hasSingleGroup) return;
     setExpandedGroupId(null);
     setExpandedGroupPage(1);
-    syncExpandedStateToUrl(null, 1, 'replace');
+    syncExpandedStateToUrl('brainrot', null, 1, 'replace');
+  };
+
+  const closeTopLevelMode = () => {
+    setOpenMode(null);
+    setExpandedGroupId(null);
+    setExpandedGroupPage(1);
+    syncExpandedStateToUrl(null, null, 1, 'replace');
+  };
+
+  const openTopLevelMode = useCallback((mode: MainPageTopLevelMode) => {
+    const nextGroupId = mode === 'brainrot' ? singleGroupId : null;
+    if (isSearchActive) {
+      setSearchQuery('');
+    }
+    setOpenMode(mode);
+    setExpandedGroupId(nextGroupId);
+    setExpandedGroupPage(1);
+    syncExpandedStateToUrl(mode, nextGroupId, 1, 'push');
+  }, [isSearchActive, singleGroupId, syncExpandedStateToUrl]);
+
+  const handleBackButton = () => {
+    if (openMode === 'brainrot' && expandedGroup && !hasSingleGroup) {
+      collapseExpandedGroup();
+      return;
+    }
+    closeTopLevelMode();
   };
 
   function buildPageItems(totalPages: number, currentPage: number): Array<number | 'ellipsis-left' | 'ellipsis-right'> {
@@ -564,13 +698,13 @@ export function CharacterLanding({
       </div>
 
       <section aria-label="Character groups" className="space-y-4">
-        <div className={cn('flex min-h-10 items-center', showBackToCategories ? 'gap-2' : 'gap-0')}>
+        <div className={cn('flex min-h-10 items-center', showBackButton ? 'gap-2' : 'gap-0')}>
           <button
             type="button"
-            onClick={collapseExpandedGroup}
+            onClick={handleBackButton}
             className={cn(
               'inline-flex h-9 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-full text-sm font-medium text-blue-700 transition-[width,opacity,transform,margin,padding,border] duration-200 ease-out dark:text-blue-300',
-              showBackToCategories
+              showBackButton
                 ? 'pointer-events-auto mr-2 w-36 cursor-pointer border border-blue-200/80 bg-white/80 px-3 opacity-100 translate-x-0 shadow-sm backdrop-blur-sm hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:hover:border-blue-700 dark:hover:text-blue-200'
                 : 'pointer-events-none mr-0 h-0 min-h-0 w-0 min-w-0 cursor-default border-0 px-0 opacity-0 -translate-x-2 sm:h-0 sm:min-h-0 sm:w-0 sm:min-w-0',
             )}
@@ -595,52 +729,129 @@ export function CharacterLanding({
           <div
             className={cn(
               'space-y-4 transition-[opacity,transform] duration-180 ease-out will-change-transform',
-              showSearchOrCategoriesView
+              showSearchView
                 ? 'relative opacity-100 translate-y-0 scale-100'
                 : 'pointer-events-none absolute inset-0 opacity-0 -translate-y-1 scale-[0.995]',
             )}
           >
-            {normalizedSearch && matchingCharacters.length > 0 ? (
-              <div className="space-y-2">
-                <div className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">{copy.matchingCharactersLabel}</div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                  {matchingCharacters.map((row) => (
-                    <GroupCharacterVideoCard
-                      key={row.key}
-                      character={row.character}
-                      profileLabel={copy.profileLabel}
-                      groupLabel={row.groupLabel}
-                      isFavorited={(favoriteStateBySlug[row.character.slug] ?? {
-                        isFavorited: row.character.isFavorited,
-                        favoritesCount: row.character.favoritesCount,
-                      }).isFavorited}
-                      favoriteSubmitting={favoriteSubmittingBySlug[row.character.slug] === true}
-                      onToggleFavorite={() => void toggleFavoriteForCharacter(row.character)}
-                    />
-                  ))}
-                </div>
+            {showSearchView ? (
+              <>
+                {filteredTopLevelGroups.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    {filteredTopLevelGroups.map((group) => (
+                      <GroupCategoryCard
+                        key={`top-search-${group.id}`}
+                        group={group}
+                        selected={openMode === group.id}
+                        onSelect={() => openTopLevelMode(group.id as MainPageTopLevelMode)}
+                        language={language}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+
+                {normalizedSearch && matchingCharacters.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">{copy.matchingCharactersLabel}</div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                      {matchingCharacters.map((row) => (
+                        <GroupCharacterVideoCard
+                          key={row.key}
+                          character={row.character}
+                          profileLabel={copy.profileLabel}
+                          groupLabel={row.groupLabel}
+                          isFavorited={(favoriteStateBySlug[row.character.slug] ?? {
+                            isFavorited: row.character.isFavorited,
+                            favoritesCount: row.character.favoritesCount,
+                          }).isFavorited}
+                          favoriteSubmitting={favoriteSubmittingBySlug[row.character.slug] === true}
+                          onToggleFavorite={() => void toggleFavoriteForCharacter(row.character)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {normalizedSearch && filteredGroups.length > 0 ? (
+                  <div className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">{copy.matchingCategoriesLabel}</div>
+                ) : null}
+
+                {filteredGroups.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    {filteredGroups.map((group) => (
+                      <GroupCategoryCard
+                        key={group.id}
+                        group={group}
+                        selected={expandedGroupId === group.id}
+                        onSelect={() => handleCategorySelect(group.id)}
+                        language={language}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+
+                {normalizedSearch && filteredTopLevelGroups.length === 0 && filteredGroups.length === 0 && matchingCharacters.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
+                    {copy.noResults}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+
+          <div
+            className={cn(
+              'transition-[opacity,transform] duration-180 ease-out will-change-transform',
+              showTopLevelCategoriesView
+                ? 'relative opacity-100 translate-y-0 scale-100'
+                : 'pointer-events-none absolute inset-0 opacity-0 translate-y-1 scale-[0.995]',
+            )}
+          >
+            {showTopLevelCategoriesView ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {topLevelGroups.map((group) => (
+                  <GroupCategoryCard
+                    key={`top-${group.id}`}
+                    group={group}
+                    selected={openMode === group.id}
+                    onSelect={() => openTopLevelMode(group.id as MainPageTopLevelMode)}
+                    language={language}
+                  />
+                ))}
               </div>
             ) : null}
+          </div>
 
-            {normalizedSearch ? (
-              <div className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">{copy.matchingCategoriesLabel}</div>
-            ) : null}
+          <div
+            className={cn(
+              'transition-[opacity,transform] duration-180 ease-out will-change-transform',
+              showStoriesView
+                ? 'relative opacity-100 translate-y-0 scale-100'
+                : 'pointer-events-none absolute inset-0 opacity-0 translate-y-1 scale-[0.995]',
+            )}
+          >
+            {showStoriesView ? <PromptInput /> : null}
+          </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              {filteredGroups.map((group) => (
-                <GroupCategoryCard
-                  key={group.id}
-                  group={group}
-                  selected={expandedGroupId === group.id}
-                  onSelect={() => handleCategorySelect(group.id)}
-                  language={language}
-                />
-              ))}
-            </div>
-
-            {normalizedSearch && filteredGroups.length === 0 && matchingCharacters.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">
-                {copy.noResults}
+          <div
+            className={cn(
+              'transition-[opacity,transform] duration-180 ease-out will-change-transform',
+              showBrainrotCategoryView
+                ? 'relative opacity-100 translate-y-0 scale-100'
+                : 'pointer-events-none absolute inset-0 opacity-0 translate-y-1 scale-[0.995]',
+            )}
+          >
+            {showBrainrotCategoryView ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {groups.map((group) => (
+                  <GroupCategoryCard
+                    key={`brainrot-${group.id}`}
+                    group={group}
+                    selected={expandedGroupId === group.id}
+                    onSelect={() => handleCategorySelect(group.id)}
+                    language={language}
+                  />
+                ))}
               </div>
             ) : null}
           </div>

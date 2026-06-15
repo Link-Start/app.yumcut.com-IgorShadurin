@@ -1,5 +1,5 @@
-import { PromptInput } from '@/components/main/PromptInput';
+import { redirect } from 'next/navigation';
 
 export default function OldStoryPage() {
-  return <PromptInput />;
+  redirect('/?openMode=stories');
 }

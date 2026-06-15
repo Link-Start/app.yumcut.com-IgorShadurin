@@ -40,6 +40,26 @@ export type MainPageCharacterSearchRow = {
 };
 
 export type MainPageLandingView = 'search' | 'categories' | 'expanded';
+export type MainPageTopLevelMode = 'stories' | 'brainrot';
+
+const MAIN_PAGE_STORIES_SEARCH_TEXT: Record<AppLanguageCode, string> = {
+  en: 'stories story old story classic story script idea prompt video templates',
+  ru: 'истории история старые истории классическая история сценарий идея промпт видео шаблоны',
+};
+
+export function normalizeMainPageTopLevelMode(value: string | null | undefined): MainPageTopLevelMode | null {
+  if (value === 'stories' || value === 'brainrot') return value;
+  return null;
+}
+
+export function resolveInitialMainPageTopLevelMode(input: {
+  openMode: string | null | undefined;
+  hasOpenCategory: boolean;
+}): MainPageTopLevelMode | null {
+  const explicit = normalizeMainPageTopLevelMode(input.openMode);
+  if (explicit) return explicit;
+  return input.hasOpenCategory ? 'brainrot' : null;
+}
 
 export function normalizeWeight(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
@@ -93,6 +113,14 @@ export function pickLocalizedText(value: LocalizedText, language: AppLanguageCod
 
 export function normalizeMainPageSearchQuery(value: string): string {
   return value.trim().toLowerCase();
+}
+
+export function mainPageStoriesMatchesSearch(
+  normalizedSearch: string,
+  language: AppLanguageCode,
+): boolean {
+  if (!normalizedSearch) return true;
+  return MAIN_PAGE_STORIES_SEARCH_TEXT[language].includes(normalizedSearch);
 }
 
 export function mainPageGroupMatchesSearch(

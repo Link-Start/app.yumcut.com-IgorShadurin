@@ -24,6 +24,8 @@ type ProjectConfirmationProps = {
   draftId: string;
 };
 
+const STORIES_HOME_PATH = '/?openMode=stories';
+
 type ProjectConfirmationCopy = {
   loadingAria: string;
   customVoice: string;
@@ -152,7 +154,7 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
           languageCode: draft.languageCode,
         });
         deleteProjectDraft(draft.id);
-        router.replace('/old-story');
+        router.replace(STORIES_HOME_PATH);
       } else {
         const res = await Api.createProject(payloadForApi);
         setSummary?.((prev) => {
@@ -178,7 +180,7 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
   }
 
   function handleBack() {
-    router.push('/old-story');
+    router.push(STORIES_HOME_PATH);
   }
 
   if (loadingDraft) {
@@ -194,7 +196,7 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
       <div className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center gap-4 text-center">
         <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{copy.draftNotFoundTitle}</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">{copy.draftNotFoundDescription}</p>
-        <Button onClick={() => router.push('/old-story')}>{copy.startNewProject}</Button>
+        <Button onClick={() => router.push(STORIES_HOME_PATH)}>{copy.startNewProject}</Button>
       </div>
     );
   }
