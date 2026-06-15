@@ -502,6 +502,7 @@ export function CharacterLanding({
   const showBrainrotCategoryView = !isSearchActive && openMode === 'brainrot' && landingView === 'categories';
   const showExpandedGroupView = !isSearchActive && openMode === 'brainrot' && landingView === 'expanded' && expandedGroup !== null;
   const showBackButton = !isSearchActive && openMode !== null;
+  const showLandingChrome = !showStoriesView;
 
   const syncExpandedStateToUrl = useCallback((
     nextOpenMode: MainPageTopLevelMode | null,
@@ -740,42 +741,46 @@ export function CharacterLanding({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-3 pb-14 sm:px-4 lg:px-0">
-      <div className="mb-8 text-center">
-        <h1 className="text-pretty text-center font-semibold tracking-tighter text-gray-900 dark:text-gray-100 sm:text-[32px] md:text-[46px] text-[29px]">
-          {copy.heading}
-        </h1>
-        <p className="mt-1 mb-2 text-center text-[clamp(12px,3.5vw,20px)] sm:text-[20px] text-gray-600 dark:text-gray-300 whitespace-normal text-pretty leading-tight tracking-tight">
-          {copy.subtitle}
-        </p>
-      </div>
-
-      <section aria-label="Character groups" className="space-y-4">
-        <div className={cn('flex min-h-10 items-center', showBackButton ? 'gap-2' : 'gap-0')}>
-          <button
-            type="button"
-            onClick={handleBackButton}
-            className={cn(
-              'inline-flex h-9 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-full text-sm font-medium text-blue-700 transition-[width,opacity,transform,margin,padding,border] duration-200 ease-out dark:text-blue-300',
-              showBackButton
-                ? 'pointer-events-auto mr-2 w-36 cursor-pointer border border-blue-200/80 bg-white/80 px-3 opacity-100 translate-x-0 shadow-sm backdrop-blur-sm hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:hover:border-blue-700 dark:hover:text-blue-200'
-                : 'pointer-events-none mr-0 h-0 min-h-0 w-0 min-w-0 cursor-default border-0 px-0 opacity-0 -translate-x-2 sm:h-0 sm:min-h-0 sm:w-0 sm:min-w-0',
-            )}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>{copy.categoriesBack}</span>
-          </button>
-
-          <div className="relative w-full transition-all duration-200 ease-out">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder={copy.searchPlaceholder}
-              className="h-10 rounded-full pl-9"
-              aria-label={copy.searchPlaceholder}
-            />
-          </div>
+      {showLandingChrome ? (
+        <div className="mb-8 text-center">
+          <h1 className="text-pretty text-center font-semibold tracking-tighter text-gray-900 dark:text-gray-100 sm:text-[32px] md:text-[46px] text-[29px]">
+            {copy.heading}
+          </h1>
+          <p className="mt-1 mb-2 text-center text-[clamp(12px,3.5vw,20px)] sm:text-[20px] text-gray-600 dark:text-gray-300 whitespace-normal text-pretty leading-tight tracking-tight">
+            {copy.subtitle}
+          </p>
         </div>
+      ) : null}
+
+      <section aria-label="Character groups" className={cn(showLandingChrome ? 'space-y-4' : 'space-y-0')}>
+        {showLandingChrome ? (
+          <div className={cn('flex min-h-10 items-center', showBackButton ? 'gap-2' : 'gap-0')}>
+            <button
+              type="button"
+              onClick={handleBackButton}
+              className={cn(
+                'inline-flex h-9 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-full text-sm font-medium text-blue-700 transition-[width,opacity,transform,margin,padding,border] duration-200 ease-out dark:text-blue-300',
+                showBackButton
+                  ? 'pointer-events-auto mr-2 w-36 cursor-pointer border border-blue-200/80 bg-white/80 px-3 opacity-100 translate-x-0 shadow-sm backdrop-blur-sm hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:hover:border-blue-700 dark:hover:text-blue-200'
+                  : 'pointer-events-none mr-0 h-0 min-h-0 w-0 min-w-0 cursor-default border-0 px-0 opacity-0 -translate-x-2 sm:h-0 sm:min-h-0 sm:w-0 sm:min-w-0',
+              )}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>{copy.categoriesBack}</span>
+            </button>
+
+            <div className="relative w-full transition-all duration-200 ease-out">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={copy.searchPlaceholder}
+                className="h-10 rounded-full pl-9"
+                aria-label={copy.searchPlaceholder}
+              />
+            </div>
+          </div>
+        ) : null}
 
         <div className="relative">
           <div
