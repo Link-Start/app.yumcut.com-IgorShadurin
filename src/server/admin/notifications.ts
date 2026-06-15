@@ -52,6 +52,7 @@ export async function shouldNotifyAdmins(
     | 'new_user'
     | 'guest_converted'
     | 'new_project'
+    | 'project_attempt_paywall'
     | 'project_done'
     | 'project_error'
     | 'new_group'
@@ -63,6 +64,7 @@ export async function shouldNotifyAdmins(
   if (kind === 'new_user' || kind === 'guest_converted') return settings.notifyNewUser;
   if (kind === 'account_deleted') return settings.notifyNewUser;
   if (kind === 'new_project') return settings.notifyNewProject;
+  if (kind === 'project_attempt_paywall') return settings.notifyNewProject;
   if (kind === 'new_group') return settings.notifyNewProject; // reuse the same toggle
   if (kind === 'project_done') return settings.notifyProjectDone;
   if (kind === 'project_error') return settings.notifyProjectError;

@@ -26,6 +26,11 @@ import { normalizeContentTone, type ContentTone } from '@/shared/constants/conte
 import { normalizeLanguageVoiceMap } from '@/shared/voices/language-voice-map';
 import { voiceSupportsLanguage } from '@/shared/voices/client-utils';
 import type { LanguageVoiceMap } from '@/shared/types';
+import {
+  collectProjectAttemptContext,
+  createProjectAttemptClientId,
+  recordProjectCreationAttemptFromClient,
+} from '@/lib/project-attempts';
 import { normalizeCharacterCreationSettings } from '@/shared/constants/character-creation-settings';
 import { CHARACTER_PROJECT_TARGET_DURATION_SECONDS } from '@/shared/constants/character-project';
 import {
@@ -318,6 +323,7 @@ export function CharacterProfilePage({
   const [initedFromSettings, setInitedFromSettings] = useState(false);
   const [pendingToolPrefill, setPendingToolPrefill] = useState<ToolLandingPrefill | null>(null);
   const [toolPrefillReady, setToolPrefillReady] = useState(false);
+  const [sourceToolSlug, setSourceToolSlug] = useState<string | null>(null);
   const [favoriteState, setFavoriteState] = useState({
     isFavorited: initialIsFavorited,
     favoritesCount: initialFavoritesCount,
@@ -389,6 +395,10 @@ export function CharacterProfilePage({
 
   const applyToolPrefill = useMemo(
     () => (prefill: ToolLandingPrefill) => {
+      if (typeof prefill.sourceToolSlug === 'string' && prefill.sourceToolSlug.trim().length > 0) {
+        setSourceToolSlug(prefill.sourceToolSlug.trim());
+      }
+
       if (typeof prefill.text === 'string' && prefill.text.trim().length > 0) {
         setScriptText(prefill.text.slice(0, TOOL_PREFILL_MAX_TEXT_CHARS));
       }
@@ -641,7 +651,43 @@ export function CharacterProfilePage({
     setIsDeletingPlaceholder(false);
   }, [shouldAnimatePlaceholder]);
 
-  const onCreate = () => {
+  const buildAttemptPayload = (result: 'paywall_shown' | 'confirm_shown', clientAttemptId = createProjectAttemptClientId()) => {
+    const characterSettings = normalizeCharacterCreationSettings(settings?.characterCreationSettings ?? null);
+    const selectedLanguageVoices = selectedVoiceId ? { [selectedLanguage]: selectedVoiceId } : {};
+    return {
+      ...collectProjectAttemptContext({
+        sourceToolSlug,
+        mainPageMode: 'brainrot',
+        mainPageCategoryId: backCategoryId,
+        characterSlug: character.slug ?? character.id,
+      }),
+      clientAttemptId,
+      result,
+      promptText: scriptText.trim(),
+      promptMode: useExact ? 'script' as const : 'idea' as const,
+      projectExperience: 'character' as const,
+      durationSeconds: CHARACTER_PROJECT_TARGET_DURATION_SECONDS,
+      tokenCost,
+      tokenBalance: balance,
+      mainPageMode: 'brainrot',
+      mainPageCategoryId: backCategoryId,
+      characterSlug: character.slug ?? character.id,
+      languageCodes: [selectedLanguage],
+      languageVoices: selectedLanguageVoices,
+      settingsSnapshot: {
+        contentTone,
+        useExactTextAsScript: useExact,
+        characterCreationSettings: characterSettings,
+        includeDefaultMusic: false,
+        addOverlay: characterSettings.addOverlay,
+        watermarkEnabled: characterSettings.watermarkEnabled,
+        captionsEnabled: characterSettings.captionsEnabled,
+        includeCallToAction: characterSettings.includeCallToAction,
+      },
+    };
+  };
+
+  const onCreate = async () => {
     if (!canAttemptCreation) return;
 
     if (status !== 'authenticated') {
@@ -650,6 +696,7 @@ export function CharacterProfilePage({
     }
     if (!hasEnoughTokens) {
       setSelectedPlanKey('monthly');
+      await recordProjectCreationAttemptFromClient(buildAttemptPayload('paywall_shown'));
       setPaywallOpen(true);
       return;
     }
@@ -660,6 +707,7 @@ export function CharacterProfilePage({
     if (!canAttemptCreation || submitting) return;
     setSubmitting(true);
     try {
+      const recordedAttempt = await recordProjectCreationAttemptFromClient(buildAttemptPayload('confirm_shown'));
       const characterSettings = normalizeCharacterCreationSettings(settings?.characterCreationSettings ?? null);
       const trimmedScriptText = scriptText.trim();
       const payload: Record<string, unknown> = {
@@ -675,6 +723,9 @@ export function CharacterProfilePage({
         captionsEnabled: characterSettings.captionsEnabled,
         includeCallToAction: characterSettings.includeCallToAction,
       };
+      if (recordedAttempt?.id) {
+        payload.creationAttemptId = recordedAttempt.id;
+      }
       if (useExact) {
         payload.useExactTextAsScript = true;
         payload.rawScript = trimmedScriptText;

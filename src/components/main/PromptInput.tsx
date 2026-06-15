@@ -47,6 +47,11 @@ import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
 import { TokenLowBalanceAlert } from './TokenLowBalanceAlert';
 import {
+  collectProjectAttemptContext,
+  recordProjectCreationAttemptFromClient,
+  createProjectAttemptClientId,
+} from '@/lib/project-attempts';
+import {
   clearStoredToolPrefill,
   readStoredToolPrefill,
   readToolPrefillFromQuery,
@@ -229,6 +234,7 @@ export function PromptInput() {
   const [groupMode, setGroupMode] = useState(false);
   const [pendingToolPrefill, setPendingToolPrefill] = useState<ToolLandingPrefill | null>(null);
   const [toolPrefillReady, setToolPrefillReady] = useState(false);
+  const [sourceToolSlug, setSourceToolSlug] = useState<string | null>(null);
   const { summary: tokenSummary, balance: tokenBalance, loading: tokensLoading } = useTokenSummary();
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlanKey | null>(null);
@@ -247,6 +253,10 @@ export function PromptInput() {
   );
 
   const applyToolPrefill = useCallback((prefill: ToolLandingPrefill) => {
+    if (typeof prefill.sourceToolSlug === 'string' && prefill.sourceToolSlug.trim().length > 0) {
+      setSourceToolSlug(prefill.sourceToolSlug.trim());
+    }
+
     if (typeof prefill.text === 'string' && prefill.text.trim().length > 0) {
       setText(prefill.text.slice(0, TOOL_PREFILL_MAX_TEXT_CHARS));
     }
@@ -516,9 +526,50 @@ export function PromptInput() {
       return;
     }
     if (projectStateValidation.disabled.submit) return;
+    const trimmed = text.trim();
+    const sanitizedLanguageVoices = normalizeLanguageVoiceMap(languageVoices);
+    const apiLanguageVoices = extractExplicitLanguageVoices(sanitizedLanguageVoices);
+    const settingsSnapshot = {
+      includeDefaultMusic: settings?.includeDefaultMusic ?? true,
+      addOverlay: settings?.addOverlay ?? true,
+      includeCallToAction: settings?.includeCallToAction ?? true,
+      autoApproveScript: settings?.autoApproveScript ?? true,
+      autoApproveAudio: settings?.autoApproveAudio ?? true,
+      watermarkEnabled: settings?.watermarkEnabled ?? true,
+      captionsEnabled: settings?.captionsEnabled ?? true,
+      targetLanguages: languages,
+      scriptCreationGuidanceEnabled: !!settings?.scriptCreationGuidanceEnabled,
+      scriptCreationGuidance: settings?.scriptCreationGuidance ?? '',
+      scriptAvoidanceGuidanceEnabled: !!settings?.scriptAvoidanceGuidanceEnabled,
+      scriptAvoidanceGuidance: settings?.scriptAvoidanceGuidance ?? '',
+      audioStyleGuidanceEnabled: !!settings?.audioStyleGuidanceEnabled,
+      audioStyleGuidance: settings?.audioStyleGuidance ?? '',
+      languageVoicePreferences: sanitizedLanguageVoices,
+    } satisfies PendingProjectDraft['settings'];
+
+    const buildAttemptPayload = (result: 'paywall_shown' | 'draft_created', clientAttemptId = createProjectAttemptClientId()) => ({
+      ...collectProjectAttemptContext({
+        sourceToolSlug,
+        mainPageMode: 'stories',
+        templateId: templateSelection?.type === 'custom' ? templateSelection.id : null,
+      }),
+      clientAttemptId,
+      result,
+      promptText: trimmed,
+      promptMode: useExact ? 'script' as const : 'idea' as const,
+      projectExperience: 'story' as const,
+      durationSeconds: useExact ? null : duration,
+      tokenCost: projectCost,
+      tokenBalance,
+      languageCodes: [...languages],
+      languageVoices: sanitizedLanguageVoices,
+      settingsSnapshot,
+    });
+
     if (!hasTokensForCurrent) {
       if (isEnglish) {
         if (tokensLoading) return;
+        await recordProjectCreationAttemptFromClient(buildAttemptPayload('paywall_shown'));
         setPaywallOpen(true);
         return;
       }
@@ -532,13 +583,15 @@ export function PromptInput() {
       return;
     }
     setSubmitting(true);
-    const trimmed = text.trim();
-    const sanitizedLanguageVoices = normalizeLanguageVoiceMap(languageVoices);
-    const apiLanguageVoices = extractExplicitLanguageVoices(sanitizedLanguageVoices);
+    const recordedAttempt = await recordProjectCreationAttemptFromClient(buildAttemptPayload('draft_created'));
+    const creationAttemptId = recordedAttempt?.id ?? null;
     const payload: PendingProjectDraft['payload'] = {
       useExactTextAsScript: useExact,
       projectExperience: 'story',
     };
+    if (creationAttemptId) {
+      payload.creationAttemptId = creationAttemptId;
+    }
     if (useExact) {
       payload.rawScript = trimmed;
     } else {
@@ -580,26 +633,9 @@ export function PromptInput() {
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2, 10);
 
-    const settingsSnapshot = {
-      includeDefaultMusic: settings?.includeDefaultMusic ?? true,
-      addOverlay: settings?.addOverlay ?? true,
-      includeCallToAction: settings?.includeCallToAction ?? true,
-      autoApproveScript: settings?.autoApproveScript ?? true,
-      autoApproveAudio: settings?.autoApproveAudio ?? true,
-      watermarkEnabled: settings?.watermarkEnabled ?? true,
-      captionsEnabled: settings?.captionsEnabled ?? true,
-      targetLanguages: languages,
-      scriptCreationGuidanceEnabled: !!settings?.scriptCreationGuidanceEnabled,
-      scriptCreationGuidance: settings?.scriptCreationGuidance ?? '',
-      scriptAvoidanceGuidanceEnabled: !!settings?.scriptAvoidanceGuidanceEnabled,
-      scriptAvoidanceGuidance: settings?.scriptAvoidanceGuidance ?? '',
-      audioStyleGuidanceEnabled: !!settings?.audioStyleGuidanceEnabled,
-      audioStyleGuidance: settings?.audioStyleGuidance ?? '',
-      languageVoicePreferences: sanitizedLanguageVoices,
-    } satisfies PendingProjectDraft['settings'];
-
     const draft: PendingProjectDraft = {
       id: draftId,
+      creationAttemptId,
       createdAt: new Date().toISOString(),
       text: trimmed,
       useExact,

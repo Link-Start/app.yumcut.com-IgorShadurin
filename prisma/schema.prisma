@@ -55,6 +55,8 @@ model User {
   subscriptionPurchases     SubscriptionPurchase[]
   guestProfile              GuestProfile?
   favoriteCharacters        UserFavoriteCharacter[]
+  attribution               UserAttribution?
+  projectCreationAttempts   ProjectCreationAttempt[]
 }
 
 model UserSettings {
@@ -135,10 +137,89 @@ model Project {
   templateId               String?                    @db.Char(36)
   template                 Template?                  @relation(fields: [templateId], references: [id])
   publishTasks             PublishTask[]
+  creationAttempts         ProjectCreationAttempt[]
 
   @@index([groupId])
   @@index([templateId])
   @@index([currentDaemonId])
+}
+
+model UserAttribution {
+  id                       String   @id @default(uuid()) @db.Char(36)
+  userId                   String   @unique @db.Char(36)
+  firstUtmSource           String?  @db.VarChar(200)
+  lastUtmSource            String?  @db.VarChar(200)
+  firstReferrerOrigin      String?  @db.VarChar(255)
+  firstReferrerPath        String?  @db.VarChar(512)
+  lastReferrerOrigin       String?  @db.VarChar(255)
+  lastReferrerPath         String?  @db.VarChar(512)
+  firstLandingPath         String?  @db.VarChar(512)
+  lastLandingPath          String?  @db.VarChar(512)
+  firstSourceToolSlug      String?  @db.VarChar(191)
+  lastSourceToolSlug       String?  @db.VarChar(191)
+  firstIntent              String?  @db.VarChar(32)
+  lastIntent               String?  @db.VarChar(32)
+  firstProjectPrompt       String?  @db.LongText
+  firstProjectPromptMode   String?  @db.VarChar(16)
+  firstProjectExperience   String?  @db.VarChar(32)
+  firstMainPageMode        String?  @db.VarChar(32)
+  firstMainPageCategoryId  String?  @db.VarChar(64)
+  firstCharacterSlug       String?  @db.VarChar(191)
+  firstTemplateId          String?  @db.Char(36)
+  firstProjectAttemptId    String?  @db.Char(36)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([firstUtmSource])
+  @@index([lastUtmSource])
+  @@index([firstSourceToolSlug])
+  @@index([firstCharacterSlug])
+}
+
+model ProjectCreationAttempt {
+  id                   String   @id @default(uuid()) @db.Char(36)
+  userId               String   @db.Char(36)
+  projectId            String?  @db.Char(36)
+  clientAttemptId      String   @db.VarChar(64)
+  result               String   @db.VarChar(32)
+  promptText           String?  @db.LongText
+  promptMode           String?  @db.VarChar(16)
+  projectExperience    String?  @db.VarChar(32)
+  durationSeconds      Int?
+  tokenCost            Int?
+  tokenBalance         Int?
+  mainPageMode         String?  @db.VarChar(32)
+  mainPageCategoryId   String?  @db.VarChar(64)
+  characterSlug        String?  @db.VarChar(191)
+  templateId           String?  @db.Char(36)
+  utmSource            String?  @db.VarChar(200)
+  utmMedium            String?  @db.VarChar(200)
+  utmCampaign          String?  @db.VarChar(200)
+  utmContent           String?  @db.VarChar(200)
+  utmTerm              String?  @db.VarChar(200)
+  intent               String?  @db.VarChar(32)
+  sourceToolSlug       String?  @db.VarChar(191)
+  referrerOrigin       String?  @db.VarChar(255)
+  referrerPath         String?  @db.VarChar(512)
+  landingPath          String?  @db.VarChar(512)
+  query                Json?
+  languageCodes        Json?
+  languageVoices       Json?
+  settingsSnapshot     Json?
+  rawContext           Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project              Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, clientAttemptId])
+  @@index([userId, createdAt])
+  @@index([projectId])
+  @@index([result, createdAt])
+  @@index([utmSource])
+  @@index([sourceToolSlug])
+  @@index([characterSlug])
 }
 
 model ProjectStatusHistory {

@@ -73,6 +73,7 @@ export const createProjectSchema = z.object({
     .optional(),
   useExactTextAsScript: z.boolean().optional(),
   templateId: z.string().uuid().optional(),
+  creationAttemptId: z.string().uuid().optional(),
   voiceId: z.string().max(128).optional().or(z.literal('')).transform((v) => v || undefined),
   languages: z
     .array(LANGUAGE_ENUM)

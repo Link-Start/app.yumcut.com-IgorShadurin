@@ -102,6 +102,12 @@ export const Api = {
       body: JSON.stringify(payload),
       errorToastTitle: 'Failed to update project creation settings',
     }),
+  recordProjectCreationAttempt: (payload: import('@/shared/types').ProjectCreationAttemptRequestDTO) =>
+    api<import('@/shared/types').ProjectCreationAttemptResponseDTO>('/api/analytics/project-attempts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      showErrorToast: false,
+    }),
   deleteProject: (id: string) => api(`/api/projects/${id}`, { method: 'DELETE' }),
   createProject: (payload: any) => api<import('@/shared/types').ProjectListItemDTO>('/api/projects', { method: 'POST', body: JSON.stringify(payload) }),
   // Groups API

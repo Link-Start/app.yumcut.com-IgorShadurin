@@ -25,6 +25,7 @@ import { normalizeProjectExperience } from '@/shared/constants/project-experienc
 import { normalizeContentTone } from '@/shared/constants/content-tone';
 import { defaultCharacterVideoGeneration } from '@/shared/constants/video-generation';
 import { CHARACTER_PROJECT_TARGET_DURATION_SECONDS } from '@/shared/constants/character-project';
+import { linkProjectCreationAttemptToProject } from '@/server/analytics/project-attempts';
 import {
   CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE,
   type CharacterVideoGenerationMode,
@@ -81,6 +82,7 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     characterSlug,
     useExactTextAsScript,
     templateId,
+    creationAttemptId,
     voiceId,
     languages: requestedLanguages,
     languageVoices,
@@ -484,6 +486,18 @@ export const POST = withApiError(async function POST(req: NextRequest) {
   }).catch((err) => {
     console.error('Failed to notify admins about new project', err);
   });
+
+  if (creationAttemptId) {
+    try {
+      await linkProjectCreationAttemptToProject({
+        userId,
+        attemptId: creationAttemptId,
+        projectId: project.id,
+      });
+    } catch (err) {
+      console.error('Failed to link project creation attempt', { projectId: project.id, creationAttemptId, err });
+    }
+  }
 
   sendProjectCreatedEmail({
     userId,

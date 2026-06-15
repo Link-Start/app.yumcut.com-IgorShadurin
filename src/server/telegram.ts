@@ -8,6 +8,8 @@ import { ProjectStatus } from '@/shared/constants/status';
 type Maybe<T> = T | null | undefined;
 
 const LINK_TOKEN_TTL_MS = 10 * 60 * 1000;
+export const TELEGRAM_SEND_MESSAGE_TEXT_LIMIT = 4096;
+const TELEGRAM_SAFE_TEXT_LIMIT = 3900;
 const RELEVANT_STATUSES = new Set<ProjectStatus>([
   ProjectStatus.ProcessScriptValidate,
   ProjectStatus.ProcessAudioValidate,
@@ -42,12 +44,42 @@ type ReplyMarkup = {
   inline_keyboard: { text: string; url: string }[][];
 };
 
-export async function sendTelegramMessage(
+type TelegramMessageOptions = {
+  disableNotification?: boolean;
+  parseMode?: 'HTML' | 'MarkdownV2';
+  disableWebPagePreview?: boolean;
+  replyMarkup?: ReplyMarkup;
+};
+
+type TelegramSendResult = {
+  ok: boolean;
+  status?: number;
+  body?: string;
+};
+
+function clipTextByCharacters(text: string, maxLength: number, suffix = '...') {
+  const chars = Array.from(text);
+  if (chars.length <= maxLength) return text;
+  if (maxLength <= suffix.length) return chars.slice(0, Math.max(0, maxLength)).join('');
+  return `${chars.slice(0, maxLength - suffix.length).join('')}${suffix}`;
+}
+
+export function clipTelegramText(text: string, maxLength = TELEGRAM_SAFE_TEXT_LIMIT) {
+  return clipTextByCharacters(text, maxLength, '\n...[truncated]');
+}
+
+function isTelegramMessageTooLong(result: TelegramSendResult) {
+  if (result.status !== 400) return false;
+  const body = (result.body || '').toLowerCase();
+  return body.includes('message is too long') || body.includes('too long') || body.includes('message_too_long');
+}
+
+async function sendTelegramMessageRequest(
   chatId: string,
   text: string,
-  options: { disableNotification?: boolean; parseMode?: 'HTML' | 'MarkdownV2'; disableWebPagePreview?: boolean; replyMarkup?: ReplyMarkup } = {},
-) {
-  if (!config.TELEGRAM_BOT_TOKEN) return false;
+  options: TelegramMessageOptions = {},
+): Promise<TelegramSendResult> {
+  if (!config.TELEGRAM_BOT_TOKEN) return { ok: false };
   try {
     const payload = {
       chat_id: chatId,
@@ -64,14 +96,49 @@ export async function sendTelegramMessage(
     });
     if (!res.ok) {
       const body = await res.text();
-      console.error('Failed to send Telegram message', { status: res.status, body });
-      return false;
+      return { ok: false, status: res.status, body };
     }
-    return true;
+    return { ok: true, status: res.status };
   } catch (err) {
-    console.error('Failed to send Telegram message', err);
+    return { ok: false, body: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function sendTelegramMessage(
+  chatId: string,
+  text: string,
+  options: TelegramMessageOptions = {},
+) {
+  const result = await sendTelegramMessageRequest(chatId, text, options);
+  if (!result.ok) {
+    console.error('Failed to send Telegram message', { status: result.status, body: result.body });
     return false;
   }
+  return true;
+}
+
+async function sendTelegramMessageWithLengthFallback(
+  chatId: string,
+  text: string,
+  options: TelegramMessageOptions = {},
+) {
+  const attempts = [
+    text,
+    clipTelegramText(text, 3600),
+    clipTelegramText(text, 2400),
+    clipTelegramText(text, 1200),
+  ];
+  let lastResult: TelegramSendResult | null = null;
+
+  for (const attemptText of attempts) {
+    const result = await sendTelegramMessageRequest(chatId, attemptText, options);
+    if (result.ok) return true;
+    lastResult = result;
+    if (!isTelegramMessageTooLong(result)) break;
+  }
+
+  console.error('Failed to send Telegram message', { status: lastResult?.status, body: lastResult?.body });
+  return false;
 }
 
 export async function getTelegramAccount(userId: string) {
@@ -411,6 +478,7 @@ type AdminNotificationKind =
   | 'new_user'
   | 'guest_converted'
   | 'new_project'
+  | 'project_attempt_paywall'
   | 'project_done'
   | 'project_error'
   | 'new_group'
@@ -442,6 +510,30 @@ type AdminNotificationPayloads = {
     userEmail: string | null | undefined;
     userName: string | null | undefined;
     projectUrl: string | null | undefined;
+  };
+  project_attempt_paywall: {
+    attemptId: string;
+    userId: string;
+    userEmail: string | null | undefined;
+    userName: string | null | undefined;
+    promptText: string | null | undefined;
+    promptMode: string | null | undefined;
+    projectExperience: string | null | undefined;
+    durationSeconds: number | null | undefined;
+    tokenCost: number | null | undefined;
+    tokenBalance: number | null | undefined;
+    mainPageMode: string | null | undefined;
+    mainPageCategoryId: string | null | undefined;
+    characterSlug: string | null | undefined;
+    templateId: string | null | undefined;
+    utmSource: string | null | undefined;
+    utmMedium: string | null | undefined;
+    utmCampaign: string | null | undefined;
+    intent: string | null | undefined;
+    sourceToolSlug: string | null | undefined;
+    referrerOrigin: string | null | undefined;
+    referrerPath: string | null | undefined;
+    landingPath: string | null | undefined;
   };
   project_done: {
     projectId: string;
@@ -561,6 +653,53 @@ async function notifyAdminsInternal<K extends AdminNotificationKind>(kind: K, pa
       lines.push(`Project ID: ${projectPayload.projectId}`);
       break;
     }
+    case 'project_attempt_paywall': {
+      const attemptPayload = payload as AdminNotificationPayloads['project_attempt_paywall'];
+      lines.push('🚧 Paywall before project creation');
+      lines.push(`Owner: ${ownerLabel}`);
+      lines.push(`User ID: ${attemptPayload.userId}`);
+      lines.push(`Attempt ID: ${attemptPayload.attemptId}`);
+      if (attemptPayload.projectExperience || attemptPayload.promptMode) {
+        lines.push(`Mode: ${attemptPayload.projectExperience || '—'} / ${attemptPayload.promptMode || '—'}`);
+      }
+      if (typeof attemptPayload.durationSeconds === 'number') {
+        lines.push(`Duration: ${attemptPayload.durationSeconds}s`);
+      }
+      if (typeof attemptPayload.tokenCost === 'number' || typeof attemptPayload.tokenBalance === 'number') {
+        lines.push(`Tokens: need ${attemptPayload.tokenCost ?? '—'}, balance ${attemptPayload.tokenBalance ?? '—'}`);
+      }
+      if (attemptPayload.mainPageMode || attemptPayload.mainPageCategoryId) {
+        lines.push(`Entry: ${attemptPayload.mainPageMode || '—'}${attemptPayload.mainPageCategoryId ? ` / ${attemptPayload.mainPageCategoryId}` : ''}`);
+      }
+      if (attemptPayload.characterSlug) {
+        lines.push(`Character: ${attemptPayload.characterSlug}`);
+      }
+      if (attemptPayload.templateId) {
+        lines.push(`Template ID: ${attemptPayload.templateId}`);
+      }
+      if (attemptPayload.sourceToolSlug) {
+        lines.push(`Tool: ${attemptPayload.sourceToolSlug}`);
+      }
+      if (attemptPayload.utmSource || attemptPayload.utmMedium || attemptPayload.utmCampaign) {
+        lines.push(`UTM: ${attemptPayload.utmSource || '—'} / ${attemptPayload.utmMedium || '—'} / ${attemptPayload.utmCampaign || '—'}`);
+      }
+      if (attemptPayload.intent) {
+        lines.push(`Intent: ${attemptPayload.intent}`);
+      }
+      if (attemptPayload.landingPath) {
+        lines.push(`Landing: ${attemptPayload.landingPath}`);
+      }
+      if (attemptPayload.referrerOrigin) {
+        lines.push(`Referrer: ${attemptPayload.referrerOrigin}${attemptPayload.referrerPath || ''}`);
+      }
+      const promptText = attemptPayload.promptText?.trim() || '—';
+      const promptHeader = 'Prompt before paywall:';
+      const baseLength = Array.from([...lines, promptHeader].join('\n')).length;
+      const promptBudget = Math.max(500, TELEGRAM_SAFE_TEXT_LIMIT - baseLength - 2);
+      lines.push(promptHeader);
+      lines.push(clipTelegramText(promptText, promptBudget));
+      break;
+    }
     case 'project_done': {
       const donePayload = payload as AdminNotificationPayloads['project_done'];
       lines.push('✅ Project completed');
@@ -674,7 +813,7 @@ async function notifyAdminsInternal<K extends AdminNotificationKind>(kind: K, pa
   const message = lines.join('\n');
   await Promise.allSettled(
     recipients.map(({ chatId }) =>
-      sendTelegramMessage(chatId, message, { disableWebPagePreview: true }).catch((err) => {
+      sendTelegramMessageWithLengthFallback(chatId, message, { disableWebPagePreview: true }).catch((err) => {
         console.error('Failed to notify admin via Telegram', { kind, chatId, err });
         return false;
       }),
@@ -695,7 +834,7 @@ export async function notifyAdminsWithMessage(message: string) {
     if (recipients.length === 0) return;
     await Promise.allSettled(
       recipients.map(({ chatId }) =>
-        sendTelegramMessage(chatId, trimmed, { disableWebPagePreview: true }).catch((err) => {
+        sendTelegramMessageWithLengthFallback(chatId, trimmed, { disableWebPagePreview: true }).catch((err) => {
           console.error('Failed to send raw admin Telegram message', { chatId, err });
           return false;
         }),
@@ -716,6 +855,10 @@ export function notifyAdminsOfGuestConversion(payload: AdminNotificationPayloads
 
 export function notifyAdminsOfNewProject(payload: AdminNotificationPayloads['new_project']) {
   return notifyAdminsInternal('new_project', payload);
+}
+
+export function notifyAdminsOfProjectAttemptPaywall(payload: AdminNotificationPayloads['project_attempt_paywall']) {
+  return notifyAdminsInternal('project_attempt_paywall', payload);
 }
 
 export function notifyAdminsOfNewGroup(payload: AdminNotificationPayloads['new_group']) {

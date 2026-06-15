@@ -236,6 +236,48 @@ export interface AdminProjectCreationSettingsDTO {
   };
 }
 
+export type ProjectCreationAttemptResult = 'draft_created' | 'paywall_shown' | 'confirm_shown' | 'project_created';
+export type ProjectCreationAttemptPromptMode = 'idea' | 'script';
+export type ProjectCreationAttemptExperience = 'story' | 'character';
+
+export interface ProjectCreationAttemptContextDTO {
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  utmContent?: string | null;
+  utmTerm?: string | null;
+  intent?: string | null;
+  sourceToolSlug?: string | null;
+  referrer?: string | null;
+  landingPath?: string | null;
+  query?: Record<string, string | string[]>;
+  rawContext?: Record<string, unknown>;
+}
+
+export interface ProjectCreationAttemptRequestDTO extends ProjectCreationAttemptContextDTO {
+  clientAttemptId?: string;
+  result: ProjectCreationAttemptResult;
+  promptText?: string | null;
+  promptMode?: ProjectCreationAttemptPromptMode | null;
+  projectExperience?: ProjectCreationAttemptExperience | null;
+  durationSeconds?: number | null;
+  tokenCost?: number | null;
+  tokenBalance?: number | null;
+  mainPageMode?: string | null;
+  mainPageCategoryId?: string | null;
+  characterSlug?: string | null;
+  templateId?: string | null;
+  languageCodes?: string[];
+  languageVoices?: LanguageVoiceMap;
+  settingsSnapshot?: Record<string, unknown>;
+}
+
+export interface ProjectCreationAttemptResponseDTO {
+  id: string;
+  clientAttemptId: string;
+  result: ProjectCreationAttemptResult;
+}
+
 export interface ProjectDetailDTO {
   id: string;
   userId: string;
@@ -425,6 +467,7 @@ export interface ProjectDraftCharacterSnapshot {
 
 export interface PendingProjectDraft {
   id: string;
+  creationAttemptId?: string | null;
   createdAt: string;
   text: string;
   useExact: boolean;
@@ -466,6 +509,7 @@ export interface PendingProjectDraft {
     };
     projectExperience?: ProjectExperience;
     contentTone?: ContentTone;
+    creationAttemptId?: string | null;
   };
   // Optional snapshot to show in confirmation UI
   template?: {
