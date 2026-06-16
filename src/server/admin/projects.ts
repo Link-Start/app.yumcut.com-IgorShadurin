@@ -1,7 +1,7 @@
 import { prisma } from '@/server/db';
 import { ProjectStatus } from '@/shared/constants/status';
 import { normalizeMediaUrl } from '@/server/storage';
-import { buildProjectErrorStatusInfo, getLatestErrorLog } from '@/server/projects/errors';
+import { buildProjectErrorStatusInfo, getLatestErrorLog, getProjectErrorLogFileForAdmin } from '@/server/projects/errors';
 import { normalizeLanguageList, DEFAULT_LANGUAGE } from '@/shared/constants/languages';
 import { sortAudioCandidatesByCreatedAtDesc } from '@/server/projects/helpers';
 import { normalizeLanguageVoiceMap } from '@/shared/voices/language-voice-map';
@@ -210,7 +210,12 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
     }
     case ProjectStatus.Error: {
       const errorLog = await getLatestErrorLog(prisma, p.id);
-      statusInfo = buildProjectErrorStatusInfo(errorLog, latestLog, { includeExtra: true });
+      const errorInfo = buildProjectErrorStatusInfo(errorLog, latestLog, { includeExtra: true });
+      const errorLogFile = await getProjectErrorLogFileForAdmin(p.id, errorInfo.errorExtra ?? null);
+      statusInfo = {
+        ...errorInfo,
+        ...(errorLogFile ? { errorLogFile } : {}),
+      };
       break;
     }
     case ProjectStatus.Done: {

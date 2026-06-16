@@ -16,9 +16,19 @@ import { AdminBackButton } from '@/components/admin/AdminBackButton';
 import { AdminProjectStatusChanger } from '@/components/admin/AdminProjectStatusChanger';
 import { AdminProjectErrorDetails } from '@/components/admin/AdminProjectErrorDetails';
 import type { ProjectLanguageProgressStateDTO } from '@/shared/types';
-import type { ProjectErrorDetail } from '@/server/projects/errors';
+import type { ProjectErrorDetail, ProjectErrorLogFile } from '@/server/projects/errors';
 
 function formatStatus(status: ProjectStatus) { return statusLabel(status); }
+
+function isProjectErrorLogFile(value: unknown): value is ProjectErrorLogFile {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.path === 'string'
+    && typeof candidate.content === 'string'
+    && typeof candidate.sizeBytes === 'number'
+    && typeof candidate.truncated === 'boolean'
+    && (candidate.source === 'status-log-path' || candidate.source === 'template-launch');
+}
 
 export default async function AdminProjectDetailPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -49,6 +59,9 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
   const errorDetails = project.status === ProjectStatus.Error && Array.isArray(statusInfo?.errorDetails)
     ? (statusInfo.errorDetails as ProjectErrorDetail[])
     : [];
+  const errorLogFile = project.status === ProjectStatus.Error && isProjectErrorLogFile(statusInfo?.errorLogFile)
+    ? statusInfo.errorLogFile
+    : null;
   const errorExtra = project.status === ProjectStatus.Error && statusInfo?.errorExtra && typeof statusInfo.errorExtra === 'object' && !Array.isArray(statusInfo.errorExtra)
     ? statusInfo.errorExtra as Record<string, unknown>
     : null;
@@ -124,7 +137,7 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
       ) : null}
 
       {errorMessage ? <ProjectErrorCard message={errorMessage} /> : null}
-      <AdminProjectErrorDetails occurredAt={errorOccurredAt} details={errorDetails} extra={errorExtra} />
+      <AdminProjectErrorDetails occurredAt={errorOccurredAt} details={errorDetails} logFile={errorLogFile} extra={errorExtra} />
       <ProjectFinalVideoCard
         variants={languageVariants}
         primaryLanguage={primaryLanguage}
