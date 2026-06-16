@@ -9,11 +9,20 @@ export function buildStatusErrorExtra(
       ? err
       : String(err);
   const errorName = err instanceof Error && err.name ? err.name : null;
+  const errorRecord = err && typeof err === 'object' ? err as Record<string, unknown> : null;
+  const command = typeof errorRecord?.command === 'string' && errorRecord.command.trim()
+    ? errorRecord.command.trim()
+    : null;
+  const logPath = typeof errorRecord?.logPath === 'string' && errorRecord.logPath.trim()
+    ? errorRecord.logPath.trim()
+    : null;
 
   return {
     phase,
     ...extra,
     error,
     ...(errorName ? { errorName } : {}),
+    ...(command && extra.command === undefined ? { command } : {}),
+    ...(logPath && extra.logPath === undefined ? { logPath } : {}),
   };
 }
