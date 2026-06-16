@@ -11,6 +11,7 @@ import { resolveProjectLanguagesFromSnapshot } from './project-utils';
 import { createHandledError } from './error';
 import { ensureProjectScaffold, ensureLanguageWorkspace, ensureLanguageLogDir } from '../language-workspace';
 import { nextPipelineStatus } from '@/shared/pipeline/project-pipeline';
+import { buildStatusErrorExtra } from '../status-error-extra';
 
 type CaptionsPhaseArgs = {
   projectId: string;
@@ -134,7 +135,10 @@ export async function handleCaptionsPhase({ projectId, cfg, daemonConfig }: Capt
       projectId,
       error: err?.message || String(err),
     });
-    await setStatus(projectId, ProjectStatus.Error, 'Captions overlay generation failed');
+    await setStatus(projectId, ProjectStatus.Error, 'Captions overlay generation failed', buildStatusErrorExtra('captions', err, {
+      workspace: agentWorkspace,
+      workspaceRoot: agentWorkspace,
+    }));
     throw createHandledError('Captions overlay generation failed', err);
   }
 }

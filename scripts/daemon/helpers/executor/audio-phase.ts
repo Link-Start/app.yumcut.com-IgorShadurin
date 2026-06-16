@@ -16,6 +16,7 @@ import { ensureProjectScaffold, ensureLanguageWorkspace } from '../language-work
 import { isCustomTemplateData } from '@/shared/templates/custom-data';
 import { normalizeContentTone } from '@/shared/constants/content-tone';
 import { clampCharacterAudioDuration } from '../character-audio-duration';
+import { buildStatusErrorExtra } from '../status-error-extra';
 
 type SupportedVoiceProvider = 'minimax' | 'elevenlabs' | 'inworld';
 const STYLE_SUPPORTED_PROVIDERS: ReadonlySet<SupportedVoiceProvider> = new Set(['elevenlabs']);
@@ -365,7 +366,7 @@ export async function handleAudioPhase({ projectId, cfg, jobPayload }: AudioPhas
       projectId,
       error: err?.message || String(err),
     });
-    await setStatus(projectId, ProjectStatus.Error, 'Voiceover generation failed');
+    await setStatus(projectId, ProjectStatus.Error, 'Voiceover generation failed', buildStatusErrorExtra('audio', err));
     throw createHandledError('Voiceover generation failed', err);
   }
 }

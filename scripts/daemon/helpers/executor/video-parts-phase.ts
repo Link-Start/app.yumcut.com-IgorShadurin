@@ -18,6 +18,7 @@ import { refreshTemplateImagesFromStorage } from '../template-images';
 import { resolveCharacterImagePath } from '../character-cache';
 import { runLipsyncRunpod, runLipsyncRunware } from '../lipsync';
 import type { CharacterVideoGenerationMode } from '@/shared/constants/character-video-quality';
+import { buildStatusErrorExtra } from '../status-error-extra';
 
 type VideoPartsPhaseArgs = {
   projectId: string;
@@ -365,7 +366,7 @@ export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemon
       voiceExternalId,
       videoGenerationMode,
     });
-    await setStatus(projectId, ProjectStatus.Error, 'Video parts rendering failed', {
+    await setStatus(projectId, ProjectStatus.Error, 'Video parts rendering failed', buildStatusErrorExtra('video_parts', err, {
       failedLanguage,
       logPath: logPathFromError ?? lastAttemptLogPath ?? null,
       command: commandFromError ?? lastAttemptCommand ?? null,
@@ -374,7 +375,7 @@ export async function handleVideoPartsPhase({ projectId, cfg, jobPayload, daemon
       logDir: lastAttempt.logDir ?? null,
       pendingLanguages,
       completedLanguages,
-    });
+    }));
     throw createHandledError('Video parts rendering failed', err);
   }
 }

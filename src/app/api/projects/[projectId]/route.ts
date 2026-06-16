@@ -4,7 +4,7 @@ import { ok, unauthorized, notFound } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { ProjectStatus } from '@/shared/constants/status';
 import { normalizeMediaUrl } from '@/server/storage';
-import { getLatestErrorLog } from '@/server/projects/errors';
+import { buildProjectErrorStatusInfo, getLatestErrorLog } from '@/server/projects/errors';
 import { normalizeLanguageList, DEFAULT_LANGUAGE } from '@/shared/constants/languages';
 import { sortAudioCandidatesByCreatedAtDesc } from '@/server/projects/helpers';
 import { withCharacterSelectionLabels } from '@/server/characters/selection';
@@ -217,7 +217,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       case ProjectStatus.Error: {
         const errorLog = await getLatestErrorLog(prisma, p.id);
         statusInfo = {
-          message: errorLog?.message || latestLog?.message || 'Unknown error',
+          ...buildProjectErrorStatusInfo(errorLog, latestLog),
           ...(languageVariants.length ? { languageVariants } : {}),
         };
         break;

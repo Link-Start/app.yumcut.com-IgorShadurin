@@ -14,7 +14,9 @@ import { formatDateTimeAdmin } from '@/lib/date';
 import Link from 'next/link';
 import { AdminBackButton } from '@/components/admin/AdminBackButton';
 import { AdminProjectStatusChanger } from '@/components/admin/AdminProjectStatusChanger';
+import { AdminProjectErrorDetails } from '@/components/admin/AdminProjectErrorDetails';
 import type { ProjectLanguageProgressStateDTO } from '@/shared/types';
+import type { ProjectErrorDetail } from '@/server/projects/errors';
 
 function formatStatus(status: ProjectStatus) { return statusLabel(status); }
 
@@ -41,6 +43,15 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
   const errorMessage = project.status === ProjectStatus.Error
     ? ((statusInfo?.message as string | undefined) ?? latestLogMessage ?? undefined)
     : undefined;
+  const errorOccurredAt = project.status === ProjectStatus.Error && typeof statusInfo?.occurredAt === 'string'
+    ? statusInfo.occurredAt
+    : null;
+  const errorDetails = project.status === ProjectStatus.Error && Array.isArray(statusInfo?.errorDetails)
+    ? (statusInfo.errorDetails as ProjectErrorDetail[])
+    : [];
+  const errorExtra = project.status === ProjectStatus.Error && statusInfo?.errorExtra && typeof statusInfo.errorExtra === 'object' && !Array.isArray(statusInfo.errorExtra)
+    ? statusInfo.errorExtra as Record<string, unknown>
+    : null;
   const fallbackFinalVideo = project.finalVideoUrl ?? project.finalVideoPath ?? null;
   const failedVideoLanguages = Array.isArray(statusInfo?.failedLanguages)
     ? (statusInfo?.failedLanguages as Array<string | null | undefined>).filter(Boolean).map(String)
@@ -113,6 +124,7 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
       ) : null}
 
       {errorMessage ? <ProjectErrorCard message={errorMessage} /> : null}
+      <AdminProjectErrorDetails occurredAt={errorOccurredAt} details={errorDetails} extra={errorExtra} />
       <ProjectFinalVideoCard
         variants={languageVariants}
         primaryLanguage={primaryLanguage}

@@ -13,6 +13,7 @@ import { handleVideoMainPhase } from './executor/video-main-phase';
 import { handleRiggerAnimationPhase } from './executor/rigger-animation-phase';
 import { createHandledError, getHandledJobResult, isHandledError } from './executor/error';
 import { isStatusAllowedForExperience } from '@/shared/pipeline/project-pipeline';
+import { buildStatusErrorExtra } from './status-error-extra';
 
 export { __setDaemonConfigForTests } from './executor/context';
 
@@ -133,7 +134,9 @@ export async function executeForProject(projectId: string, status: ProjectStatus
     }
     if (!isHandledError(err)) {
       log.error('Executor crashed', { projectId, status, error: err?.message || String(err) });
-      await setStatus(projectId, ProjectStatus.Error, 'Executor crashed');
+      await setStatus(projectId, ProjectStatus.Error, 'Executor crashed', buildStatusErrorExtra('executor', err, {
+        status,
+      }));
     }
     throw err;
   }

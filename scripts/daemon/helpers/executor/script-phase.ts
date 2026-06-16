@@ -19,6 +19,7 @@ import { isCustomTemplateData } from '@/shared/templates/custom-data';
 import { getDaemonConfig } from './context';
 import { generateMetadata } from '../metadata';
 import { rememberTemplateOriginalPath, saveTemplateOriginalScript } from '../template-original';
+import { buildStatusErrorExtra } from '../status-error-extra';
 
 type ScriptPhaseArgs = {
   projectId: string;
@@ -334,7 +335,10 @@ export async function handleScriptPhase(args: ScriptPhaseArgs) {
         await archiveInitialError(projectId, normalizedSourceLanguage, (err as any).command, err.message);
       }
     }
-    await setStatus(projectId, ProjectStatus.Error, failureMessage);
+    await setStatus(projectId, ProjectStatus.Error, failureMessage, buildStatusErrorExtra('script', err, {
+      reason,
+      languageCode: targetLanguageCode,
+    }));
     throw createHandledError(failureMessage, err);
   }
 }

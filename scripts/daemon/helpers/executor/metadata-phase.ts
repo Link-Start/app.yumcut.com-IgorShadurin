@@ -11,6 +11,7 @@ import { createHandledError } from './error';
 import { resolveProjectLanguagesFromSnapshot } from './project-utils';
 import { ensureProjectScaffold, ensureLanguageWorkspace, ensureLanguageLogDir } from '../language-workspace';
 import { nextPipelineStatus } from '@/shared/pipeline/project-pipeline';
+import { buildStatusErrorExtra } from '../status-error-extra';
 
 type MetadataPhaseArgs = {
   projectId: string;
@@ -176,10 +177,10 @@ export async function handleMetadataPhase({ projectId, cfg, daemonConfig }: Meta
       languageCode: currentLanguage,
       error: err?.message || String(err),
     });
-    await setStatus(projectId, ProjectStatus.Error, 'Metadata generation failed', {
+    await setStatus(projectId, ProjectStatus.Error, 'Metadata generation failed', buildStatusErrorExtra('metadata', err, {
       failedStep: currentStep,
       failedLanguage: currentLanguage,
-    });
+    }));
     throw createHandledError('Metadata generation failed', err);
   }
 }

@@ -16,6 +16,7 @@ import { createHandledError } from './error';
 import { ensureProjectScaffold, ensureLanguageWorkspace, ensureLanguageLogDir, ensureTemplateWorkspace } from '../language-workspace';
 import type { ProjectScaffold } from '../language-workspace';
 import { isCustomTemplateData } from '@/shared/templates/custom-data';
+import { buildStatusErrorExtra } from '../status-error-extra';
 
 type ImagesPhaseArgs = {
   projectId: string;
@@ -187,7 +188,10 @@ export async function handleImagesPhase({ projectId, cfg, jobPayload, daemonConf
       projectId,
       error: err?.message || String(err),
     });
-    await setStatus(projectId, ProjectStatus.Error, 'Image generation failed');
+    await setStatus(projectId, ProjectStatus.Error, 'Image generation failed', buildStatusErrorExtra('images', err, {
+      workspace: sharedImagesWorkspace,
+      workspaceRoot: agentWorkspace,
+    }));
     throw createHandledError('Image generation failed', err);
   }
 }

@@ -11,6 +11,7 @@ import type { CreationSnapshot } from './types';
 import { determineEffectName, resolveProjectLanguagesFromSnapshot } from './project-utils';
 import { createHandledError } from './error';
 import { ensureProjectScaffold, ensureLanguageWorkspace, ensureLanguageLogDir } from '../language-workspace';
+import { buildStatusErrorExtra } from '../status-error-extra';
 
 type VideoMainPhaseArgs = {
   projectId: string;
@@ -282,7 +283,15 @@ export async function handleVideoMainPhase({ projectId, cfg, jobPayload, daemonC
       projectId,
       error: err?.message || String(err),
     });
-    await setStatus(projectId, ProjectStatus.Error, 'Final video compilation failed');
+    await setStatus(projectId, ProjectStatus.Error, 'Final video compilation failed', buildStatusErrorExtra('video_main', err, {
+      workspace: primaryInfo.languageWorkspace ?? agentWorkspace,
+      workspaceRoot: agentWorkspace,
+      languageCode: primaryLanguage,
+      effectName,
+      includeDefaultMusic,
+      addOverlay: includeOverlay,
+      watermarkEnabled: cfg.watermarkEnabled,
+    }));
     throw createHandledError('Final video compilation failed', err);
   }
 }

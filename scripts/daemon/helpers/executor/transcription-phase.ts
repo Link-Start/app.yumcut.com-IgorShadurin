@@ -11,6 +11,7 @@ import { ensureProjectScaffold, ensureLanguageWorkspace, ensureLanguageLogDir } 
 import { generateSentenceMetadata } from '../metadata';
 import { isCustomTemplateData } from '@/shared/templates/custom-data';
 import { readTemplateOriginalPath } from '../template-original';
+import { buildStatusErrorExtra } from '../status-error-extra';
 
 type TranscriptionPhaseArgs = {
   projectId: string;
@@ -20,6 +21,7 @@ type TranscriptionPhaseArgs = {
 };
 
 export async function handleTranscriptionPhase({ projectId, jobPayload, cfg, daemonConfig }: TranscriptionPhaseArgs) {
+  let agentWorkspace: string | null = null;
   try {
     const snapshot = await getTranscriptionSnapshot(projectId);
     const languagesFromConfig = Array.isArray((cfg as any).languages)
@@ -30,7 +32,7 @@ export async function handleTranscriptionPhase({ projectId, jobPayload, cfg, dae
     const finalVoiceovers = snapshot.finalVoiceovers || {};
 
     const projectScaffold = await ensureProjectScaffold(projectId);
-    const agentWorkspace = projectScaffold.workspaceRoot;
+    agentWorkspace = projectScaffold.workspaceRoot;
 
     const progress = await getLanguageProgress(projectId);
     const disabledLanguages = new Set(progress.progress.filter((row) => row.disabled).map((row) => row.languageCode));
@@ -159,7 +161,10 @@ export async function handleTranscriptionPhase({ projectId, jobPayload, cfg, dae
       projectId,
       error: err?.message || String(err),
     });
-    await setStatus(projectId, ProjectStatus.Error, 'Transcription failed');
+    await setStatus(projectId, ProjectStatus.Error, 'Transcription failed', buildStatusErrorExtra('transcription', err, {
+      workspace: agentWorkspace,
+      workspaceRoot: agentWorkspace,
+    }));
     throw createHandledError('Transcription failed', err);
   }
 }

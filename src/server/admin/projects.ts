@@ -1,7 +1,7 @@
 import { prisma } from '@/server/db';
 import { ProjectStatus } from '@/shared/constants/status';
 import { normalizeMediaUrl } from '@/server/storage';
-import { getLatestErrorLog } from '@/server/projects/errors';
+import { buildProjectErrorStatusInfo, getLatestErrorLog } from '@/server/projects/errors';
 import { normalizeLanguageList, DEFAULT_LANGUAGE } from '@/shared/constants/languages';
 import { sortAudioCandidatesByCreatedAtDesc } from '@/server/projects/helpers';
 import { normalizeLanguageVoiceMap } from '@/shared/voices/language-voice-map';
@@ -210,7 +210,7 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
     }
     case ProjectStatus.Error: {
       const errorLog = await getLatestErrorLog(prisma, p.id);
-      statusInfo = { message: errorLog?.message || latestLog?.message || 'Unknown error' };
+      statusInfo = buildProjectErrorStatusInfo(errorLog, latestLog, { includeExtra: true });
       break;
     }
     case ProjectStatus.Done: {
@@ -431,7 +431,7 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
       name: p.user.name,
     },
     latestLogMessage: (status === ProjectStatus.Error
-      ? ((await getLatestErrorLog(prisma, p.id))?.message || latestLog?.message)
+      ? buildProjectErrorStatusInfo(await getLatestErrorLog(prisma, p.id), latestLog).message
       : latestLog?.message) || null,
     languageProgress,
     tokensUsed,
