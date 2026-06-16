@@ -89,7 +89,10 @@ describe('daemon status lock release', () => {
     vi.doMock('@/server/db', () => ({ prisma }));
     vi.doMock('@/server/auth', () => ({ assertDaemonAuth: async () => 'daemon-1' }));
     vi.doMock('@/server/telegram', () => ({ notifyProjectStatusChange: vi.fn(async () => {}) }));
-    vi.doMock('@/server/emails/project-lifecycle', () => ({ sendProjectReadyEmail: vi.fn(async () => {}) }));
+    vi.doMock('@/server/emails/project-lifecycle', () => ({
+      sendProjectFailedEmail: vi.fn(async () => {}),
+      sendProjectReadyEmail: vi.fn(async () => {}),
+    }));
     vi.doMock('@/server/projects/helpers', () => ({ storeTemplateImageMetadata: vi.fn(async () => {}) }));
 
     const route = await import('@/app/api/daemon/projects/[projectId]/status/route');

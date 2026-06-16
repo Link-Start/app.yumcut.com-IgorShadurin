@@ -3,6 +3,7 @@ import { config } from '@/server/config';
 import { normalizeMediaUrl } from '@/server/storage';
 import {
   EMAIL_KIND_PROJECT_CREATED,
+  EMAIL_KIND_PROJECT_FAILED,
   EMAIL_KIND_PROJECT_READY,
   normalizeEmail,
   sendLocalizedPlainTextEmail,
@@ -27,6 +28,10 @@ type BaseProjectEmailInput = {
 
 type ProjectReadyEmailInput = BaseProjectEmailInput & {
   finalVideoUrl?: string | null;
+};
+
+type ProjectFailedEmailInput = BaseProjectEmailInput & {
+  refundedTokens: number;
 };
 
 const DEFAULT_APP_ORIGIN = 'https://app.yumcut.com';
@@ -109,6 +114,43 @@ export async function sendProjectReadyEmail(input: ProjectReadyEmailInput): Prom
       project_title: (input.projectTitle || '').trim(),
       project_url: projectUrl,
       final_video_url: finalVideoUrl,
+    },
+  });
+
+  return {
+    sent: result.ok,
+    skipped: false,
+    error: result.ok ? null : (result.error ?? 'Unknown email send error'),
+  };
+}
+
+function formatTokenAmount(value: number, languageHint?: string | null): string {
+  const normalized = typeof languageHint === 'string' ? languageHint.trim().toLowerCase() : '';
+  const locale = normalized.startsWith('ru') ? 'ru-RU' : 'en-US';
+  return Math.max(0, Math.floor(Number.isFinite(value) ? value : 0)).toLocaleString(locale);
+}
+
+export async function sendProjectFailedEmail(input: ProjectFailedEmailInput): Promise<EmailResult> {
+  const to = normalizeEmail(input.email);
+  if (!to) {
+    return { sent: false, skipped: true, reason: 'invalid-email' };
+  }
+
+  const enabled = await resolveProjectEmailsEnabled(input);
+  if (!enabled) {
+    return { sent: false, skipped: true, reason: 'disabled-by-user' };
+  }
+
+  const projectUrl = buildProjectAdminUrl(input.projectId);
+  const result = await sendLocalizedPlainTextEmail({
+    to,
+    kind: EMAIL_KIND_PROJECT_FAILED,
+    languageHint: input.preferredLanguage,
+    name: input.name,
+    variables: {
+      project_title: (input.projectTitle || '').trim(),
+      project_url: projectUrl,
+      refunded_tokens: formatTokenAmount(input.refundedTokens, input.preferredLanguage),
     },
   });
 

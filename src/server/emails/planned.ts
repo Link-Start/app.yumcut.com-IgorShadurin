@@ -12,6 +12,7 @@ export const EMAIL_KIND_REPLY_BONUS_CONFIRMED = 'reply_bonus_confirmed_v1';
 export const EMAIL_KIND_SUBSCRIPTION_WINBACK = 'subscription_cancelled_winback_v1';
 export const EMAIL_KIND_PROJECT_CREATED = 'project_created_v1';
 export const EMAIL_KIND_PROJECT_READY = 'project_ready_v1';
+export const EMAIL_KIND_PROJECT_FAILED = 'project_failed_v1';
 
 const DEFAULT_EMAIL_LANGUAGE = 'en';
 const EMAIL_TEMPLATE_ROOT = path.join(process.cwd(), 'email');

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { captureBrowserAttribution } from '@/lib/browser-attribution';
 import { readUtmSourceCookie, UTM_SOURCE_COOKIE_NAME } from '@/shared/utm/helpers';
 
 const COOKIE_DOMAIN = '.yumcut.com';
@@ -36,6 +37,8 @@ function getCookieValue(name: string) {
 
 export function UtmSourceTracker() {
   useEffect(() => {
+    captureBrowserAttribution();
+
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('utm_source');
     if (fromQuery) {

@@ -16,6 +16,7 @@ const userUpdate = vi.hoisted(() => vi.fn());
 const assertDaemonAuth = vi.hoisted(() => vi.fn());
 const notifyProjectStatusChange = vi.hoisted(() => vi.fn());
 const sendProjectReadyEmail = vi.hoisted(() => vi.fn());
+const sendProjectFailedEmail = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/db', () => ({
   prisma: {
@@ -42,6 +43,7 @@ vi.mock('@/server/telegram', () => ({
 
 vi.mock('@/server/emails/project-lifecycle', () => ({
   sendProjectReadyEmail,
+  sendProjectFailedEmail,
 }));
 
 function makeRequest(projectId: string, body: Record<string, unknown>) {
@@ -71,6 +73,7 @@ describe('daemon status token refunds on project failure', () => {
     userUpdate.mockResolvedValue({});
     notifyProjectStatusChange.mockResolvedValue(undefined);
     sendProjectReadyEmail.mockResolvedValue({ sent: true, skipped: false, error: null });
+    sendProjectFailedEmail.mockResolvedValue({ sent: true, skipped: false, error: null });
     transaction.mockImplementation(async (callback: any) => callback({
       project: { update: projectUpdate, updateMany: projectUpdateMany },
       audioCandidate: { updateMany: vi.fn(), findUnique: vi.fn() },
@@ -95,6 +98,17 @@ describe('daemon status token refunds on project failure', () => {
       { delta: -70, metadata: { projectId: 'other-project' } },
     ]);
     userFindUnique.mockResolvedValue({ tokenBalance: 20 });
+    projectFindUnique.mockResolvedValueOnce({
+      id: 'project-1',
+      title: 'Failed project',
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        name: 'User Name',
+        preferredLanguage: 'en',
+        settings: { projectEmailsEnabled: true },
+      },
+    });
 
     const route = await import('@/app/api/daemon/projects/[projectId]/status/route');
     const req = makeRequest('project-1', {
@@ -125,6 +139,12 @@ describe('daemon status token refunds on project failure', () => {
         message: expect.stringContaining('Refunded 110 tokens'),
       }),
     }));
+    expect(sendProjectFailedEmail).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user-1',
+      email: 'user@example.com',
+      projectId: 'project-1',
+      refundedTokens: 110,
+    }));
   });
 
   it('does not double refund if ledger is already balanced for the project', async () => {
@@ -151,6 +171,29 @@ describe('daemon status token refunds on project failure', () => {
         message: 'Video parts rendering failed',
       }),
     }));
+    expect(sendProjectFailedEmail).not.toHaveBeenCalled();
+  });
+
+  it('does not send project-failed email when project is already error', async () => {
+    projectFindFirst.mockResolvedValueOnce({
+      id: 'project-1',
+      userId: 'user-1',
+      status: ProjectStatus.Error,
+      currentDaemonId: 'daemon-1',
+      deleted: false,
+      languages: ['en'],
+    });
+    tokenTransactionFindMany.mockResolvedValue([]);
+
+    const route = await import('@/app/api/daemon/projects/[projectId]/status/route');
+    const req = makeRequest('project-1', {
+      status: ProjectStatus.Error,
+      message: 'Still failed',
+    });
+
+    const res = await route.POST(req, { params: Promise.resolve({ projectId: 'project-1' }) });
+    expect(res.status).toBe(200);
+    expect(sendProjectFailedEmail).not.toHaveBeenCalled();
   });
 
   it('sends project-ready email when project transitions to done', async () => {

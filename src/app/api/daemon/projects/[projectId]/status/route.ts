@@ -13,7 +13,7 @@ import { storeTemplateImageMetadata } from '@/server/projects/helpers';
 import { TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
 import { PROJECT_RELATED_TOKEN_TYPES, extractProjectIdFromTokenMetadata, toUsedTokensFromDelta } from '@/server/admin/token-usage';
 import { normalizeMediaUrl } from '@/server/storage';
-import { sendProjectReadyEmail } from '@/server/emails/project-lifecycle';
+import { sendProjectFailedEmail, sendProjectReadyEmail } from '@/server/emails/project-lifecycle';
 
 type Params = { projectId: string };
 
@@ -96,8 +96,8 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
       }
     }
   }
+  let refundedTokens = 0;
   await prisma.$transaction(async (tx) => {
-    let refundedTokens = 0;
     const primaryLanguage = normalizedLanguages[0] ?? DEFAULT_LANGUAGE;
     const finalVoiceovers = extra && typeof (extra as any).finalVoiceovers === 'object' && (extra as any).finalVoiceovers !== null
       ? (extra as any).finalVoiceovers as Record<string, string>
@@ -174,6 +174,44 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
     }
   } catch (err) {
     console.error('Failed to send Telegram notification', err);
+  }
+
+  if (status === ProjectStatus.Error && previousStatus !== ProjectStatus.Error) {
+    try {
+      const failedProject = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: {
+          id: true,
+          title: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              preferredLanguage: true,
+              settings: {
+                select: { projectEmailsEnabled: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (failedProject?.user) {
+        await sendProjectFailedEmail({
+          userId: failedProject.user.id,
+          email: failedProject.user.email,
+          name: failedProject.user.name,
+          preferredLanguage: failedProject.user.preferredLanguage,
+          projectId: failedProject.id,
+          projectTitle: failedProject.title,
+          refundedTokens,
+          projectEmailsEnabled: failedProject.user.settings?.projectEmailsEnabled ?? true,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to send project failure email', err);
+    }
   }
 
   if (status === ProjectStatus.Done && previousStatus !== ProjectStatus.Done) {

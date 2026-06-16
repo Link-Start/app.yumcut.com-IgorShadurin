@@ -24,6 +24,7 @@ vi.mock('@/server/storage', () => ({
 vi.mock('@/server/emails/planned', () => ({
   EMAIL_KIND_PROJECT_CREATED: 'project_created_v1',
   EMAIL_KIND_PROJECT_READY: 'project_ready_v1',
+  EMAIL_KIND_PROJECT_FAILED: 'project_failed_v1',
   normalizeEmail: (value?: string | null) => {
     if (!value) return null;
     const next = value.trim().toLowerCase();
@@ -76,9 +77,16 @@ describe('project lifecycle emails', () => {
       projectId: 'project-1',
       finalVideoUrl: 'https://cdn.example.com/final.mp4',
     });
+    const failed = await mod.sendProjectFailedEmail({
+      userId: 'user-1',
+      email: 'user@example.com',
+      projectId: 'project-1',
+      refundedTokens: 30,
+    });
 
     expect(created).toEqual({ sent: false, skipped: true, reason: 'disabled-by-user' });
     expect(ready).toEqual({ sent: false, skipped: true, reason: 'disabled-by-user' });
+    expect(failed).toEqual({ sent: false, skipped: true, reason: 'disabled-by-user' });
     expect(sendLocalizedPlainTextEmail).not.toHaveBeenCalled();
   });
 
@@ -99,6 +107,29 @@ describe('project lifecycle emails', () => {
       variables: expect.objectContaining({
         project_url: 'https://app.yumcut.com/admin/projects/project-2',
         final_video_url: 'https://cdn.example.com/final.mp4',
+      }),
+    }));
+  });
+
+  it('includes refund amount in project failed email', async () => {
+    const mod = await import('@/server/emails/project-lifecycle');
+    const result = await mod.sendProjectFailedEmail({
+      userId: 'user-1',
+      email: 'user@example.com',
+      name: 'Dmitry',
+      preferredLanguage: 'en',
+      projectId: 'project-3',
+      projectTitle: 'Failed title',
+      refundedTokens: 1234,
+    });
+
+    expect(result).toEqual({ sent: true, skipped: false, error: null });
+    expect(sendLocalizedPlainTextEmail).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'project_failed_v1',
+      variables: expect.objectContaining({
+        project_url: 'https://app.yumcut.com/admin/projects/project-3',
+        project_title: 'Failed title',
+        refunded_tokens: '1,234',
       }),
     }));
   });
