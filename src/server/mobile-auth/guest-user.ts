@@ -93,6 +93,7 @@ export async function getOrCreateGuestUser(metadata: GuestMetadata) {
     email: user.email,
     name: user.name,
     isGuest: true,
+    platform: metadata.platform ?? 'iOS app',
   }).catch((err) => {
     console.error('Failed to notify admins about guest user', err);
   });

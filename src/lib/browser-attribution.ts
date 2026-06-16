@@ -1,9 +1,11 @@
 import { readUtmSourceCookie, UTM_SOURCE_COOKIE_NAME } from '@/shared/utm/helpers';
 
 export const BROWSER_ATTRIBUTION_STORAGE_KEY = 'yc_browser_attribution_v1';
+export const BROWSER_ATTRIBUTION_COOKIE_NAME = 'yc_browser_attribution';
 
 const MAX_FIELD_LENGTH = 300;
 const ATTRIBUTION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const ATTRIBUTION_COOKIE_MAX_AGE_SECONDS = Math.floor(ATTRIBUTION_TTL_MS / 1000);
 const AUTH_REFERRER_HOSTS = new Set([
   'accounts.google.com',
   'appleid.apple.com',
@@ -24,6 +26,7 @@ export const ATTRIBUTION_QUERY_KEYS = [
   'openCategory',
   'page',
   'lang',
+  'templateId',
 ] as const;
 
 export type AttributionQuery = Record<string, string | string[]>;
@@ -38,6 +41,10 @@ export type BrowserAttribution = {
   sourceToolSlug?: string | null;
   referrer?: string | null;
   landingPath?: string | null;
+  mainPageMode?: string | null;
+  mainPageCategoryId?: string | null;
+  characterSlug?: string | null;
+  templateId?: string | null;
   query?: AttributionQuery;
   capturedAt: string;
   updatedAt: string;
@@ -115,6 +122,7 @@ function writeStored(attribution: BrowserAttribution) {
   const serialized = JSON.stringify(attribution);
   try { window.localStorage.setItem(BROWSER_ATTRIBUTION_STORAGE_KEY, serialized); } catch {}
   try { window.sessionStorage.setItem(BROWSER_ATTRIBUTION_STORAGE_KEY, serialized); } catch {}
+  writeAttributionCookie(attribution);
 }
 
 function normalizeAttribution(input: Partial<BrowserAttribution> | null | undefined): BrowserAttribution | null {
@@ -130,6 +138,10 @@ function normalizeAttribution(input: Partial<BrowserAttribution> | null | undefi
     sourceToolSlug: cleanText(input.sourceToolSlug, 191) ?? null,
     referrer: cleanText(input.referrer, 2048) ?? null,
     landingPath: cleanText(input.landingPath, 512) ?? null,
+    mainPageMode: cleanText(input.mainPageMode, 64) ?? null,
+    mainPageCategoryId: cleanText(input.mainPageCategoryId, 191) ?? null,
+    characterSlug: cleanText(input.characterSlug, 191) ?? null,
+    templateId: cleanText(input.templateId, 191) ?? null,
     ...(hasQuery(query) ? { query } : {}),
     capturedAt: cleanText(input.capturedAt, 64) ?? new Date().toISOString(),
     updatedAt: cleanText(input.updatedAt, 64) ?? new Date().toISOString(),
@@ -144,6 +156,10 @@ function normalizeAttribution(input: Partial<BrowserAttribution> | null | undefi
     !normalized.intent &&
     !normalized.sourceToolSlug &&
     !normalized.referrer &&
+    !normalized.mainPageMode &&
+    !normalized.mainPageCategoryId &&
+    !normalized.characterSlug &&
+    !normalized.templateId &&
     !hasQuery(normalized.query)
   ) {
     return null;
@@ -169,6 +185,65 @@ function sanitizeQuery(input: AttributionQuery): AttributionQuery {
 
 function normalizeLandingPath(url: URL): string {
   return `${url.pathname}${url.search}${url.hash}`.slice(0, 512);
+}
+
+function inferMainPageMode(url: URL): string | null {
+  const explicit = readParam(url.searchParams, 'openMode');
+  if (explicit) return explicit;
+  return url.pathname.startsWith('/character/') ? 'brainrot' : null;
+}
+
+function inferCharacterSlug(url: URL): string | null {
+  if (!url.pathname.startsWith('/character/')) return null;
+  const segment = url.pathname.split('/').filter(Boolean)[1];
+  if (!segment) return null;
+  try {
+    return cleanText(decodeURIComponent(segment), 191);
+  } catch {
+    return cleanText(segment, 191);
+  }
+}
+
+function buildCookiePayload(attribution: BrowserAttribution): Record<string, string> {
+  const payload: Record<string, string> = {};
+  const fields: Array<keyof BrowserAttribution> = [
+    'utmSource',
+    'utmMedium',
+    'utmCampaign',
+    'utmContent',
+    'utmTerm',
+    'intent',
+    'sourceToolSlug',
+    'referrer',
+    'landingPath',
+    'mainPageMode',
+    'mainPageCategoryId',
+    'characterSlug',
+    'templateId',
+  ];
+  for (const field of fields) {
+    const value = attribution[field];
+    if (typeof value === 'string' && value.trim()) {
+      payload[field] = value.trim();
+    }
+  }
+  return payload;
+}
+
+function writeAttributionCookie(attribution: BrowserAttribution) {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+  try {
+    const payload = buildCookiePayload(attribution);
+    if (Object.keys(payload).length === 0) return;
+    const value = encodeURIComponent(JSON.stringify(payload));
+    const currentUrl = new URL(window.location.href);
+    const secure = currentUrl.protocol === 'https:' ? '; secure' : '';
+    const host = currentUrl.hostname.toLowerCase();
+    const domain = host === 'yumcut.com' || host.endsWith('.yumcut.com') ? '; domain=.yumcut.com' : '';
+    document.cookie = `${BROWSER_ATTRIBUTION_COOKIE_NAME}=${value}; path=/; max-age=${ATTRIBUTION_COOKIE_MAX_AGE_SECONDS}; samesite=lax${domain}${secure}`;
+  } catch {
+    // Cookie support can be disabled; local/session storage still covers client-side attempts.
+  }
 }
 
 function shouldKeepReferrer(referrer: string | null, currentOrigin: string): boolean {
@@ -204,6 +279,10 @@ function hasAttributionSignal(input: Partial<BrowserAttribution>, query: Attribu
     input.intent ||
     input.sourceToolSlug ||
     input.referrer ||
+    input.mainPageMode ||
+    input.mainPageCategoryId ||
+    input.characterSlug ||
+    input.templateId ||
     hasQuery(query),
   );
 }
@@ -229,6 +308,10 @@ export function captureBrowserAttribution(): BrowserAttribution | null {
     intent: readParam(params, 'intent'),
     sourceToolSlug: readParam(params, 'yc_t'),
     referrer: acceptedReferrer,
+    mainPageMode: inferMainPageMode(url),
+    mainPageCategoryId: readParam(params, 'openCategory'),
+    characterSlug: inferCharacterSlug(url),
+    templateId: readParam(params, 'templateId'),
   };
   const currentSignal: Partial<BrowserAttribution> = { ...current, utmSource: queryUtmSource };
   const hasCurrentSignal = hasAttributionSignal(currentSignal, query);
@@ -242,6 +325,10 @@ export function captureBrowserAttribution(): BrowserAttribution | null {
     sourceToolSlug: hasCurrentSignal ? (current.sourceToolSlug ?? null) : (stored?.sourceToolSlug ?? null),
     referrer: hasCurrentSignal ? (current.referrer ?? null) : (stored?.referrer ?? null),
     landingPath: hasCurrentSignal ? normalizeLandingPath(url) : (stored?.landingPath ?? normalizeLandingPath(url)),
+    mainPageMode: hasCurrentSignal ? (current.mainPageMode ?? null) : (stored?.mainPageMode ?? current.mainPageMode ?? null),
+    mainPageCategoryId: hasCurrentSignal ? (current.mainPageCategoryId ?? null) : (stored?.mainPageCategoryId ?? current.mainPageCategoryId ?? null),
+    characterSlug: hasCurrentSignal ? (current.characterSlug ?? null) : (stored?.characterSlug ?? current.characterSlug ?? null),
+    templateId: hasCurrentSignal ? (current.templateId ?? null) : (stored?.templateId ?? current.templateId ?? null),
     query: hasQuery(query) ? query : (hasCurrentSignal ? undefined : stored?.query),
     capturedAt: stored?.capturedAt ?? now,
     updatedAt: hasCurrentSignal ? now : (stored?.updatedAt ?? now),

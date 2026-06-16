@@ -486,13 +486,28 @@ type AdminNotificationKind =
   | 'subscription_cancelled'
   | 'account_deleted';
 
+type AdminAttributionPayload = {
+  platform?: Maybe<string>;
+  mainPageMode?: Maybe<string>;
+  mainPageCategoryId?: Maybe<string>;
+  characterSlug?: Maybe<string>;
+  templateId?: Maybe<string>;
+  sourceToolSlug?: Maybe<string>;
+  utmSource?: Maybe<string>;
+  utmMedium?: Maybe<string>;
+  utmCampaign?: Maybe<string>;
+  intent?: Maybe<string>;
+  landingPath?: Maybe<string>;
+  referrerOrigin?: Maybe<string>;
+  referrerPath?: Maybe<string>;
+};
+
 type AdminNotificationPayloads = {
-  new_user: {
+  new_user: AdminAttributionPayload & {
     userId: string;
     email: string | null | undefined;
     name: string | null | undefined;
     isGuest?: boolean;
-    utmSource?: string | null;
     signupBonusAmount?: number | null;
   };
   guest_converted: {
@@ -511,7 +526,7 @@ type AdminNotificationPayloads = {
     userName: string | null | undefined;
     projectUrl: string | null | undefined;
   };
-  project_attempt_paywall: {
+  project_attempt_paywall: AdminAttributionPayload & {
     attemptId: string;
     userId: string;
     userEmail: string | null | undefined;
@@ -522,18 +537,6 @@ type AdminNotificationPayloads = {
     durationSeconds: number | null | undefined;
     tokenCost: number | null | undefined;
     tokenBalance: number | null | undefined;
-    mainPageMode: string | null | undefined;
-    mainPageCategoryId: string | null | undefined;
-    characterSlug: string | null | undefined;
-    templateId: string | null | undefined;
-    utmSource: string | null | undefined;
-    utmMedium: string | null | undefined;
-    utmCampaign: string | null | undefined;
-    intent: string | null | undefined;
-    sourceToolSlug: string | null | undefined;
-    referrerOrigin: string | null | undefined;
-    referrerPath: string | null | undefined;
-    landingPath: string | null | undefined;
   };
   project_done: {
     projectId: string;
@@ -596,6 +599,73 @@ type AdminNotificationPayloads = {
   };
 };
 
+function cleanNotificationText(value: Maybe<string>, maxLength = 300) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.replace(/\0/g, '').trim();
+  if (!normalized) return null;
+  return Array.from(normalized).slice(0, maxLength).join('');
+}
+
+function formatPlatformLabel(value: Maybe<string>) {
+  const normalized = cleanNotificationText(value, 64);
+  if (!normalized) return null;
+  const lower = normalized.toLowerCase();
+  if (lower === 'web' || lower === 'session' || lower.includes('web')) return 'web';
+  if (
+    lower === 'mobile' ||
+    lower === 'ios' ||
+    lower === 'ios app' ||
+    lower.includes('iphone') ||
+    lower.includes('ipad') ||
+    lower.includes('ios')
+  ) {
+    return 'iOS app';
+  }
+  return normalized;
+}
+
+function appendAdminAttributionLines(lines: string[], payload: AdminAttributionPayload) {
+  const platform = formatPlatformLabel(payload.platform);
+  if (platform) {
+    lines.push(`Platform: ${platform}`);
+  }
+  const mainPageMode = cleanNotificationText(payload.mainPageMode, 64);
+  const mainPageCategoryId = cleanNotificationText(payload.mainPageCategoryId, 191);
+  if (mainPageMode || mainPageCategoryId) {
+    lines.push(`Entry: ${mainPageMode || '—'}${mainPageCategoryId ? ` / ${mainPageCategoryId}` : ''}`);
+  }
+  const characterSlug = cleanNotificationText(payload.characterSlug, 191);
+  if (characterSlug) {
+    lines.push(`Character: ${characterSlug}`);
+  }
+  const templateId = cleanNotificationText(payload.templateId, 191);
+  if (templateId) {
+    lines.push(`Template ID: ${templateId}`);
+  }
+  const sourceToolSlug = cleanNotificationText(payload.sourceToolSlug, 191);
+  if (sourceToolSlug) {
+    lines.push(`Tool: ${sourceToolSlug}`);
+  }
+  const utmSource = cleanNotificationText(payload.utmSource, 200);
+  const utmMedium = cleanNotificationText(payload.utmMedium, 200);
+  const utmCampaign = cleanNotificationText(payload.utmCampaign, 200);
+  if (utmSource || utmMedium || utmCampaign) {
+    lines.push(`UTM: ${utmSource || '—'} / ${utmMedium || '—'} / ${utmCampaign || '—'}`);
+  }
+  const intent = cleanNotificationText(payload.intent, 64);
+  if (intent) {
+    lines.push(`Intent: ${intent}`);
+  }
+  const landingPath = cleanNotificationText(payload.landingPath, 512);
+  if (landingPath) {
+    lines.push(`Landing: ${landingPath}`);
+  }
+  const referrerOrigin = cleanNotificationText(payload.referrerOrigin, 255);
+  if (referrerOrigin) {
+    lines.push(`Referrer: ${referrerOrigin}${cleanNotificationText(payload.referrerPath, 512) || ''}`);
+  }
+}
+
 async function notifyAdminsInternal<K extends AdminNotificationKind>(kind: K, payload: AdminNotificationPayloads[K]) {
   if (!isTelegramEnabled()) return;
   if (!(await shouldNotifyAdmins(kind))) return;
@@ -623,9 +693,7 @@ async function notifyAdminsInternal<K extends AdminNotificationKind>(kind: K, pa
       lines.push(signupBonusAmount > 0
         ? `Signup bonus: ${signupBonusAmount.toLocaleString()} tokens`
         : 'Signup bonus: No signup bonus');
-      if (newUser.utmSource?.trim()) {
-        lines.push(`Source: ${newUser.utmSource.trim()}`);
-      }
+      appendAdminAttributionLines(lines, newUser);
       lines.push(`User ID: ${newUser.userId}`);
       if (newUser.isGuest) {
         lines.push('Mode: Guest onboarding');
@@ -659,6 +727,7 @@ async function notifyAdminsInternal<K extends AdminNotificationKind>(kind: K, pa
       lines.push(`Owner: ${ownerLabel}`);
       lines.push(`User ID: ${attemptPayload.userId}`);
       lines.push(`Attempt ID: ${attemptPayload.attemptId}`);
+      appendAdminAttributionLines(lines, attemptPayload);
       if (attemptPayload.projectExperience || attemptPayload.promptMode) {
         lines.push(`Mode: ${attemptPayload.projectExperience || '—'} / ${attemptPayload.promptMode || '—'}`);
       }
@@ -667,30 +736,6 @@ async function notifyAdminsInternal<K extends AdminNotificationKind>(kind: K, pa
       }
       if (typeof attemptPayload.tokenCost === 'number' || typeof attemptPayload.tokenBalance === 'number') {
         lines.push(`Tokens: need ${attemptPayload.tokenCost ?? '—'}, balance ${attemptPayload.tokenBalance ?? '—'}`);
-      }
-      if (attemptPayload.mainPageMode || attemptPayload.mainPageCategoryId) {
-        lines.push(`Entry: ${attemptPayload.mainPageMode || '—'}${attemptPayload.mainPageCategoryId ? ` / ${attemptPayload.mainPageCategoryId}` : ''}`);
-      }
-      if (attemptPayload.characterSlug) {
-        lines.push(`Character: ${attemptPayload.characterSlug}`);
-      }
-      if (attemptPayload.templateId) {
-        lines.push(`Template ID: ${attemptPayload.templateId}`);
-      }
-      if (attemptPayload.sourceToolSlug) {
-        lines.push(`Tool: ${attemptPayload.sourceToolSlug}`);
-      }
-      if (attemptPayload.utmSource || attemptPayload.utmMedium || attemptPayload.utmCampaign) {
-        lines.push(`UTM: ${attemptPayload.utmSource || '—'} / ${attemptPayload.utmMedium || '—'} / ${attemptPayload.utmCampaign || '—'}`);
-      }
-      if (attemptPayload.intent) {
-        lines.push(`Intent: ${attemptPayload.intent}`);
-      }
-      if (attemptPayload.landingPath) {
-        lines.push(`Landing: ${attemptPayload.landingPath}`);
-      }
-      if (attemptPayload.referrerOrigin) {
-        lines.push(`Referrer: ${attemptPayload.referrerOrigin}${attemptPayload.referrerPath || ''}`);
       }
       const promptText = attemptPayload.promptText?.trim() || '—';
       const promptHeader = 'Prompt before paywall:';

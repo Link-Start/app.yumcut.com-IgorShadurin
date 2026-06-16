@@ -26,6 +26,7 @@ export const POST = withApiError(async function POST(req: NextRequest) {
       userId: auth.userId,
       userEmail: user?.email ?? auth.sessionUser?.email ?? null,
       userName: user?.name ?? auth.sessionUser?.name ?? null,
+      platform: auth.source === 'mobile' ? 'iOS app' : 'web',
       promptText: normalized.promptText,
       promptMode: normalized.promptMode,
       projectExperience: normalized.projectExperience,

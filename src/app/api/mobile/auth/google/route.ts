@@ -20,7 +20,7 @@ export const POST = withApiError(async function POST(req: Request) {
     return unauthorized('Google account is missing an email address.');
   }
 
-  const user = await ensureGoogleUser(payload, body.idToken);
+  const user = await ensureGoogleUser(payload, body.idToken, { platform: body.platform });
   const session = await issueMobileSessionTokens({
     userId: user.id,
     deviceId: body.deviceId,

@@ -50,7 +50,7 @@ export function collectProjectAttemptContext(overrides: {
   const queryToolSlug = typeof query.yc_t === 'string' ? query.yc_t : null;
   const inferredMainPageMode = url.pathname.startsWith('/character/')
     ? 'brainrot'
-    : (readParam(params, 'openMode') ?? 'stories');
+    : (readParam(params, 'openMode') ?? attribution?.mainPageMode ?? 'stories');
   const rawContext: Record<string, unknown> = {
     path: url.pathname,
     viewport: {
@@ -76,9 +76,9 @@ export function collectProjectAttemptContext(overrides: {
     query,
     rawContext,
     mainPageMode: overrides.mainPageMode ?? inferredMainPageMode,
-    mainPageCategoryId: overrides.mainPageCategoryId ?? readParam(params, 'openCategory'),
-    characterSlug: overrides.characterSlug ?? null,
-    templateId: overrides.templateId ?? null,
+    mainPageCategoryId: overrides.mainPageCategoryId ?? readParam(params, 'openCategory') ?? attribution?.mainPageCategoryId ?? null,
+    characterSlug: overrides.characterSlug ?? attribution?.characterSlug ?? null,
+    templateId: overrides.templateId ?? attribution?.templateId ?? null,
   };
 }
 

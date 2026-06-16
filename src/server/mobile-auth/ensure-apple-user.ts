@@ -6,7 +6,12 @@ export type AppleProfile = Pick<AppleIdentityTokenPayload, 'sub' | 'email' | 'em
   name?: string | null;
 };
 
-export function ensureAppleUser(profile: AppleProfile, identityToken: string, displayName?: string | null): Promise<User> {
+export function ensureAppleUser(
+  profile: AppleProfile,
+  identityToken: string,
+  displayName?: string | null,
+  options: { platform?: string | null } = {},
+): Promise<User> {
   return ensureOAuthUser({
     provider: 'apple',
     profile: {
@@ -16,5 +21,6 @@ export function ensureAppleUser(profile: AppleProfile, identityToken: string, di
       emailVerified: profile.email_verified,
     },
     idToken: identityToken,
+    platform: options.platform,
   });
 }

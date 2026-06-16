@@ -13,6 +13,7 @@ import { scheduleUserOnboardingEmails } from '@/server/emails/planned';
 import { cookies } from 'next/headers';
 import { readUtmSourceCookie, UTM_SOURCE_COOKIE_NAME } from '@/shared/utm/helpers';
 import { APP_LANGUAGE_HINT_COOKIE_NAME, readAppLanguageHintCookie } from '@/shared/constants/app-language';
+import { BROWSER_ATTRIBUTION_COOKIE_NAME } from '@/lib/browser-attribution';
 
 const oauthProviders = [];
 const enabledProviderIds = new Set<string>();
@@ -168,6 +169,7 @@ export const authOptions: NextAuthOptions = {
     async createUser({ user }) {
       if (!user?.id) return;
       const utmSource = await readUtmSourceCookieFromRequest();
+      const browserAttribution = await readBrowserAttributionCookieFromRequest();
       const languageContext = await readSignUpLanguageContextFromRequest();
       let signupBonusAmount = 0;
       try {
@@ -188,7 +190,19 @@ export const authOptions: NextAuthOptions = {
         email: user.email,
         name: user.name,
         signupBonusAmount,
-        ...(utmSource ? { utmSource } : {}),
+        platform: 'web',
+        utmSource: browserAttribution?.utmSource ?? utmSource,
+        utmMedium: browserAttribution?.utmMedium,
+        utmCampaign: browserAttribution?.utmCampaign,
+        intent: browserAttribution?.intent,
+        sourceToolSlug: browserAttribution?.sourceToolSlug,
+        referrerOrigin: browserAttribution?.referrerOrigin,
+        referrerPath: browserAttribution?.referrerPath,
+        landingPath: browserAttribution?.landingPath,
+        mainPageMode: browserAttribution?.mainPageMode,
+        mainPageCategoryId: browserAttribution?.mainPageCategoryId,
+        characterSlug: browserAttribution?.characterSlug,
+        templateId: browserAttribution?.templateId,
       }).catch((err) => {
          
         console.error('Failed to notify admins about new user', err);
@@ -220,6 +234,112 @@ async function readUtmSourceCookieFromRequest() {
     return readUtmSourceCookie(value);
   } catch {
     return null;
+  }
+}
+
+type BrowserSignUpAttribution = {
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  intent?: string | null;
+  sourceToolSlug?: string | null;
+  referrerOrigin?: string | null;
+  referrerPath?: string | null;
+  landingPath?: string | null;
+  mainPageMode?: string | null;
+  mainPageCategoryId?: string | null;
+  characterSlug?: string | null;
+  templateId?: string | null;
+};
+
+async function readBrowserAttributionCookieFromRequest(): Promise<BrowserSignUpAttribution | null> {
+  try {
+    const cookieStore = await cookies();
+    return parseBrowserAttributionCookie(cookieStore.get(BROWSER_ATTRIBUTION_COOKIE_NAME)?.value);
+  } catch {
+    return null;
+  }
+}
+
+function parseBrowserAttributionCookie(value: string | null | undefined): BrowserSignUpAttribution | null {
+  if (!value) return null;
+  try {
+    const parsed = parseBrowserAttributionCookieJson(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const referrer = normalizeReferrerForNotification(parsed.referrer);
+    const attribution: BrowserSignUpAttribution = {
+      utmSource: cleanCookieText(parsed.utmSource, 200),
+      utmMedium: cleanCookieText(parsed.utmMedium, 200),
+      utmCampaign: cleanCookieText(parsed.utmCampaign, 200),
+      intent: cleanCookieText(parsed.intent, 64),
+      sourceToolSlug: cleanCookieText(parsed.sourceToolSlug, 191),
+      referrerOrigin: referrer.origin,
+      referrerPath: referrer.path,
+      landingPath: normalizeLandingPathForNotification(parsed.landingPath),
+      mainPageMode: cleanCookieText(parsed.mainPageMode, 64),
+      mainPageCategoryId: cleanCookieText(parsed.mainPageCategoryId, 191),
+      characterSlug: cleanCookieText(parsed.characterSlug, 191),
+      templateId: cleanCookieText(parsed.templateId, 191),
+    };
+    return Object.values(attribution).some(Boolean) ? attribution : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseBrowserAttributionCookieJson(value: string): Record<string, unknown> | null {
+  const candidates = [value];
+  try {
+    const decoded = decodeURIComponent(value);
+    if (decoded !== value) candidates.unshift(decoded);
+  } catch {}
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : null;
+    } catch {}
+  }
+  return null;
+}
+
+function cleanCookieText(value: unknown, maxLength: number): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.replace(/\0/g, '').trim();
+  if (!normalized) return null;
+  return Array.from(normalized).slice(0, maxLength).join('');
+}
+
+function normalizeLandingPathForNotification(value: unknown): string | null {
+  const normalized = cleanCookieText(value, 512);
+  if (!normalized) return null;
+  if (normalized.startsWith('/')) {
+    return normalized.split('?')[0]?.split('#')[0]?.slice(0, 512) || null;
+  }
+  try {
+    const url = new URL(normalized);
+    return url.pathname.slice(0, 512) || '/';
+  } catch {
+    return null;
+  }
+}
+
+function normalizeReferrerForNotification(value: unknown): { origin: string | null; path: string | null } {
+  const normalized = cleanCookieText(value, 2048);
+  if (!normalized) return { origin: null, path: null };
+  try {
+    const url = new URL(normalized);
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return { origin: null, path: null };
+    }
+    return {
+      origin: cleanCookieText(url.origin, 255),
+      path: cleanCookieText(url.pathname || '/', 512),
+    };
+  } catch {
+    return { origin: null, path: null };
   }
 }
 

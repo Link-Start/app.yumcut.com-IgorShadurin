@@ -101,6 +101,13 @@ describe('getOrCreateGuestUser', () => {
       userId: 'guest-user-1',
       deviceId: 'device-123',
     });
+    expect(notifyAdminsOfNewUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'guest-user-1',
+        isGuest: true,
+        platform: 'iOS',
+      }),
+    );
   });
 
   it('reuses existing guest profile and reactivates deleted users', async () => {

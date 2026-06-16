@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { BROWSER_ATTRIBUTION_STORAGE_KEY, captureBrowserAttribution } from '@/lib/browser-attribution';
+import {
+  BROWSER_ATTRIBUTION_COOKIE_NAME,
+  BROWSER_ATTRIBUTION_STORAGE_KEY,
+  captureBrowserAttribution,
+} from '@/lib/browser-attribution';
 import { collectProjectAttemptContext } from '@/lib/project-attempts';
 
 class MemoryStorage {
@@ -16,6 +20,12 @@ class MemoryStorage {
   removeItem(key: string) {
     this.values.delete(key);
   }
+}
+
+function readDocumentCookie(name: string) {
+  const cookie = (globalThis as any).document?.cookie as string | undefined;
+  const value = cookie?.split('; ').find((entry) => entry.startsWith(`${name}=`))?.slice(name.length + 1);
+  return value ? JSON.parse(decodeURIComponent(value)) as Record<string, unknown> : null;
 }
 
 function installBrowser(params: {
@@ -119,5 +129,15 @@ describe('project attempt browser attribution', () => {
     expect(context.referrer).toBe('https://example.org/posts/video-idea');
     expect(context.landingPath).toBe('/character/newton');
     expect(context.mainPageMode).toBe('brainrot');
+    expect(context.characterSlug).toBe('newton');
+
+    expect(readDocumentCookie(BROWSER_ATTRIBUTION_COOKIE_NAME)).toEqual(
+      expect.objectContaining({
+        referrer: 'https://example.org/posts/video-idea',
+        landingPath: '/character/newton',
+        mainPageMode: 'brainrot',
+        characterSlug: 'newton',
+      }),
+    );
   });
 });

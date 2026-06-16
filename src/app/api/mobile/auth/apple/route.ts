@@ -23,7 +23,7 @@ export const POST = withApiError(async function POST(req: Request) {
     return unauthorized('Apple account is missing an email address.');
   }
 
-  const user = await ensureAppleUser(payload, body.identityToken, body.fullName);
+  const user = await ensureAppleUser(payload, body.identityToken, body.fullName, { platform: body.platform });
   const session = await issueMobileSessionTokens({
     userId: user.id,
     deviceId: body.deviceId,

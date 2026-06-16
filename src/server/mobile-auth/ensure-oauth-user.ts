@@ -17,10 +17,11 @@ export type EnsureOAuthUserOptions = {
   provider: 'google' | 'apple';
   profile: OAuthProfile;
   idToken?: string | null;
+  platform?: string | null;
 };
 
 export async function ensureOAuthUser(options: EnsureOAuthUserOptions): Promise<User> {
-  const { provider, profile, idToken } = options;
+  const { provider, profile, idToken, platform } = options;
   if (!profile.providerAccountId) {
     throw new Error(`Missing providerAccountId for ${provider} profile.`);
   }
@@ -72,7 +73,7 @@ export async function ensureOAuthUser(options: EnsureOAuthUserOptions): Promise<
   await persistAccount(provider, user.id, profile.providerAccountId, idToken);
 
   if (isNewUser) {
-    await afterUserCreated(user, profile.name);
+    await afterUserCreated(user, profile.name, { platform });
   }
 
   return user;
@@ -133,7 +134,11 @@ function resolveEmailVerified(value: OAuthProfile['emailVerified']) {
   return undefined;
 }
 
-async function afterUserCreated(user: { id: string; email: string; preferredLanguage?: string | null }, name?: string | null) {
+async function afterUserCreated(
+  user: { id: string; email: string; preferredLanguage?: string | null },
+  name?: string | null,
+  options: { platform?: string | null } = {},
+) {
   let signupBonusAmount = 0;
   try {
     const signupBonusResult = await grantConfiguredSignUpBonus({
@@ -145,7 +150,13 @@ async function afterUserCreated(user: { id: string; email: string; preferredLang
   } catch (err) {
     console.error('Failed to grant signup tokens (mobile auth)', err);
   }
-  notifyAdminsOfNewUser({ userId: user.id, email: user.email, name, signupBonusAmount }).catch((err) => {
+  notifyAdminsOfNewUser({
+    userId: user.id,
+    email: user.email,
+    name,
+    signupBonusAmount,
+    platform: options.platform ?? 'iOS app',
+  }).catch((err) => {
     console.error('Failed to notify admins about new mobile user', err);
   });
   scheduleUserOnboardingEmails({

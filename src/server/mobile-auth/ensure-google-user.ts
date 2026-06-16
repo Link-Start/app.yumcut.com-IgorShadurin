@@ -4,7 +4,11 @@ import { ensureOAuthUser } from './ensure-oauth-user';
 
 export type GoogleProfile = Pick<TokenPayload, 'sub' | 'email' | 'name' | 'picture' | 'email_verified'>;
 
-export function ensureGoogleUser(profile: GoogleProfile, idToken: string): Promise<User> {
+export function ensureGoogleUser(
+  profile: GoogleProfile,
+  idToken: string,
+  options: { platform?: string | null } = {},
+): Promise<User> {
   return ensureOAuthUser({
     provider: 'google',
     profile: {
@@ -15,5 +19,6 @@ export function ensureGoogleUser(profile: GoogleProfile, idToken: string): Promi
       emailVerified: profile.email_verified,
     },
     idToken,
+    platform: options.platform,
   });
 }
