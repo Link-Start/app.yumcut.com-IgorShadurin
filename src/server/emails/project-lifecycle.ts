@@ -36,13 +36,13 @@ type ProjectFailedEmailInput = BaseProjectEmailInput & {
 
 const DEFAULT_APP_ORIGIN = 'https://app.yumcut.com';
 
-export function buildProjectAdminUrl(projectId: string): string {
+export function buildProjectUrl(projectId: string): string {
   const configured = config.NEXTAUTH_URL?.trim();
   const base = configured && configured.length > 0 ? configured : DEFAULT_APP_ORIGIN;
   try {
-    return new URL(`/admin/projects/${projectId}`, base).toString();
+    return new URL(`/project/${projectId}`, base).toString();
   } catch {
-    return `${DEFAULT_APP_ORIGIN}/admin/projects/${projectId}`;
+    return `${DEFAULT_APP_ORIGIN}/project/${projectId}`;
   }
 }
 
@@ -66,7 +66,7 @@ export async function sendProjectCreatedEmail(input: BaseProjectEmailInput): Pro
     return { sent: false, skipped: true, reason: 'disabled-by-user' };
   }
 
-  const projectUrl = buildProjectAdminUrl(input.projectId);
+  const projectUrl = buildProjectUrl(input.projectId);
   const result = await sendLocalizedPlainTextEmail({
     to,
     kind: EMAIL_KIND_PROJECT_CREATED,
@@ -103,7 +103,7 @@ export async function sendProjectReadyEmail(input: ProjectReadyEmailInput): Prom
     return { sent: false, skipped: true, reason: 'disabled-by-user' };
   }
 
-  const projectUrl = buildProjectAdminUrl(input.projectId);
+  const projectUrl = buildProjectUrl(input.projectId);
   const finalVideoUrl = resolveFinalVideoUrl(input.finalVideoUrl);
   const result = await sendLocalizedPlainTextEmail({
     to,
@@ -141,7 +141,7 @@ export async function sendProjectFailedEmail(input: ProjectFailedEmailInput): Pr
     return { sent: false, skipped: true, reason: 'disabled-by-user' };
   }
 
-  const projectUrl = buildProjectAdminUrl(input.projectId);
+  const projectUrl = buildProjectUrl(input.projectId);
   const result = await sendLocalizedPlainTextEmail({
     to,
     kind: EMAIL_KIND_PROJECT_FAILED,

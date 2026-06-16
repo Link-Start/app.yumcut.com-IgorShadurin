@@ -56,7 +56,7 @@ describe('project lifecycle emails', () => {
       to: 'user@example.com',
       kind: 'project_created_v1',
       variables: expect.objectContaining({
-        project_url: 'https://app.yumcut.com/admin/projects/project-1',
+        project_url: 'https://app.yumcut.com/project/project-1',
         project_title: 'My Project',
       }),
     }));
@@ -105,7 +105,7 @@ describe('project lifecycle emails', () => {
     expect(sendLocalizedPlainTextEmail).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'project_ready_v1',
       variables: expect.objectContaining({
-        project_url: 'https://app.yumcut.com/admin/projects/project-2',
+        project_url: 'https://app.yumcut.com/project/project-2',
         final_video_url: 'https://cdn.example.com/final.mp4',
       }),
     }));
@@ -127,7 +127,7 @@ describe('project lifecycle emails', () => {
     expect(sendLocalizedPlainTextEmail).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'project_failed_v1',
       variables: expect.objectContaining({
-        project_url: 'https://app.yumcut.com/admin/projects/project-3',
+        project_url: 'https://app.yumcut.com/project/project-3',
         project_title: 'Failed title',
         refunded_tokens: '1,234',
       }),
