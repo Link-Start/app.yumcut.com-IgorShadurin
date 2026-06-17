@@ -1,36 +1,34 @@
 import { NextRequest } from 'next/server';
+import { authenticateApiRequest } from '@/server/api-user';
 import {
   getAccountLanguage,
   patchAccountLanguageSchema,
   updateAccountLanguage,
 } from '@/server/account/language';
-import { getAuthSession } from '@/server/auth';
 import { withApiError } from '@/server/errors';
 import { error, ok, unauthorized } from '@/server/http';
 
-export const GET = withApiError(async function GET() {
-  const session = await getAuthSession();
-  if (!session?.user?.email || !(session.user as any).id) return unauthorized();
+export const GET = withApiError(async function GET(req: NextRequest) {
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
 
-  const userId = (session.user as any).id as string;
-  const language = await getAccountLanguage(userId);
+  const language = await getAccountLanguage(auth.userId);
   if (!language) return unauthorized();
 
   return ok({ language });
-}, 'Failed to load account language');
+}, 'Failed to load mobile account language');
 
 export const PATCH = withApiError(async function PATCH(req: NextRequest) {
-  const session = await getAuthSession();
-  if (!session?.user?.email || !(session.user as any).id) return unauthorized();
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
 
   const parsed = patchAccountLanguageSchema.safeParse(await req.json());
   if (!parsed.success) {
     return error('VALIDATION_ERROR', 'Invalid account language payload', 400, parsed.error.flatten());
   }
 
-  const userId = (session.user as any).id as string;
-  const language = await updateAccountLanguage(userId, parsed.data.language);
+  const language = await updateAccountLanguage(auth.userId, parsed.data.language);
   if (!language) return unauthorized();
 
   return ok({ language });
-}, 'Failed to update account language');
+}, 'Failed to update mobile account language');
