@@ -1,4 +1,4 @@
-# {{name_prefix_comma}}проект в YumCut нужно запустить заново
+# {{name_prefix_comma}}проект в YumCut не удалось завершить
 
 Здравствуйте{{name_comma_suffix}}!
 

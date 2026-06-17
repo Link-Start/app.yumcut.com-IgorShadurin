@@ -1,4 +1,4 @@
-# {{name_prefix_comma}}your YumCut project needs to be restarted
+# {{name_prefix_comma}}your YumCut project could not be completed
 
 Hi {{name}},
 
