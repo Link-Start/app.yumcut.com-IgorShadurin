@@ -31,7 +31,7 @@ import {
 import { LIMITS } from '@/shared/constants/limits';
 import { useTokenSummary } from '@/hooks/useTokenSummary';
 import { TOKEN_COSTS } from '@/shared/constants/token-costs';
-import { getSubscriptionPlansForUi, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
+import { formatSubscriptionVideoCountForPaywall, getSubscriptionPlansForUi, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
 import { pickRandomPlaceholder } from '@/shared/constants/prompt-placeholders';
 import { DEFAULT_LANGUAGE, TargetLanguageCode, normalizeLanguageList, resolvePrimaryLanguage } from '@/shared/constants/languages';
 import { useSettings } from '@/hooks/useSettings';
@@ -110,7 +110,7 @@ type PromptInputCopy = {
   paywallTitle: string;
   paywallDescription: (projectCost: number, tokenBalance: number) => string;
   paywallPerCharge: string;
-  paywallVideosPerPeriod: (videos: number, interval: 'week' | 'month') => string;
+  paywallVideosPerPeriod: (videos: string, interval: 'week' | 'month') => string;
   paywallChoosePlan: string;
   paywallOpeningCheckout: string;
   paywallCurrentPlan: string;
@@ -939,7 +939,7 @@ export function PromptInput() {
                           return (
                             <p key={`${plan.planKey}-benefit-${benefitIndex}`} className="flex items-center gap-2">
                               <Video className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
-                              <span>{copy.paywallVideosPerPeriod(benefit.videos, benefit.interval)}</span>
+                              <span>{copy.paywallVideosPerPeriod(formatSubscriptionVideoCountForPaywall(benefit.videos), benefit.interval)}</span>
                             </p>
                           );
                         }

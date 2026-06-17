@@ -26,9 +26,9 @@ describe('GET /api/mobile/paywall-config', () => {
       }),
     );
     expect(payload.plans.map((plan: any) => [plan.planKey, plan.maxValues.videos])).toEqual([
-      ['weekly', 1],
-      ['monthly', 10],
-      ['monthly_pro', 20],
+      ['weekly', 2.5],
+      ['monthly', 25],
+      ['monthly_pro', 50],
     ]);
   });
 });

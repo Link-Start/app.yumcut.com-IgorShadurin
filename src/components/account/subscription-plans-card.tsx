@@ -12,7 +12,7 @@ import type { AppLanguageCode } from '@/shared/constants/app-language';
 import type { SubscriptionStatusDTO } from '@/shared/types';
 import { requestTokenRefresh } from '@/hooks/useTokenSummary';
 import { formatDateTime } from '@/lib/date';
-import type { SubscriptionPlanKey } from '@/shared/constants/subscriptions';
+import { formatSubscriptionVideoCountForPaywall, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
 
 type SubscriptionCardCopy = {
   title: string;
@@ -24,7 +24,7 @@ type SubscriptionCardCopy = {
   expiresAt: string;
   currentPlan: string;
   planTokens: (tokens: number) => string;
-  planVideos: (videos: number, interval: 'week' | 'month') => string;
+  planVideos: (videos: string, interval: 'week' | 'month') => string;
   per: {
     week: string;
     month: string;
@@ -303,7 +303,7 @@ export function SubscriptionPlansCard({ initialStatus }: { initialStatus: Subscr
                         return <p key={`${plan.planKey}-benefit-${index}`}>{t.planTokens(benefit.tokens)}</p>;
                       }
                       if (benefit.key === 'videos_per_period' && typeof benefit.videos === 'number' && benefit.interval) {
-                        return <p key={`${plan.planKey}-benefit-${index}`}>{t.planVideos(benefit.videos, benefit.interval)}</p>;
+                        return <p key={`${plan.planKey}-benefit-${index}`}>{t.planVideos(formatSubscriptionVideoCountForPaywall(benefit.videos), benefit.interval)}</p>;
                       }
                       return null;
                     })}

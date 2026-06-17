@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Api } from '@/lib/api-client';
 import { useTokenSummary } from '@/hooks/useTokenSummary';
 import { useSettings } from '@/hooks/useSettings';
-import { CHARACTER_PROJECT_CREATION_TOKENS, getSubscriptionPlansForUi, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
+import { CHARACTER_PROJECT_CREATION_TOKENS, formatSubscriptionVideoCountForPaywall, getSubscriptionPlansForUi, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
 import { Tooltip } from '@/components/common/Tooltip';
 import { LanguageDropdown } from '@/components/main/LanguageDropdown';
 import { VoicePickerDialog } from '@/components/main/VoicePickerDialog';
@@ -104,7 +104,7 @@ type CharacterProfileCopy = {
   topUpDescription: string;
   paywallCurrentBalance: (balance: number) => string;
   tokensPerCharge: string;
-  videosPerPeriod: (videos: number, period: 'week' | 'month') => string;
+  videosPerPeriod: (videos: string, period: 'week' | 'month') => string;
   paywallPerPeriod: (period: 'week' | 'month') => string;
   paywallChipLabel: (planKey: SubscriptionPlanKey) => string;
   paywallSubscribeWithPrice: (amount: string, periodLabel: string) => string;
@@ -175,7 +175,7 @@ const COPY: Record<AppLanguageCode, CharacterProfileCopy> = {
     topUpDescription: 'Subscribe to automatically get more tokens after each successful charge.',
     paywallCurrentBalance: (currentBalance) => `Current balance: ${currentBalance.toLocaleString()} tokens.`,
     tokensPerCharge: 'tokens per charge',
-    videosPerPeriod: (videos, period) => `${videos} ${videos === 1 ? 'video' : 'videos'}/${period}`,
+    videosPerPeriod: (videos, period) => `${videos} videos/${period}`,
     paywallPerPeriod: (period) => period,
     paywallChipLabel: (planKey) => {
       if (planKey === 'weekly') return 'Just to try';
@@ -1134,7 +1134,7 @@ export function CharacterProfilePage({
                         return <p key={`${plan.planKey}-benefit-${benefitIndex}`}>{benefit.tokens.toLocaleString()} {copy.tokensPerCharge}</p>;
                       }
                       if (benefit.key === 'videos_per_period' && typeof benefit.videos === 'number' && benefit.interval) {
-                        return <p key={`${plan.planKey}-benefit-${benefitIndex}`}>{copy.videosPerPeriod(benefit.videos, benefit.interval)}</p>;
+                        return <p key={`${plan.planKey}-benefit-${benefitIndex}`}>{copy.videosPerPeriod(formatSubscriptionVideoCountForPaywall(benefit.videos), benefit.interval)}</p>;
                       }
                       return null;
                     })}

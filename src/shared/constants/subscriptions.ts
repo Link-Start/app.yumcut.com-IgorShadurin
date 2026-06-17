@@ -53,10 +53,17 @@ export type LegacyStripePriceTokenMapping = {
 export const CHARACTER_PROJECT_CREATION_TOKENS = HIGH_QUALITY_CHARACTER_PROJECT_CREATION_TOKENS;
 
 export const SUBSCRIPTION_PLAN_MAX_VALUES: Record<SubscriptionPlanKey, SubscriptionMaxValues> = {
-  weekly: { videos: 1 },
-  monthly: { videos: 10 },
-  monthly_pro: { videos: 20 },
+  weekly: { videos: 2.5 },
+  monthly: { videos: 25 },
+  monthly_pro: { videos: 50 },
 };
+
+export function formatSubscriptionVideoCountForPaywall(videos: number) {
+  if (Number.isInteger(videos)) {
+    return videos.toLocaleString();
+  }
+  return `${Math.floor(videos).toLocaleString()}+`;
+}
 
 export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, SubscriptionPlanDefinition> = {
   weekly: {
