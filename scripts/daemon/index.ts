@@ -93,6 +93,11 @@ try {
       description: 'Fallback Gemini voice used when no project-specific voice is provided.',
     },
     {
+      key: 'DAEMON_VOICE_CLONE_FALLBACK_DIR',
+      value: cfg.voiceCloneFallbackDir,
+      description: 'Directory checked for cloned provider voice samples before calling provider TTS APIs.',
+    },
+    {
       key: 'DAEMON_SCRIPT_MODE',
       value: cfg.scriptMode,
       description: 'Speed profile for transcript blocks + image generation (fast | normal).',

@@ -65,6 +65,8 @@ describe('external tools doctor', () => {
       'GEMINI_API_KEYS=gemini-secret-value',
       'MINIMAX_API_KEY=minimax-secret-value',
       'INWORLD_API_KEY_BASIC=inworld-secret-value',
+      'VOICE_CLONE_RUNPOD_API_KEY=voice-clone-key',
+      'VOICE_CLONE_RUNPOD_ENDPOINT_ID=voice-clone-endpoint',
       'ELEVENLABS_API=eleven-secret-value',
     ].join('\n'));
     await writeFile(path.join(charactersWorkspace, '.env'), 'RUNWARE_API_KEY=character-runware-secret\n');

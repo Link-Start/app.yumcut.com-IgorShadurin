@@ -23,6 +23,7 @@ export type DaemonConfig = {
   projectsWorkspace: string;
   audioDefaultVoice: string;
   audioDefaultStyle: string | null;
+  voiceCloneFallbackDir: string;
   captionsRenderer: 'python' | 'legacy';
   scriptMode: ScriptMode;
   riggerRunpodEndpoint: string | null;
@@ -47,6 +48,7 @@ const RawEnvSchema = z.object({
   DAEMON_PROJECTS_WORKSPACE: z.string().min(1, 'Projects workspace path is required'),
   DAEMON_AUDIO_DEFAULT_VOICE: z.string().optional(),
   DAEMON_AUDIO_DEFAULT_STYLE: z.string().optional(),
+  DAEMON_VOICE_CLONE_FALLBACK_DIR: z.string().optional(),
   DAEMON_CAPTIONS_RENDERER: z.string().optional(),
   DAEMON_SCRIPT_MODE: z.string().optional(),
   DAEMON_RIGGER_RUNPOD_ENDPOINT: z.string().optional(),
@@ -125,6 +127,7 @@ export function loadConfig(): DaemonConfig {
       base.DAEMON_AUDIO_DEFAULT_STYLE && base.DAEMON_AUDIO_DEFAULT_STYLE.trim()
         ? base.DAEMON_AUDIO_DEFAULT_STYLE.trim()
         : null,
+    voiceCloneFallbackDir: resolvePath(base.DAEMON_VOICE_CLONE_FALLBACK_DIR, path.join('public', 'voices-clone')),
     captionsRenderer,
     scriptMode,
     riggerRunpodEndpoint:
@@ -162,6 +165,11 @@ function resolveWorkspace(rawPath: string, createIfMissing = false) {
     throw err;
   }
   return workspace;
+}
+
+function resolvePath(rawPath: string | undefined, fallbackPath: string) {
+  const value = rawPath && rawPath.trim() ? rawPath.trim() : fallbackPath;
+  return path.isAbsolute(value) ? value : path.resolve(process.cwd(), value);
 }
 
 export function __resetDaemonConfigForTests(): void {

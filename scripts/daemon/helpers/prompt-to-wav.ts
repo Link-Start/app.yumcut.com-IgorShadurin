@@ -5,6 +5,7 @@ import path from 'path';
 import { loadConfig } from './config';
 import { log } from './logger';
 import { formatCommandForCommandsLog, withWorkspaceCommandLog } from './commands-log';
+import { resolveVoiceCloneFallback } from './voice-clone-fallback';
 
 const cfg = loadConfig();
 function useFakeAudioCli() {
@@ -12,6 +13,7 @@ function useFakeAudioCli() {
 }
 
 type SupportedVoiceProvider = 'minimax' | 'elevenlabs' | 'inworld';
+type VoiceExecutionProvider = SupportedVoiceProvider | 'runpod-clone';
 
 function normalizeProvider(value: string | null | undefined): SupportedVoiceProvider | null {
   if (!value) return null;
@@ -174,6 +176,48 @@ async function runInworldPromptToWav(workspaceRoot: string, args: string[]) {
   });
 }
 
+async function runClonePromptToWav(workspaceRoot: string, args: string[]) {
+  const preview = args.map((arg) => (arg.startsWith('--') ? arg : sanitizeArgsText(arg)));
+  const npmArgs = ['run', 'audio:clone', '--', ...args];
+  const commandLine = formatCommandForCommandsLog({ cmd: 'npm', args: npmArgs, cwd: cfg.scriptWorkspaceV2 });
+  return withWorkspaceCommandLog({
+    workspaceRoot,
+    commandLine,
+    run: async () =>
+      useFakeAudioCli()
+        ? Promise.resolve()
+        : new Promise<void>((resolve, reject) => {
+        log.info('Running RunPod clone audio CLI', { cwd: cfg.scriptWorkspaceV2, args: preview });
+        const child = spawn('npm', npmArgs, {
+          cwd: cfg.scriptWorkspaceV2,
+          env: process.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (chunk) => {
+          stdout += chunk.toString();
+        });
+        child.stderr.on('data', (chunk) => {
+          stderr += chunk.toString();
+        });
+        child.once('error', (err) => {
+          reject(new Error(`Failed to start RunPod clone audio CLI: ${err?.message || err}`));
+        });
+        child.once('close', (code) => {
+          if (code !== 0) {
+            const message = stderr.trim() || stdout.trim() || `RunPod clone audio CLI exited with code ${code}`;
+            log.error('RunPod clone audio CLI failed', { code, stderr: stderr.slice(-2000) });
+            reject(new Error(message));
+            return;
+          }
+          resolve();
+        });
+      }),
+  });
+}
+
 async function ensureDir(target: string) {
   await fs.mkdir(target, { recursive: true });
 }
@@ -220,13 +264,26 @@ export async function generateVoiceovers(options: GenerateVoiceoverOptions): Pro
     throw new Error(`No voice id available for ${resolvedProvider} provider`);
   }
 
+  const cloneFallback = await resolveVoiceCloneFallback({
+    fallbackDir: cfg.voiceCloneFallbackDir,
+    provider: resolvedProvider,
+    voiceId: resolvedVoice,
+    languageCode,
+  });
+
   const requestedStyle = typeof style === 'string' && style.trim().length > 0 ? style.trim() : null;
   const configStyle = cfg.audioDefaultStyle && cfg.audioDefaultStyle.trim().length > 0 ? cfg.audioDefaultStyle.trim() : null;
-  const supportsStyle = resolvedProvider === 'elevenlabs';
+  const supportsStyle = !cloneFallback && resolvedProvider === 'elevenlabs';
   const resolvedStyle = supportsStyle ? requestedStyle ?? configStyle : null;
 
-  const runCli =
-    resolvedProvider === 'elevenlabs' ? runLegacyPromptToWav : resolvedProvider === 'minimax' ? runMinimaxPromptToWav : runInworldPromptToWav;
+  const executionProvider: VoiceExecutionProvider = cloneFallback ? 'runpod-clone' : resolvedProvider;
+  const runCli = cloneFallback
+    ? runClonePromptToWav
+    : resolvedProvider === 'elevenlabs'
+      ? runLegacyPromptToWav
+      : resolvedProvider === 'minimax'
+        ? runMinimaxPromptToWav
+        : runInworldPromptToWav;
 
   const effectiveCommandsRoot = commandsWorkspaceRoot ?? path.dirname(languageWorkspace);
 
@@ -242,12 +299,15 @@ export async function generateVoiceovers(options: GenerateVoiceoverOptions): Pro
     '--text-file',
     scriptPath,
     '--voice',
-    resolvedVoice,
+    cloneFallback?.path ?? resolvedVoice,
     '--retries',
     '10',
     '--timeout-ms',
     String(20 * 60 * 1000),
   ];
+  if (cloneFallback) {
+    args.push('--language', cloneFallback.languageName);
+  }
   for (let i = 0; i < effectiveTakes; i += 1) {
     const take = i + 1;
     const outputPath = path.join(runDir, `take-${take}.wav`);
@@ -267,20 +327,23 @@ export async function generateVoiceovers(options: GenerateVoiceoverOptions): Pro
     voice: resolvedVoice,
     hasStyle: !!resolvedStyle,
     voiceProvider: resolvedProvider,
+    executionProvider,
+    voiceCloneFallbackPath: cloneFallback?.path ?? null,
   });
 
   let partialError: Error | null = null;
   if (useFakeAudioCli()) {
     for (const output of outputs) {
-      const payload = `${resolvedVoice || 'voice'}|${resolvedStyle || ''}|${languageCode}|${output.take}|${resolvedProvider}`;
+      const payload = `${resolvedVoice || 'voice'}|${resolvedStyle || ''}|${languageCode}|${output.take}|${executionProvider}|${cloneFallback?.path ?? ''}`;
       const header = Buffer.from('RIFF$WAVEfmt ', 'ascii');
       await fs.writeFile(output.path, Buffer.concat([header, Buffer.from(payload, 'utf8')]));
       const sidecar = [
         `Generated for: ${resolvedVoice || 'voice'}`,
         `Style: ${resolvedStyle || ''}`,
-        `Provider: ${resolvedProvider}`,
+        `Provider: ${executionProvider}`,
         `Language: ${languageCode}`,
         `Take: ${output.take}`,
+        ...(cloneFallback ? [`Clone source: ${cloneFallback.path}`] : []),
         '',
         trimmed,
       ].join('\n');
@@ -290,7 +353,7 @@ export async function generateVoiceovers(options: GenerateVoiceoverOptions): Pro
     }
   } else {
     try {
-    await runCli(effectiveCommandsRoot, args);
+      await runCli(effectiveCommandsRoot, args);
     } catch (err: any) {
       partialError = err instanceof Error ? err : new Error(String(err));
     }

@@ -11,6 +11,7 @@ type OverrideKeys =
   | 'scriptWorkspaceV2'
   | 'scriptCaptionWorkspace'
   | 'audioDefaultVoice'
+  | 'voiceCloneFallbackDir'
   | 'logsSilent'
   | 'scriptMode';
 
@@ -64,6 +65,7 @@ export function buildDaemonEnvMap(options: BuildDaemonEnvOptions): Record<string
   if (overrides.scriptWorkspaceV2 !== undefined) base.DAEMON_SCRIPT_WORKSPACE_V2 = String(overrides.scriptWorkspaceV2);
   if (overrides.scriptCaptionWorkspace !== undefined) base.DAEMON_SCRIPT_CAPTION = String(overrides.scriptCaptionWorkspace);
   if (overrides.audioDefaultVoice !== undefined) base.DAEMON_AUDIO_DEFAULT_VOICE = String(overrides.audioDefaultVoice);
+  if (overrides.voiceCloneFallbackDir !== undefined) base.DAEMON_VOICE_CLONE_FALLBACK_DIR = String(overrides.voiceCloneFallbackDir);
   if (overrides.logsSilent !== undefined) base.DAEMON_LOGS_SILENT = String(overrides.logsSilent);
   if (overrides.scriptMode !== undefined) base.DAEMON_SCRIPT_MODE = String(overrides.scriptMode);
 

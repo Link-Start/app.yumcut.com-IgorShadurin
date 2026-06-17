@@ -54,6 +54,8 @@ const TOOL_SPECS: ToolSpec[] = [
       { key: 'GEMINI_API_KEYS' },
       { key: 'MINIMAX_API_KEY' },
       { key: 'INWORLD_API_KEY_BASIC' },
+      { key: 'VOICE_CLONE_RUNPOD_API_KEY' },
+      { key: 'VOICE_CLONE_RUNPOD_ENDPOINT_ID' },
       { key: 'ELEVENLABS_API' },
     ],
   },
