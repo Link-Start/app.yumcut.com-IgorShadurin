@@ -901,7 +901,7 @@ export function CharacterProfilePage({
                           onClick={() => {
                             void onToneSelect(option.value);
                           }}
-                          className={`cursor-pointer rounded-full py-1 text-sm font-medium transition-[background-color,color,box-shadow,transform,padding] duration-200 ease-out ${
+                          className={`inline-flex h-8 cursor-pointer items-center gap-1 rounded-full text-sm font-medium leading-none transition-[background-color,color,box-shadow,transform,padding] duration-200 ease-out ${
                             active
                               ? 'bg-blue-600 px-3.5 text-white shadow-[0_4px_12px_rgba(37,99,235,0.35)]'
                               : 'px-2.5 text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white'
@@ -910,14 +910,14 @@ export function CharacterProfilePage({
                           aria-pressed={active}
                         >
                           <span
-                            className={`inline-block transition-transform duration-200 ${active ? 'scale-100' : 'scale-95'}`}
+                            className={`inline-flex items-center leading-none transition-transform duration-200 ${active ? 'scale-100' : 'scale-95'}`}
                             aria-hidden="true"
                           >
                             {option.emoji}
                           </span>
                           <span
-                            className={`inline-block overflow-hidden whitespace-nowrap align-middle transition-[max-width,opacity,margin] duration-200 ease-out ${
-                              active ? 'ml-1 max-w-32 opacity-100' : 'ml-0 max-w-0 opacity-0'
+                            className={`inline-flex items-center overflow-hidden whitespace-nowrap leading-none transition-[max-width,opacity] duration-200 ease-out ${
+                              active ? 'max-w-32 opacity-100' : 'max-w-0 opacity-0'
                             }`}
                           >
                             {copy.toneLabels[option.value]}

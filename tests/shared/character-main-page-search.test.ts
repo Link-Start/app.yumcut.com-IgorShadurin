@@ -73,7 +73,8 @@ describe('character main page search', () => {
   });
 
   it('normalizes top-level landing modes', () => {
-    expect(normalizeMainPageTopLevelMode('image')).toBe('image');
+    expect(normalizeMainPageTopLevelMode('image')).toBe('image-prank');
+    expect(normalizeMainPageTopLevelMode('image-prank')).toBe('image-prank');
     expect(normalizeMainPageTopLevelMode('stories')).toBe('stories');
     expect(normalizeMainPageTopLevelMode('brainrot')).toBe('brainrot');
     expect(normalizeMainPageTopLevelMode('cats')).toBeNull();
@@ -91,7 +92,7 @@ describe('character main page search', () => {
     expect(resolveInitialMainPageTopLevelMode({
       openMode: 'image',
       hasOpenCategory: true,
-    })).toBe('image');
+    })).toBe('image-prank');
   });
 
   it('matches image searches against the top-level Image category', () => {

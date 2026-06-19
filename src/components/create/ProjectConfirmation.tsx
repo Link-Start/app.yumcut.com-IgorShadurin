@@ -25,6 +25,7 @@ type ProjectConfirmationProps = {
 };
 
 const STORIES_HOME_PATH = '/?openMode=stories';
+const IMAGE_PRANK_HOME_PATH = '/?openMode=image-prank';
 
 type ProjectConfirmationCopy = {
   loadingAria: string;
@@ -58,7 +59,7 @@ const COPY: Record<AppLanguageCode, ProjectConfirmationCopy> = {
     startNewProject: 'Start a new project',
     makeGroupTitle: 'Make this group?',
     makeVideoTitle: 'Make this video?',
-    makeImageTitle: 'Generate this image?',
+    makeImageTitle: 'Generate this Image Prank?',
     reviewGroupDescription: 'Review the summary, then create your group.',
     reviewVideoDescription: 'Review the summary, then create your video.',
     reviewImageDescription: 'Review the prompt, price, and balance before generation starts.',
@@ -66,7 +67,7 @@ const COPY: Record<AppLanguageCode, ProjectConfirmationCopy> = {
     backToMainPage: 'Back to main page',
     createGroup: 'Create group',
     createVideo: 'Create video',
-    createImage: 'Create image',
+    createImage: 'Create Image Prank',
   },
   ru: {
     loadingAria: 'Загрузка',
@@ -78,7 +79,7 @@ const COPY: Record<AppLanguageCode, ProjectConfirmationCopy> = {
     startNewProject: 'Запустить новый проект',
     makeGroupTitle: 'Создать эту группу?',
     makeVideoTitle: 'Создать видео с этими настройками?',
-    makeImageTitle: 'Сгенерировать это изображение?',
+    makeImageTitle: 'Сгенерировать Image Prank?',
     reviewGroupDescription: 'Проверьте черновик и создайте группу.',
     reviewVideoDescription: 'Проверьте черновик и создайте видео.',
     reviewImageDescription: 'Проверьте промпт, стоимость и баланс перед запуском генерации.',
@@ -86,7 +87,7 @@ const COPY: Record<AppLanguageCode, ProjectConfirmationCopy> = {
     backToMainPage: 'На главную',
     createGroup: 'Создать группу',
     createVideo: 'Создать видео',
-    createImage: 'Создать изображение',
+    createImage: 'Создать Image Prank',
   },
 };
 
@@ -190,7 +191,7 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
   }
 
   function handleBack() {
-    router.push(STORIES_HOME_PATH);
+    router.push(isImageDraft ? IMAGE_PRANK_HOME_PATH : STORIES_HOME_PATH);
   }
 
   if (loadingDraft) {

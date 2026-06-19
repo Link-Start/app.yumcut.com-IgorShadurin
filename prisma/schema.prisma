@@ -490,6 +490,48 @@ model CharacterCategoryCharacter {
   @@index([categoryId, priority])
 }
 
+model ImagePrankCategory {
+  id            String           @id @default(uuid()) @db.Char(36)
+  slug          String           @unique @db.VarChar(191)
+  titleEn       String           @db.VarChar(191)
+  titleRu       String           @db.VarChar(191)
+  subtitleEn    String?          @db.VarChar(255)
+  subtitleRu    String?          @db.VarChar(255)
+  descriptionEn String?          @db.Text
+  descriptionRu String?          @db.Text
+  searchTextEn  String?          @db.Text
+  searchTextRu  String?          @db.Text
+  priority      Int              @default(0)
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  items         ImagePrankItem[]
+
+  @@index([isActive, priority, createdAt])
+}
+
+model ImagePrankItem {
+  id            String             @id @default(uuid()) @db.Char(36)
+  categoryId    String             @db.Char(36)
+  slug          String             @unique @db.VarChar(191)
+  titleEn       String             @db.VarChar(191)
+  titleRu       String             @db.VarChar(191)
+  descriptionEn String?            @db.VarChar(300)
+  descriptionRu String?            @db.VarChar(300)
+  searchTextEn  String?            @db.Text
+  searchTextRu  String?            @db.Text
+  imagePath     String             @db.VarChar(512)
+  imageUrl      String?            @db.VarChar(512)
+  priority      Int                @default(0)
+  isPublic      Boolean            @default(false)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  category      ImagePrankCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId, priority])
+  @@index([isPublic, priority, createdAt])
+}
+
 model UserCharacter {
   id          String                   @id @default(uuid()) @db.Char(36)
   userId      String                   @db.Char(36)

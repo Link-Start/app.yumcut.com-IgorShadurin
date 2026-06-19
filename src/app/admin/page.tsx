@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutTemplate, Palette, AudioLines, Mic, Music, Subtitles, Layers } from 'lucide-react';
+import { LayoutTemplate, Palette, AudioLines, Mic, Music, Subtitles, Layers, Images, UsersRound } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -127,12 +127,30 @@ export default async function AdminHomePage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Characters</CardTitle>
+          <div className="min-w-0">
+            <CardTitle className="inline-flex items-center gap-2">
+              <UsersRound className="h-5 w-5 text-blue-500" />
+              Characters
+            </CardTitle>
             <CardDescription>Import, preview, and manage catalog characters and categories.</CardDescription>
           </div>
           <Button asChild className="cursor-pointer">
             <Link href="/admin/characters">Manage</Link>
+          </Button>
+        </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="min-w-0">
+            <CardTitle className="inline-flex items-center gap-2">
+              <Images className="h-5 w-5 text-blue-500" />
+              Pranks
+            </CardTitle>
+            <CardDescription>CRUD Image Prank catalog images and categories.</CardDescription>
+          </div>
+          <Button asChild className="cursor-pointer">
+            <Link href="/admin/pranks">Manage</Link>
           </Button>
         </CardHeader>
       </Card>

@@ -31,6 +31,7 @@ const COPY: Record<AppLanguageCode, {
   deleteProjectWarning: string;
   cancel: string;
   generatedImage: string;
+  imagePrank: string;
   generatingImage: string;
   generationFailed: string;
   imageReady: string;
@@ -47,6 +48,7 @@ const COPY: Record<AppLanguageCode, {
   copy: string;
   copied: string;
   sourceImage: string;
+  referenceImages: string;
   catalogCharacter: string;
   generationData: string;
   noSourceImage: string;
@@ -66,6 +68,7 @@ const COPY: Record<AppLanguageCode, {
     deleteProjectWarning: 'Tokens spent on this image generation will not be refunded.',
     cancel: 'Cancel',
     generatedImage: 'Generated image',
+    imagePrank: 'Image Prank',
     generatingImage: 'Generating image',
     generationFailed: 'Image generation failed',
     imageReady: 'Image ready',
@@ -82,6 +85,7 @@ const COPY: Record<AppLanguageCode, {
     copy: 'Copy',
     copied: 'Copied',
     sourceImage: 'Source image',
+    referenceImages: 'Reference images',
     catalogCharacter: 'Catalog character',
     generationData: 'Generation data',
     noSourceImage: 'No source image was attached.',
@@ -101,6 +105,7 @@ const COPY: Record<AppLanguageCode, {
     deleteProjectWarning: 'Токены, потраченные на генерацию изображения, не возвращаются.',
     cancel: 'Отмена',
     generatedImage: 'Сгенерированное изображение',
+    imagePrank: 'Image Prank',
     generatingImage: 'Генерация изображения',
     generationFailed: 'Генерация изображения завершилась ошибкой',
     imageReady: 'Изображение готово',
@@ -117,6 +122,7 @@ const COPY: Record<AppLanguageCode, {
     copy: 'Копировать',
     copied: 'Скопировано',
     sourceImage: 'Исходное изображение',
+    referenceImages: 'Референсные изображения',
     catalogCharacter: 'Персонаж из каталога',
     generationData: 'Данные генерации',
     noSourceImage: 'Исходное изображение не было прикреплено.',
@@ -231,6 +237,8 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState<DownloadFormat | null>(null);
   const image = project.imageGeneration ?? null;
+  const isImagePrank = image?.kind === 'image-prank';
+  const sourceImages = image?.sourceImages?.filter((source) => source.imageUrl) ?? [];
   const resultImageUrl = image?.resultImageUrl?.trim() || null;
   const prompt = image?.prompt?.trim() || project.prompt?.trim() || '';
   const progress = getProgressPercent(project, nowMs);
@@ -350,7 +358,13 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
         <CardHeader className="flex flex-col gap-3 border-b border-gray-200/80 pb-3 dark:border-gray-800/80 sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
             <ImageIcon className="h-4 w-4 text-blue-500" />
-            {resultImageUrl ? t.generatedImage : isError ? t.generationFailed : t.generatingImage}
+            {isImagePrank
+              ? t.imagePrank
+              : resultImageUrl
+                ? t.generatedImage
+                : isError
+                  ? t.generationFailed
+                  : t.generatingImage}
           </div>
           {resultImageUrl ? (
             <div className="inline-flex self-start rounded-lg shadow-sm sm:self-auto">
@@ -496,9 +510,35 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
           <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
             <h2 className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
               <UserRound className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              {t.sourceImage}
+              {sourceImages.length > 0 ? t.referenceImages : t.sourceImage}
             </h2>
-            {image?.originalImageUrl ? (
+            {sourceImages.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {sourceImages.map((source, index) => (
+                  <div
+                    key={`${source.role}-${source.imagePath ?? source.imageUrl ?? index}`}
+                    className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60"
+                  >
+                    <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-white dark:bg-gray-950">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={source.imageUrl ?? ''}
+                        alt={source.label || t.referenceImages}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {source.label || t.referenceImages}
+                      </div>
+                      <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {source.role}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : image?.originalImageUrl ? (
               <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
                 <div className="flex h-[120px] w-[120px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

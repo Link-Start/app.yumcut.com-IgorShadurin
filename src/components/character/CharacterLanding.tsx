@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button-1';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from '@/components/ui/pagination';
 import { PromptInput } from '@/components/main/PromptInput';
+import { ImagePrankCatalog } from '@/components/image-prank/ImagePrankCatalog';
 import { CharacterPreviewCard } from './CharacterPreviewCard';
 import {
   filterMainPageGroupsForSearch,
@@ -25,20 +26,10 @@ import {
   type MainPageGroupCharacter,
   type MainPageTopLevelMode,
 } from './main-page-groups';
+import type { ImagePrankCatalogCategoryDTO } from '@/shared/types';
 const CATEGORY_PREVIEW_CELLS = 4;
 const CATEGORY_PREVIEW_SECTIONS = 6;
 const MAX_CHARACTERS_PER_CATEGORY_PAGE = 18;
-const IMAGE_PREVIEW_IMAGES = [
-  '/template/3d/preview.jpg',
-  '/template/anime/preview.jpg',
-  '/template/cyberpunk/preview.jpg',
-  '/template/plastic-toys/preview.jpg',
-  '/template/bubble-gum/preview.jpg',
-  '/template/v2-comics/preview.jpg',
-  '/template/doodling/preview.jpg',
-  '/template/basic/preview.jpg',
-  '/template/noir/preview.jpg',
-];
 const STORIES_PREVIEW_IMAGES = [
   '/template/basic/preview.jpg',
   '/template/v2-comics/preview.jpg',
@@ -64,7 +55,7 @@ const COPY = {
     matchingCharactersLabel: 'Matching characters',
     noResults: 'No categories or characters found.',
     categoriesBack: 'Categories',
-    imageTitle: 'Image',
+    imageTitle: 'Image Prank',
     imageSubtitle: 'Prank image generation',
     storiesTitle: 'Stories',
     storiesSubtitle: 'Classic story videos',
@@ -89,7 +80,7 @@ const COPY = {
     matchingCharactersLabel: 'Найденные персонажи',
     noResults: 'Категории или персонажи не найдены.',
     categoriesBack: 'Категории',
-    imageTitle: 'Картинка',
+    imageTitle: 'Image Prank',
     imageSubtitle: 'Генерация prank-картинок',
     storiesTitle: 'Истории',
     storiesSubtitle: 'Классические сюжетные видео',
@@ -131,10 +122,12 @@ type LandingCopy = {
 };
 
 function buildPreviewSections(images: string[]): string[][] {
-  const source = images.length > 0 ? images : ['/template/basic/preview.jpg'];
+  const source = images;
   return Array.from({ length: CATEGORY_PREVIEW_SECTIONS }, (_, sectionIndex) => (
     Array.from({ length: CATEGORY_PREVIEW_CELLS }, (_, cellIndex) => (
-      source[(sectionIndex * CATEGORY_PREVIEW_CELLS + cellIndex) % source.length] ?? source[0]!
+      source.length > 0
+        ? source[(sectionIndex * CATEGORY_PREVIEW_CELLS + cellIndex) % source.length] ?? source[0]!
+        : ''
     ))
   ));
 }
@@ -281,14 +274,13 @@ function makeTopLevelGroup(input: {
   subtitle: LocalizedText;
   images: string[];
 }): MainPageGroup {
-  const images = input.images.length > 0 ? input.images : ['/template/basic/preview.jpg'];
   return {
     id: input.id,
     title: input.title,
     subtitle: input.subtitle,
     description: input.subtitle,
     hiddenSearchText: input.subtitle,
-    characters: images.map((imageUrl, index) => makePreviewCharacter(`${input.id}-preview-${index}`, imageUrl)),
+    characters: input.images.map((imageUrl, index) => makePreviewCharacter(`${input.id}-preview-${index}`, imageUrl)),
   };
 }
 
@@ -374,10 +366,12 @@ function GroupCategoryCard({
 
 export function CharacterLanding({
   groups,
+  imagePrankCategories,
   initialOpenMode = null,
   initialOpenCategoryId = null,
 }: {
   groups: MainPageGroup[];
+  imagePrankCategories: ImagePrankCatalogCategoryDTO[];
   initialOpenMode?: MainPageTopLevelMode | null;
   initialOpenCategoryId?: string | null;
 }) {
@@ -405,12 +399,13 @@ export function CharacterLanding({
 
   const topLevelGroups = useMemo(() => {
     const brainrotImages = groups.flatMap((group) => group.characters.map((character) => character.imageUrl));
+    const imagePrankImages = imagePrankCategories.flatMap((category) => category.items.map((item) => item.imageUrl));
     return [
       makeTopLevelGroup({
-        id: 'image',
+        id: 'image-prank',
         title: { en: COPY.en.imageTitle, ru: COPY.ru.imageTitle },
         subtitle: { en: COPY.en.imageSubtitle, ru: COPY.ru.imageSubtitle },
-        images: IMAGE_PREVIEW_IMAGES,
+        images: imagePrankImages,
       }),
       makeTopLevelGroup({
         id: 'stories',
@@ -425,12 +420,12 @@ export function CharacterLanding({
         images: brainrotImages,
       }),
     ];
-  }, [groups]);
+  }, [groups, imagePrankCategories]);
 
   const filteredTopLevelGroups = useMemo(() => {
     if (!normalizedSearch) return topLevelGroups;
     return topLevelGroups.filter((group) => {
-      if (group.id === 'image') {
+      if (group.id === 'image-prank') {
         return imageMatchesSearch;
       }
       if (group.id === 'stories') {
@@ -550,12 +545,12 @@ export function CharacterLanding({
   });
   const showTopLevelCategoriesView = !isSearchActive && openMode === null;
   const showSearchView = isSearchActive;
-  const showImageView = !isSearchActive && openMode === 'image';
+  const showImagePrankView = !isSearchActive && openMode === 'image-prank';
   const showStoriesView = !isSearchActive && openMode === 'stories';
   const showBrainrotCategoryView = !isSearchActive && openMode === 'brainrot' && landingView === 'categories';
   const showExpandedGroupView = !isSearchActive && openMode === 'brainrot' && landingView === 'expanded' && expandedGroup !== null;
   const showBackButton = !isSearchActive && openMode !== null;
-  const showLandingChrome = !showImageView && !showStoriesView;
+  const showLandingChrome = !showImagePrankView && !showStoriesView;
 
   const syncExpandedStateToUrl = useCallback((
     nextOpenMode: MainPageTopLevelMode | null,
@@ -570,7 +565,7 @@ export function CharacterLanding({
       url.searchParams.delete('openMode');
       url.searchParams.delete('openCategory');
       url.searchParams.delete('page');
-    } else if (nextOpenMode === 'image' || nextOpenMode === 'stories') {
+    } else if (nextOpenMode === 'image-prank' || nextOpenMode === 'stories') {
       url.searchParams.set('openMode', nextOpenMode);
       url.searchParams.delete('openCategory');
       url.searchParams.delete('page');
@@ -937,12 +932,12 @@ export function CharacterLanding({
           <div
             className={cn(
               'transition-[opacity,transform] duration-180 ease-out will-change-transform',
-              showImageView
+              showImagePrankView
                 ? 'relative opacity-100 translate-y-0 scale-100'
                 : 'pointer-events-none absolute inset-0 opacity-0 translate-y-1 scale-[0.995]',
             )}
           >
-            {showImageView ? <PromptInput projectType="image" /> : null}
+            {showImagePrankView ? <ImagePrankCatalog categories={imagePrankCategories} /> : null}
           </div>
 
           <div

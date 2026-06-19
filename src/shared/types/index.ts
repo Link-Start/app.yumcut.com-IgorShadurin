@@ -115,6 +115,44 @@ export interface MobileCharacterCatalogDTO {
   categories: MobileCharacterCatalogCategoryDTO[];
 }
 
+export type ImagePrankMode = 'catalog' | 'custom-two-image' | 'custom-one-image';
+
+export type ImagePrankSourceImageRole = 'prank' | 'target' | 'reference';
+
+export interface ImagePrankSourceImageDTO {
+  role: ImagePrankSourceImageRole;
+  label: string;
+  imageUrl: string | null;
+  imagePath?: string | null;
+}
+
+export interface ImagePrankCatalogItemDTO {
+  id: string;
+  slug: string;
+  title: LocalizedCatalogTextDTO;
+  description: LocalizedCatalogTextDTO;
+  hiddenSearchText: LocalizedCatalogTextDTO;
+  imageUrl: string;
+  imagePath: string;
+  categoryId: string;
+  categorySlug: string;
+  categoryTitle: LocalizedCatalogTextDTO;
+}
+
+export interface ImagePrankCatalogCategoryDTO {
+  id: string;
+  slug: string;
+  title: LocalizedCatalogTextDTO;
+  subtitle: LocalizedCatalogTextDTO;
+  description: LocalizedCatalogTextDTO;
+  hiddenSearchText: LocalizedCatalogTextDTO;
+  items: ImagePrankCatalogItemDTO[];
+}
+
+export interface ImagePrankCatalogDTO {
+  categories: ImagePrankCatalogCategoryDTO[];
+}
+
 export interface MobileCharacterProfileDTO extends CharacterCatalogMetricsDTO {
   id: string;
   characterId: string;
@@ -298,7 +336,11 @@ export interface ProjectDetailDTO {
   imageEditorEnabled?: boolean;
   templateImages?: ProjectTemplateImageDTO[];
   imageGeneration?: {
+    kind?: 'standalone' | 'image-prank';
+    mode?: ImagePrankMode | null;
+    displayLabel?: string | null;
     prompt: string;
+    userPrompt?: string | null;
     provider: string | null;
     model: string | null;
     width: number | null;
@@ -310,6 +352,13 @@ export interface ProjectDetailDTO {
     characterTitle: string | null;
     variationTitle: string | null;
     source: CharacterSelectionSource | null;
+    sourceImages?: ImagePrankSourceImageDTO[];
+    catalogItem?: {
+      id: string;
+      slug: string;
+      title: string;
+      categoryTitle?: string | null;
+    } | null;
     estimatedDurationSeconds: number;
     startedAt: string;
   } | null;
@@ -525,6 +574,16 @@ export interface PendingProjectDraft {
       lipsyncPrompt?: string;
     };
     projectExperience?: ProjectExperience;
+    imagePrank?: {
+      mode: ImagePrankMode;
+      catalogItemId?: string;
+      sourceImages: Array<{
+        role: ImagePrankSourceImageRole;
+        path: string;
+        url: string;
+        label?: string;
+      }>;
+    };
     contentTone?: ContentTone;
     creationAttemptId?: string | null;
   };

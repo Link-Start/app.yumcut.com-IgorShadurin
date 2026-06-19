@@ -6,6 +6,7 @@ import {
 } from '@/components/character/main-page-groups';
 import { getAuthSession } from '@/server/auth';
 import { listCharacterCatalogGroups } from '@/server/character-catalog';
+import { listPublicImagePrankCatalog } from '@/server/image-pranks';
 
 type SearchParams = {
   openMode?: string | string[];
@@ -26,9 +27,9 @@ export async function generateMetadata({ searchParams }: { searchParams?: Promis
     openMode,
     hasOpenCategory: category !== null,
   });
-  if (initialOpenMode === 'image') {
+  if (initialOpenMode === 'image-prank') {
     return {
-      title: `Image | ${TITLE_SUFFIX}`,
+      title: `Image Prank | ${TITLE_SUFFIX}`,
     };
   }
   if (initialOpenMode === 'stories') {
@@ -53,7 +54,10 @@ export async function generateMetadata({ searchParams }: { searchParams?: Promis
 export default async function Home({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const session = await getAuthSession();
   const sessionUserId = (session?.user as any)?.id as string | undefined;
-  const groups = await listCharacterCatalogGroups(sessionUserId ?? null);
+  const [groups, imagePrankCatalog] = await Promise.all([
+    listCharacterCatalogGroups(sessionUserId ?? null),
+    listPublicImagePrankCatalog(),
+  ]);
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const rawOpenMode = resolvedSearchParams?.openMode;
   const openMode = Array.isArray(rawOpenMode) ? rawOpenMode[0] : rawOpenMode;
@@ -68,6 +72,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Se
   return (
     <CharacterLanding
       groups={groups}
+      imagePrankCategories={imagePrankCatalog.categories}
       initialOpenMode={initialOpenMode}
       initialOpenCategoryId={initialOpenCategoryId}
     />

@@ -20,6 +20,20 @@ export type RunwareTextToImageParams = {
   outputFormat?: 'jpg' | 'png' | 'webp';
 };
 
+export type RunwareImageEditParams = {
+  apiKey: string;
+  prompt: string;
+  referenceImages: string[];
+  width: number;
+  height: number;
+  model?: string;
+  steps?: number;
+  cfgScale?: number;
+  scheduler?: string;
+  negativePrompt?: string;
+  outputFormat?: 'jpg' | 'png' | 'webp';
+};
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -132,6 +146,62 @@ export async function requestRunwareImage(params: {
     negativePrompt: params.negativePrompt,
     outputFormat: 'jpg',
   });
+  const response = await fetch('https://api.runware.ai/v1', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${params.apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Runware request failed ${response.status}: ${text}`);
+  }
+  let json: any;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error('Runware response was not valid JSON.');
+  }
+  const imageBytes = await extractRunwareImageBytes(json);
+  if (!imageBytes) {
+    throw new Error('Runware did not return image data.');
+  }
+  return { imageBytes, responseJson: json };
+}
+
+export async function requestRunwareImageEdit(params: RunwareImageEditParams): Promise<{ imageBytes: Uint8Array; responseJson: any }> {
+  const referenceImages = params.referenceImages
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  if (referenceImages.length === 0) {
+    throw new Error('At least one reference image is required.');
+  }
+
+  const payload = [
+    {
+      taskType: 'imageInference',
+      taskUUID: crypto.randomUUID(),
+      model: params.model ?? 'runware:108@22',
+      numberResults: 1,
+      width: params.width,
+      height: params.height,
+      steps: params.steps ?? 32,
+      outputType: 'URL',
+      outputFormat: params.outputFormat ?? 'jpg',
+      includeCost: true,
+      checkNSFW: false,
+      cfgScale: params.cfgScale ?? 4,
+      scheduler: params.scheduler ?? 'DPM++ 2M Karras',
+      positivePrompt: params.prompt,
+      negativePrompt: params.negativePrompt ?? QWEN_DEFAULT_NEGATIVE_PROMPT,
+      inputs: {
+        referenceImages,
+      },
+    },
+  ] as const;
+
   const response = await fetch('https://api.runware.ai/v1', {
     method: 'POST',
     headers: {

@@ -1,0 +1,461 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ImagePlus, Images, Loader2, UploadCloud, Wand2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Api } from '@/lib/api-client';
+import { storeProjectDraft } from '@/lib/project-draft';
+import { resolveStorageBaseUrl } from '@/components/main/character-modal/storage';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { TOKEN_COSTS } from '@/shared/constants/token-costs';
+import type { AppLanguageCode } from '@/shared/constants/app-language';
+import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
+import type {
+  ImagePrankCatalogItemDTO,
+  ImagePrankMode,
+  ImagePrankSourceImageRole,
+  PendingProjectDraft,
+  ProjectDraftSettingsSnapshot,
+} from '@/shared/types';
+
+type UploadedSource = {
+  role: ImagePrankSourceImageRole;
+  path: string;
+  url: string;
+  label: string;
+};
+
+type ImageSlotState = {
+  file: File | null;
+  previewUrl: string | null;
+};
+
+const COPY: Record<AppLanguageCode, {
+  title: string;
+  customTitle: string;
+  catalogLabel: string;
+  prankImage: string;
+  targetImage: string;
+  referenceImage: string;
+  upload: string;
+  replace: string;
+  promptLabel: string;
+  promptPlaceholder: string;
+  twoImages: string;
+  oneImage: string;
+  cost: string;
+  balanceAfter: string;
+  create: string;
+  uploading: string;
+  back: string;
+  missingPrompt: string;
+  missingImages: string;
+  tokenLoadFailed: string;
+}> = {
+  en: {
+    title: 'Image Prank',
+    customTitle: 'Custom mix',
+    catalogLabel: 'Catalog image',
+    prankImage: 'Prank image',
+    targetImage: 'Target image',
+    referenceImage: 'Reference image',
+    upload: 'Upload',
+    replace: 'Replace',
+    promptLabel: 'Prompt',
+    promptPlaceholder: 'What should happen in the prank?',
+    twoImages: '2 images',
+    oneImage: '1 image',
+    cost: 'Cost',
+    balanceAfter: 'After',
+    create: 'Continue',
+    uploading: 'Uploading',
+    back: 'Back',
+    missingPrompt: 'Enter a prompt',
+    missingImages: 'Upload the required images',
+    tokenLoadFailed: 'Could not load token balance',
+  },
+  ru: {
+    title: 'Image Prank',
+    customTitle: 'Свой микс',
+    catalogLabel: 'Картинка из каталога',
+    prankImage: 'Prank-картинка',
+    targetImage: 'Целевое изображение',
+    referenceImage: 'Референс',
+    upload: 'Загрузить',
+    replace: 'Заменить',
+    promptLabel: 'Промпт',
+    promptPlaceholder: 'Что должно произойти в prank-картинке?',
+    twoImages: '2 изображения',
+    oneImage: '1 изображение',
+    cost: 'Цена',
+    balanceAfter: 'После',
+    create: 'Продолжить',
+    uploading: 'Загрузка',
+    back: 'Назад',
+    missingPrompt: 'Введите промпт',
+    missingImages: 'Загрузите нужные изображения',
+    tokenLoadFailed: 'Не удалось загрузить баланс токенов',
+  },
+};
+
+function pickTitle(item: ImagePrankCatalogItemDTO | null, language: AppLanguageCode) {
+  if (!item) return '';
+  return language === 'ru' ? item.title.ru || item.title.en : item.title.en || item.title.ru;
+}
+
+function defaultSettings(): ProjectDraftSettingsSnapshot {
+  return {
+    includeDefaultMusic: false,
+    addOverlay: false,
+    includeCallToAction: false,
+    autoApproveScript: true,
+    autoApproveAudio: true,
+    watermarkEnabled: false,
+    captionsEnabled: false,
+    targetLanguages: ['en'],
+    languageVoicePreferences: {},
+    scriptCreationGuidanceEnabled: false,
+    scriptCreationGuidance: '',
+    scriptAvoidanceGuidanceEnabled: false,
+    scriptAvoidanceGuidance: '',
+    audioStyleGuidanceEnabled: false,
+    audioStyleGuidance: '',
+  };
+}
+
+function createDraftId() {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2, 10);
+}
+
+function useObjectUrl(file: File | null) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file) {
+      setUrl(null);
+      return;
+    }
+    const next = URL.createObjectURL(file);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file]);
+  return url;
+}
+
+function UploadSlot({
+  label,
+  state,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  state: ImageSlotState;
+  onChange: (file: File | null) => void;
+  disabled: boolean;
+}) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100">{label}</Label>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(event: ChangeEvent<HTMLInputElement>) => {
+          onChange(event.target.files?.[0] ?? null);
+          event.target.value = '';
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => ref.current?.click()}
+        disabled={disabled}
+        className="group flex aspect-square w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/30"
+      >
+        {state.previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={state.previewUrl} alt={label} className="h-full w-full object-contain" />
+        ) : (
+          <span className="flex flex-col items-center gap-2 p-4 text-sm text-gray-600 dark:text-gray-300">
+            <UploadCloud className="h-6 w-6 text-blue-500" />
+            {label}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+async function uploadSource(file: File, role: ImagePrankSourceImageRole, label: string, storageBaseUrl: string): Promise<UploadedSource> {
+  const grant = await Api.createCharacterUploadToken();
+  if (!grant?.data || !grant.signature) throw new Error('Upload authorization failed');
+  if (!grant.mimeTypes.includes(file.type)) throw new Error('Selected file type is not allowed');
+  if (file.size > grant.maxBytes) {
+    throw new Error(`File is too large. Maximum size is ${Math.floor(grant.maxBytes / 1024 / 1024)}MB`);
+  }
+
+  const form = new FormData();
+  form.set('file', file);
+  form.set('data', grant.data);
+  form.set('signature', grant.signature);
+
+  const response = await fetch(`${storageBaseUrl.replace(/\/$/, '')}/api/storage/user-images`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!response.ok) throw new Error(`Storage upload failed (${response.status})`);
+  const payload = await response.json();
+  if (!payload?.path || !payload?.url) throw new Error('Storage response missing image URL');
+  return {
+    role,
+    path: payload.path,
+    url: payload.url,
+    label,
+  };
+}
+
+export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO | null }) {
+  const { language } = useAppLanguage();
+  const copy = COPY[language];
+  const router = useRouter();
+  const storageBaseUrl = useMemo(resolveStorageBaseUrl, []);
+  const [prompt, setPrompt] = useState('');
+  const [oneImageMode, setOneImageMode] = useState(false);
+  const [prankFile, setPrankFile] = useState<File | null>(null);
+  const [targetFile, setTargetFile] = useState<File | null>(null);
+  const [tokenBalance, setTokenBalance] = useState(0);
+  const [tokenCost, setTokenCost] = useState(TOKEN_COSTS.actions.imageGeneration);
+  const [submitting, setSubmitting] = useState(false);
+  const prankPreviewUrl = useObjectUrl(prankFile);
+  const targetPreviewUrl = useObjectUrl(targetFile);
+  const isCatalogMode = !!item;
+  const mode: ImagePrankMode = isCatalogMode
+    ? 'catalog'
+    : oneImageMode
+      ? 'custom-one-image'
+      : 'custom-two-image';
+  const itemTitle = pickTitle(item ?? null, language);
+  const balanceAfter = Math.max(tokenBalance - tokenCost, 0);
+
+  useEffect(() => {
+    let cancelled = false;
+    Api.getTokenSummary()
+      .then((summary) => {
+        if (cancelled) return;
+        setTokenBalance(summary.balance);
+        setTokenCost(summary.actionCosts.imageGeneration ?? TOKEN_COSTS.actions.imageGeneration);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error(copy.tokenLoadFailed);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [copy.tokenLoadFailed]);
+
+  const validate = () => {
+    if (!prompt.trim()) {
+      toast.error(copy.missingPrompt);
+      return false;
+    }
+    if (isCatalogMode && !targetFile) {
+      toast.error(copy.missingImages);
+      return false;
+    }
+    if (!isCatalogMode && !oneImageMode && (!prankFile || !targetFile)) {
+      toast.error(copy.missingImages);
+      return false;
+    }
+    if (!isCatalogMode && oneImageMode && !targetFile) {
+      toast.error(copy.missingImages);
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    if (submitting || !validate()) return;
+    setSubmitting(true);
+    try {
+      const uploaded: UploadedSource[] = [];
+      if (isCatalogMode) {
+        uploaded.push(await uploadSource(targetFile!, 'target', copy.targetImage, storageBaseUrl));
+      } else if (oneImageMode) {
+        uploaded.push(await uploadSource(targetFile!, 'target', copy.referenceImage, storageBaseUrl));
+      } else {
+        const [prank, target] = await Promise.all([
+          uploadSource(prankFile!, 'prank', copy.prankImage, storageBaseUrl),
+          uploadSource(targetFile!, 'target', copy.targetImage, storageBaseUrl),
+        ]);
+        uploaded.push(prank, target);
+      }
+
+      const draftId = createDraftId();
+      const payload: PendingProjectDraft['payload'] = {
+        prompt: prompt.trim(),
+        projectExperience: 'image-generation',
+        imagePrank: {
+          mode,
+          ...(item ? { catalogItemId: item.id } : {}),
+          sourceImages: uploaded.map((source) => ({
+            role: source.role,
+            path: source.path,
+            url: source.url,
+            label: source.label,
+          })),
+        },
+      };
+      const previewImageUrl = item?.imageUrl ?? uploaded[0]?.url ?? null;
+      const draft: PendingProjectDraft = {
+        id: draftId,
+        createdAt: new Date().toISOString(),
+        text: prompt.trim(),
+        useExact: false,
+        groupMode: false,
+        mode: 'idea',
+        durationSeconds: null,
+        effectiveDurationSeconds: 0,
+        languageCode: 'en',
+        languageCodes: ['en'],
+        languageVoices: {},
+        tokenCost,
+        tokenBalance,
+        hasEnoughTokens: tokenBalance >= tokenCost,
+        outputType: 'image',
+        settings: defaultSettings(),
+        voiceId: null,
+        character: previewImageUrl ? {
+          characterTitle: itemTitle || copy.title,
+          variationTitle: item ? copy.catalogLabel : copy.customTitle,
+          source: 'global',
+          imageUrl: previewImageUrl,
+        } : null,
+        template: null,
+        payload,
+      };
+      storeProjectDraft(draft);
+      router.push(`/create/confirm/${draftId}`);
+    } catch (err) {
+      console.error('Image prank draft failed', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to prepare Image Prank');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-6xl space-y-5 px-3 pb-14 pt-2 sm:px-4 lg:px-0">
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-900"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {copy.back}
+        </button>
+        <div className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+          <Wand2 className="h-4 w-4 text-blue-500" />
+          {copy.title}
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {item ? (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100">{copy.catalogLabel}</Label>
+              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.imageUrl} alt={itemTitle} className="h-full w-full object-contain" />
+              </div>
+            </div>
+          ) : oneImageMode ? null : (
+            <UploadSlot
+              label={copy.prankImage}
+              state={{ file: prankFile, previewUrl: prankPreviewUrl }}
+              onChange={setPrankFile}
+              disabled={submitting}
+            />
+          )}
+          <UploadSlot
+            label={oneImageMode && !item ? copy.referenceImage : copy.targetImage}
+            state={{ file: targetFile, previewUrl: targetPreviewUrl }}
+            onChange={setTargetFile}
+            disabled={submitting}
+          />
+        </div>
+
+        <div className="space-y-4 rounded-lg border border-gray-200 bg-white/80 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+          <div className="space-y-2">
+            <Label htmlFor="image-prank-prompt" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {copy.promptLabel}
+            </Label>
+            <Textarea
+              id="image-prank-prompt"
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder={copy.promptPlaceholder}
+              className="min-h-36 resize-none"
+              disabled={submitting}
+            />
+          </div>
+
+          {!item ? (
+            <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-900">
+              {[
+                { value: false, label: copy.twoImages, Icon: Images },
+                { value: true, label: copy.oneImage, Icon: ImagePlus },
+              ].map((option) => {
+                const active = oneImageMode === option.value;
+                const OptionIcon = option.Icon;
+                return (
+                  <button
+                    key={String(option.value)}
+                    type="button"
+                    onClick={() => {
+                      setOneImageMode(option.value);
+                      if (option.value) setPrankFile(null);
+                    }}
+                    className={cn(
+                      'inline-flex h-8 cursor-pointer items-center gap-1 rounded-full px-3 text-sm font-medium leading-none transition-[background-color,color,box-shadow]',
+                      active
+                        ? 'bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.35)]'
+                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white',
+                    )}
+                    aria-pressed={active}
+                    disabled={submitting}
+                  >
+                    <OptionIcon className="h-4 w-4" aria-hidden="true" />
+                    <span className="inline-flex items-center whitespace-nowrap leading-none">{option.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+              <div className="text-gray-500 dark:text-gray-400">{copy.cost}</div>
+              <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{tokenCost.toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+              <div className="text-gray-500 dark:text-gray-400">{copy.balanceAfter}</div>
+              <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{balanceAfter.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <Button type="button" className="w-full cursor-pointer" onClick={() => void handleSubmit()} disabled={submitting}>
+            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
+            {submitting ? copy.uploading : copy.create}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

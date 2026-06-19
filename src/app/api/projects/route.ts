@@ -26,6 +26,14 @@ import { normalizeContentTone } from '@/shared/constants/content-tone';
 import { defaultCharacterVideoGeneration } from '@/shared/constants/video-generation';
 import { CHARACTER_PROJECT_TARGET_DURATION_SECONDS } from '@/shared/constants/character-project';
 import { linkProjectCreationAttemptToProject } from '@/server/analytics/project-attempts';
+import { getPublicImagePrankItemById } from '@/server/image-pranks';
+import { normalizeMediaUrl, toStoredMediaPath } from '@/server/storage';
+import type {
+  ImagePrankCatalogItemDTO,
+  ImagePrankMode,
+  ImagePrankSourceImageDTO,
+  ImagePrankSourceImageRole,
+} from '@/shared/types';
 import {
   CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE,
   type CharacterVideoGenerationMode,
@@ -89,6 +97,7 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     videoGeneration,
     characterVideoQuality,
     projectExperience,
+    imagePrank,
     contentTone,
     includeDefaultMusic,
     addOverlay,
@@ -104,6 +113,7 @@ export const POST = withApiError(async function POST(req: NextRequest) {
       prompt: prompt ?? '',
       characterSelection,
       characterSlug,
+      imagePrank,
       creationAttemptId,
     });
   }
@@ -529,12 +539,139 @@ export const POST = withApiError(async function POST(req: NextRequest) {
   } satisfies import('@/shared/types').ProjectListItemDTO);
 }, 'Failed to create project');
 
+type ImagePrankRequestSource = {
+  role: ImagePrankSourceImageRole;
+  path: string;
+  url: string;
+  label?: string;
+};
+
+type ImagePrankRequest = {
+  mode: ImagePrankMode;
+  catalogItemId?: string;
+  sourceImages: ImagePrankRequestSource[];
+};
+
+type ResolvedImagePrankPayload = {
+  mode: ImagePrankMode;
+  prompt: string;
+  userPrompt: string;
+  sourceImages: ImagePrankSourceImageDTO[];
+  catalogItem: {
+    id: string;
+    slug: string;
+    title: string;
+    categoryTitle: string;
+  } | null;
+};
+
+const IMAGE_PRANK_SYSTEM_PROMPT = [
+  'System instruction for Image Prank generation:',
+  'Use the provided reference images in the exact order supplied.',
+  'When two reference images are supplied, organically integrate the first reference image into the second reference image as the target scene or background.',
+  'Match perspective, scale, lighting direction, shadows, reflections, color temperature, depth of field, camera style, texture, grain, and natural occlusion so the result looks like a real single image, not a sticker, collage, or copy-paste.',
+  'Preserve the target scene unless the user explicitly asks to change it.',
+  'When one reference image is supplied, edit that image according to the user prompt while preserving its main subject and camera realism.',
+  'Do not add captions, text, UI, logos, watermarks, or random artifacts.',
+].join('\n');
+
+function buildImagePrankPrompt(userPrompt: string) {
+  return `${IMAGE_PRANK_SYSTEM_PROMPT}\n\nUser prompt:\n${userPrompt.trim()}`;
+}
+
+function localizedTitle(item: ImagePrankCatalogItemDTO): string {
+  return item.title.en || item.title.ru || 'Image prank';
+}
+
+function localizedCategoryTitle(item: ImagePrankCatalogItemDTO): string {
+  return item.categoryTitle.en || item.categoryTitle.ru || 'Catalog';
+}
+
+function normalizeUploadedImageSource(source: ImagePrankRequestSource): ImagePrankSourceImageDTO {
+  const path = toStoredMediaPath(source.path);
+  return {
+    role: source.role,
+    label: source.label?.trim() || (source.role === 'prank' ? 'Prank image' : 'Target image'),
+    imagePath: path,
+    imageUrl: normalizeMediaUrl(path),
+  };
+}
+
+async function resolveImagePrankPayload(input: {
+  userPrompt: string;
+  imagePrank: ImagePrankRequest;
+}): Promise<ResolvedImagePrankPayload> {
+  const { imagePrank, userPrompt } = input;
+  const uploaded = imagePrank.sourceImages.map(normalizeUploadedImageSource);
+  const findRole = (role: ImagePrankSourceImageRole) => uploaded.find((source) => source.role === role) ?? null;
+  let catalogItem: ImagePrankCatalogItemDTO | null = null;
+  let sourceImages: ImagePrankSourceImageDTO[] = [];
+
+  if (imagePrank.mode === 'catalog') {
+    if (!imagePrank.catalogItemId) {
+      throw new Error('Catalog prank image is required');
+    }
+    catalogItem = await getPublicImagePrankItemById(imagePrank.catalogItemId);
+    if (!catalogItem) {
+      throw new Error('Catalog prank image is not available');
+    }
+    const target = findRole('target');
+    if (!target) {
+      throw new Error('Target image is required');
+    }
+    sourceImages = [
+      {
+        role: 'prank',
+        label: localizedTitle(catalogItem),
+        imagePath: catalogItem.imagePath,
+        imageUrl: catalogItem.imageUrl,
+      },
+      {
+        ...target,
+        label: target.label || 'Target image',
+      },
+    ];
+  } else if (imagePrank.mode === 'custom-two-image') {
+    const prank = findRole('prank');
+    const target = findRole('target');
+    if (!prank || !target) {
+      throw new Error('Two custom images are required');
+    }
+    sourceImages = [
+      { ...prank, label: prank.label || 'Prank image' },
+      { ...target, label: target.label || 'Target image' },
+    ];
+  } else {
+    const target = findRole('target');
+    if (!target || uploaded.length !== 1) {
+      throw new Error('One custom image is required');
+    }
+    sourceImages = [{ ...target, label: target.label || 'Reference image' }];
+  }
+
+  return {
+    mode: imagePrank.mode,
+    prompt: buildImagePrankPrompt(userPrompt),
+    userPrompt,
+    sourceImages,
+    catalogItem: catalogItem
+      ? {
+          id: catalogItem.id,
+          slug: catalogItem.slug,
+          title: localizedTitle(catalogItem),
+          categoryTitle: localizedCategoryTitle(catalogItem),
+        }
+      : null,
+  };
+}
+
 async function createImageGenerationProject(params: {
   userId: string;
   auth: NonNullable<Awaited<ReturnType<typeof authenticateApiRequest>>>;
   prompt: string;
   characterSelection?: unknown;
   characterSlug?: string;
+  imagePrank?: ImagePrankRequest;
   creationAttemptId?: string;
 }) {
   const prompt = params.prompt.trim();
@@ -550,25 +687,43 @@ async function createImageGenerationProject(params: {
     return error('VALIDATION_ERROR', 'Use either character selection or character slug, not both', 400);
   }
 
+  let resolvedImagePrank: ResolvedImagePrankPayload | null = null;
+  if (params.imagePrank) {
+    try {
+      resolvedImagePrank = await resolveImagePrankPayload({
+        userPrompt: prompt,
+        imagePrank: params.imagePrank,
+      });
+    } catch (err) {
+      return error('VALIDATION_ERROR', err instanceof Error ? err.message : 'Image prank payload is invalid', 400);
+    }
+  }
+
   const imageSpec = {
     provider: 'runware',
-    model: 'runware:108@1',
+    model: resolvedImagePrank ? 'runware:108@22' : 'runware:108@1',
     width: 1024,
     height: 1024,
     estimatedDurationSeconds: 300,
   };
   const tokenCost = TOKEN_COSTS.actions.imageGeneration;
   const now = new Date();
-  const title = deriveTitleFromText(prompt, 20);
+  const title = resolvedImagePrank
+    ? `Image Prank: ${deriveTitleFromText(prompt, 18)}`
+    : deriveTitleFromText(prompt, 20);
   let normalizedSelection: Awaited<ReturnType<typeof resolveImageProjectCharacterSelection>>;
-  try {
-    normalizedSelection = await resolveImageProjectCharacterSelection({
-      userId: params.userId,
-      characterSlug: normalizedCharacterSlug,
-      characterSelection: params.characterSelection,
-    });
-  } catch (err) {
-    return error('VALIDATION_ERROR', err instanceof Error ? err.message : 'Character selection is not available', 400);
+  if (resolvedImagePrank) {
+    normalizedSelection = null;
+  } else {
+    try {
+      normalizedSelection = await resolveImageProjectCharacterSelection({
+        userId: params.userId,
+        characterSlug: normalizedCharacterSlug,
+        characterSelection: params.characterSelection,
+      });
+    } catch (err) {
+      return error('VALIDATION_ERROR', err instanceof Error ? err.message : 'Character selection is not available', 400);
+    }
   }
 
   const project = await prisma.$transaction(async (tx) => {
@@ -586,7 +741,7 @@ async function createImageGenerationProject(params: {
       userId: params.userId,
       amount: tokenCost,
       type: TOKEN_TRANSACTION_TYPES.imageGeneration,
-      description: 'Image generation',
+      description: resolvedImagePrank ? 'Image Prank generation' : 'Image generation',
       initiator: makeUserInitiator(params.userId),
       metadata: {
         projectId: created.id,
@@ -595,6 +750,13 @@ async function createImageGenerationProject(params: {
         model: imageSpec.model,
         width: imageSpec.width,
         height: imageSpec.height,
+        ...(resolvedImagePrank
+          ? {
+              imageKind: 'image-prank',
+              imagePrankMode: resolvedImagePrank.mode,
+              catalogItemId: resolvedImagePrank.catalogItem?.id ?? null,
+            }
+          : {}),
       },
     }, tx);
 
@@ -617,9 +779,20 @@ async function createImageGenerationProject(params: {
         message: 'Image generation queued',
         extra: {
           projectExperience: 'image-generation',
+          ...(resolvedImagePrank
+            ? {
+                imageKind: 'image-prank',
+                imagePrank: {
+                  mode: resolvedImagePrank.mode,
+                  sourceImages: resolvedImagePrank.sourceImages,
+                  catalogItem: resolvedImagePrank.catalogItem,
+                  userPrompt: resolvedImagePrank.userPrompt,
+                },
+              }
+            : {}),
           progressStartedAt: now.toISOString(),
           ...imageSpec,
-        },
+        } as any,
       },
     });
 
@@ -631,11 +804,22 @@ async function createImageGenerationProject(params: {
         status: 'queued',
         payload: {
           projectExperience: 'image-generation',
-          prompt,
+          prompt: resolvedImagePrank?.prompt ?? prompt,
+          userPrompt: resolvedImagePrank?.userPrompt ?? prompt,
+          ...(resolvedImagePrank
+            ? {
+                imageKind: 'image-prank',
+                imagePrank: {
+                  mode: resolvedImagePrank.mode,
+                  sourceImages: resolvedImagePrank.sourceImages,
+                  catalogItem: resolvedImagePrank.catalogItem,
+                },
+              }
+            : {}),
           ...imageSpec,
           characterSelection: normalizedSelection ?? null,
           initiatorUserId: params.userId,
-        },
+        } as any,
       },
     });
 

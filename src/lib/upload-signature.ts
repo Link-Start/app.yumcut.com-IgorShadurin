@@ -229,8 +229,8 @@ export function issueSignedUploadGrant(params: {
     issuedAt: now.toISOString(),
     expiresAt: expires.toISOString(),
     nonce: Buffer.from(randomBytes(16)).toString('hex'),
-    maxBytes: 2 * 1024 * 1024,
-    mimeTypes: ['image/png', 'image/jpeg'],
+    maxBytes: 10 * 1024 * 1024,
+    mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
   };
   const keyId = signingKeyId();
   if (keyId) payload.keyId = keyId;

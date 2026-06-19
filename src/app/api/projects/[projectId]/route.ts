@@ -415,20 +415,61 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       : [];
     const resultImageAsset = imageAssets[0] ?? null;
     const imageStatusInfo = sanitizedStatusInfo as Record<string, any> | undefined;
+    const initialPayload = (initialJob?.payload as any) ?? {};
+    const payloadImagePrank = initialPayload?.imagePrank && typeof initialPayload.imagePrank === 'object'
+      ? initialPayload.imagePrank
+      : null;
+    const statusImagePrank = imageStatusInfo?.imagePrank && typeof imageStatusInfo.imagePrank === 'object'
+      ? imageStatusInfo.imagePrank
+      : null;
+    const resolvedImagePrank = statusImagePrank ?? payloadImagePrank;
+    const sourceImages = Array.isArray(resolvedImagePrank?.sourceImages)
+      ? resolvedImagePrank.sourceImages
+          .map((entry: any) => ({
+            role: entry?.role === 'prank' || entry?.role === 'target' || entry?.role === 'reference' ? entry.role : 'reference',
+            label: typeof entry?.label === 'string' && entry.label.trim() ? entry.label.trim() : 'Reference image',
+            imageUrl: typeof entry?.imageUrl === 'string' && entry.imageUrl.trim()
+              ? entry.imageUrl
+              : normalizeMediaUrl(typeof entry?.imagePath === 'string' ? entry.imagePath : null),
+            imagePath: typeof entry?.imagePath === 'string' ? entry.imagePath : null,
+          }))
+      : [];
+    const catalogItem = resolvedImagePrank?.catalogItem && typeof resolvedImagePrank.catalogItem === 'object'
+      ? {
+          id: typeof resolvedImagePrank.catalogItem.id === 'string' ? resolvedImagePrank.catalogItem.id : '',
+          slug: typeof resolvedImagePrank.catalogItem.slug === 'string' ? resolvedImagePrank.catalogItem.slug : '',
+          title: typeof resolvedImagePrank.catalogItem.title === 'string' ? resolvedImagePrank.catalogItem.title : 'Image Prank',
+          categoryTitle: typeof resolvedImagePrank.catalogItem.categoryTitle === 'string' ? resolvedImagePrank.catalogItem.categoryTitle : null,
+        }
+      : null;
+    const imageKind = typeof initialPayload.imageKind === 'string'
+      ? initialPayload.imageKind
+      : (typeof imageStatusInfo?.imageKind === 'string' ? imageStatusInfo.imageKind : 'standalone');
+    const displayPrompt = typeof imageStatusInfo?.userPrompt === 'string' && imageStatusInfo.userPrompt.trim()
+      ? imageStatusInfo.userPrompt
+      : (typeof initialPayload.userPrompt === 'string' && initialPayload.userPrompt.trim()
+        ? initialPayload.userPrompt
+        : String(initialPayload.prompt ?? p.prompt ?? ''));
     const imageGeneration = projectExperience === 'image-generation'
       ? {
-          prompt: String((initialJob?.payload as any)?.prompt ?? p.prompt ?? ''),
-          provider: typeof (initialJob?.payload as any)?.provider === 'string'
-            ? (initialJob?.payload as any).provider
+          kind: imageKind === 'image-prank' ? 'image-prank' : 'standalone',
+          mode: imageKind === 'image-prank' && typeof resolvedImagePrank?.mode === 'string'
+            ? resolvedImagePrank.mode
+            : null,
+          displayLabel: imageKind === 'image-prank' ? 'Image Prank' : 'Image',
+          prompt: displayPrompt,
+          userPrompt: displayPrompt,
+          provider: typeof initialPayload?.provider === 'string'
+            ? initialPayload.provider
             : (typeof imageStatusInfo?.provider === 'string' ? imageStatusInfo.provider : null),
-          model: typeof (initialJob?.payload as any)?.model === 'string'
-            ? (initialJob?.payload as any).model
+          model: typeof initialPayload?.model === 'string'
+            ? initialPayload.model
             : (typeof imageStatusInfo?.model === 'string' ? imageStatusInfo.model : null),
-          width: typeof (initialJob?.payload as any)?.width === 'number'
-            ? (initialJob?.payload as any).width
+          width: typeof initialPayload?.width === 'number'
+            ? initialPayload.width
             : (typeof imageStatusInfo?.width === 'number' ? imageStatusInfo.width : null),
-          height: typeof (initialJob?.payload as any)?.height === 'number'
-            ? (initialJob?.payload as any).height
+          height: typeof initialPayload?.height === 'number'
+            ? initialPayload.height
             : (typeof imageStatusInfo?.height === 'number' ? imageStatusInfo.height : null),
           resultImageUrl:
             (typeof imageStatusInfo?.finalImageUrl === 'string' && imageStatusInfo.finalImageUrl.trim())
@@ -451,9 +492,11 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
           characterTitle: characterTitle ?? null,
           variationTitle: variationTitle ?? null,
           source: characterSelectionPayload?.source ?? characterSelectionPayload?.type ?? null,
+          sourceImages,
+          catalogItem,
           estimatedDurationSeconds:
-            typeof (initialJob?.payload as any)?.estimatedDurationSeconds === 'number'
-              ? (initialJob?.payload as any).estimatedDurationSeconds
+            typeof initialPayload?.estimatedDurationSeconds === 'number'
+              ? initialPayload.estimatedDurationSeconds
               : 300,
           startedAt:
             (typeof imageStatusInfo?.progressStartedAt === 'string' && imageStatusInfo.progressStartedAt)

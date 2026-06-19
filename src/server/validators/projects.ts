@@ -35,6 +35,19 @@ const videoGenerationSchema = z.object({
   lipsyncPrompt: z.string().trim().min(1).max(LIMITS.promptMax).optional(),
 }).strict();
 
+const imagePrankSourceImageSchema = z.object({
+  role: z.enum(['prank', 'target', 'reference']),
+  path: z.string().trim().min(1).max(512),
+  url: z.string().trim().min(1).max(1024),
+  label: z.string().trim().max(120).optional(),
+}).strict();
+
+const imagePrankSchema = z.object({
+  mode: z.enum(['catalog', 'custom-two-image', 'custom-one-image']),
+  catalogItemId: z.string().uuid().optional(),
+  sourceImages: z.array(imagePrankSourceImageSchema).min(1).max(2),
+}).strict();
+
 const languageVoiceRecordSchema = z.record(z.string(), languageVoiceIdSchema).superRefine((val, ctx) => {
   if (!val || typeof val !== 'object') return;
   for (const key of Object.keys(val)) {
@@ -83,6 +96,7 @@ export const createProjectSchema = z.object({
   videoGeneration: videoGenerationSchema.optional(),
   characterVideoQuality: z.enum(CHARACTER_VIDEO_QUALITIES).optional(),
   projectExperience: z.enum(PROJECT_EXPERIENCES).optional(),
+  imagePrank: imagePrankSchema.optional(),
   contentTone: z.enum(CONTENT_TONES).optional(),
   includeDefaultMusic: z.boolean().optional(),
   addOverlay: z.boolean().optional(),
@@ -107,6 +121,30 @@ export const createProjectSchema = z.object({
   if (isImageGeneration) {
     if (!val.prompt || val.prompt.trim().length === 0) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Prompt cannot be empty', path: ['prompt'] });
+    }
+    if (val.imagePrank) {
+      const roleCounts = val.imagePrank.sourceImages.reduce<Record<string, number>>((acc, image) => {
+        acc[image.role] = (acc[image.role] ?? 0) + 1;
+        return acc;
+      }, {});
+      if (val.imagePrank.mode === 'catalog') {
+        if (!val.imagePrank.catalogItemId) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Catalog prank image is required', path: ['imagePrank', 'catalogItemId'] });
+        }
+        if ((roleCounts.target ?? 0) !== 1) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Target image is required', path: ['imagePrank', 'sourceImages'] });
+        }
+      }
+      if (val.imagePrank.mode === 'custom-two-image') {
+        if ((roleCounts.prank ?? 0) !== 1 || (roleCounts.target ?? 0) !== 1) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Two custom images are required', path: ['imagePrank', 'sourceImages'] });
+        }
+      }
+      if (val.imagePrank.mode === 'custom-one-image') {
+        if ((roleCounts.target ?? 0) !== 1 || val.imagePrank.sourceImages.length !== 1) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'One custom image is required', path: ['imagePrank', 'sourceImages'] });
+        }
+      }
     }
     return;
   }

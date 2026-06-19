@@ -185,6 +185,7 @@ export const Api = {
       errorToastTitle: 'Failed to update final text script',
     }),
   getCharacters: () => api('/api/characters'),
+  getImagePrankCatalog: () => api<import('@/shared/types').ImagePrankCatalogDTO>('/api/image-pranks'),
   createCharacterUploadToken: () => api<{ data: string; signature: string; expiresAt: string; mimeTypes: string[]; maxBytes: number }>('/api/storage/upload-token', { method: 'POST' }),
   completeCharacterUpload: (payload: { data: string; signature: string; path: string; url: string; title: string; description?: string; attachToCharacterId?: string }) =>
     api('/api/characters/custom/upload', { method: 'POST', body: JSON.stringify(payload) }),
@@ -255,6 +256,113 @@ export const Api = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+  adminImagePrankCategoriesList: () => api<{ items: Array<{ id: string; slug: string; titleEn: string; titleRu: string; subtitleEn: string | null; subtitleRu: string | null; isActive: boolean; priority: number }> }>('/api/admin/image-prank-categories'),
+  adminImagePrankCategoriesCreate: (body: { slug: string; title: string; subtitle?: string; isActive?: boolean; priority?: number }) =>
+    api<{ id: string; slug: string; titleEn: string; titleRu: string; subtitleEn: string | null; subtitleRu: string | null; isActive: boolean; priority: number }>('/api/admin/image-prank-categories', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  adminImagePrankCategoriesUpdate: (id: string, body: { slug?: string; title?: string; subtitle?: string | null; isActive?: boolean; priority?: number }) =>
+    api<{ id: string; slug: string; titleEn: string; titleRu: string; subtitleEn: string | null; subtitleRu: string | null; isActive: boolean; priority: number }>(`/api/admin/image-prank-categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  adminImagePrankCategoriesDelete: (id: string, options?: { deleteFiles?: boolean }) => {
+    const qp = new URLSearchParams();
+    if (options?.deleteFiles === true) qp.set('deleteFiles', '1');
+    const query = qp.toString();
+    const suffix = query ? `?${query}` : '';
+    return api<{ ok: boolean }>(`/api/admin/image-prank-categories/${id}${suffix}`, { method: 'DELETE' });
+  },
+  adminImagePranksList: (params?: { q?: string; categoryId?: string | null; page?: number; pageSize?: number }) => {
+    const qp = new URLSearchParams();
+    const q = params?.q?.trim() || '';
+    if (q) qp.set('q', q);
+    if (params?.categoryId) qp.set('categoryId', params.categoryId);
+    if (typeof params?.page === 'number' && Number.isFinite(params.page)) qp.set('page', String(Math.max(1, Math.floor(params.page))));
+    if (typeof params?.pageSize === 'number' && Number.isFinite(params.pageSize)) qp.set('pageSize', String(Math.max(1, Math.floor(params.pageSize))));
+    const query = qp.toString() ? `?${qp.toString()}` : '';
+    return api<{
+      items: Array<{
+        id: string;
+        categoryId: string;
+        slug: string;
+        titleEn: string;
+        titleRu: string;
+        descriptionEn: string | null;
+        descriptionRu: string | null;
+        imagePath: string;
+        imageUrl: string | null;
+        previewImageUrl: string | null;
+        isPublic: boolean;
+        priority: number;
+        category: { id: string; slug: string; titleEn: string } | null;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
+    }>(`/api/admin/image-pranks${query}`);
+  },
+  adminImagePrankCreate: async (payload: {
+    categoryId: string;
+    slug: string;
+    title: string;
+    description?: string;
+    searchText?: string;
+    isPublic?: boolean;
+    priority?: number;
+    image: File;
+  }) => {
+    const form = new FormData();
+    form.set('categoryId', payload.categoryId);
+    form.set('slug', payload.slug);
+    form.set('title', payload.title);
+    form.set('description', payload.description ?? '');
+    form.set('searchText', payload.searchText ?? '');
+    form.set('isPublic', payload.isPublic ? 'true' : 'false');
+    form.set('priority', String(payload.priority ?? 0));
+    form.set('image', payload.image);
+    return api<{ id: string } & Record<string, unknown>>('/api/admin/image-pranks', {
+      method: 'POST',
+      body: form,
+      headers: {},
+    });
+  },
+  adminImagePrankUpdate: async (id: string, payload: {
+    categoryId?: string;
+    slug?: string;
+    title?: string;
+    description?: string | null;
+    searchText?: string | null;
+    isPublic?: boolean;
+    priority?: number;
+    image?: File | null;
+  }) => {
+    const form = new FormData();
+    if (payload.categoryId !== undefined) form.set('categoryId', payload.categoryId);
+    if (payload.slug !== undefined) form.set('slug', payload.slug);
+    if (payload.title !== undefined) form.set('title', payload.title);
+    if (payload.description !== undefined) form.set('description', payload.description ?? '');
+    if (payload.searchText !== undefined) form.set('searchText', payload.searchText ?? '');
+    if (payload.isPublic !== undefined) form.set('isPublic', payload.isPublic ? 'true' : 'false');
+    if (payload.priority !== undefined) form.set('priority', String(payload.priority));
+    if (payload.image) form.set('image', payload.image);
+    return api<{ id: string } & Record<string, unknown>>(`/api/admin/image-pranks/${id}`, {
+      method: 'PATCH',
+      body: form,
+      headers: {},
+    });
+  },
+  adminImagePrankDelete: (id: string, options?: { deleteFiles?: boolean }) => {
+    const qp = new URLSearchParams();
+    if (options?.deleteFiles === true) qp.set('deleteFiles', '1');
+    const query = qp.toString();
+    const suffix = query ? `?${query}` : '';
+    return api<{ ok: boolean }>(`/api/admin/image-pranks/${id}${suffix}`, { method: 'DELETE' });
+  },
   adminCharactersList: (params?: { q?: string; categoryId?: string | null; page?: number; pageSize?: number }) => {
     const qp = new URLSearchParams();
     const q = params?.q?.trim() || '';

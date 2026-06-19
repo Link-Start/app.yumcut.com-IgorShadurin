@@ -40,11 +40,11 @@ export type MainPageCharacterSearchRow = {
 };
 
 export type MainPageLandingView = 'search' | 'categories' | 'expanded';
-export type MainPageTopLevelMode = 'image' | 'stories' | 'brainrot';
+export type MainPageTopLevelMode = 'image-prank' | 'stories' | 'brainrot';
 
 const MAIN_PAGE_IMAGE_SEARCH_TEXT: Record<AppLanguageCode, string> = {
-  en: 'image images prank image generation picture photo prompt still ai image',
-  ru: 'картинка картинки изображение изображения генерация изображения фото промпт',
+  en: 'image prank images prank image generation picture photo prompt still ai image custom mix',
+  ru: 'image prank картинка prank картинки изображение изображения генерация изображения фото промпт свой микс',
 };
 
 const MAIN_PAGE_STORIES_SEARCH_TEXT: Record<AppLanguageCode, string> = {
@@ -53,7 +53,8 @@ const MAIN_PAGE_STORIES_SEARCH_TEXT: Record<AppLanguageCode, string> = {
 };
 
 export function normalizeMainPageTopLevelMode(value: string | null | undefined): MainPageTopLevelMode | null {
-  if (value === 'image' || value === 'stories' || value === 'brainrot') return value;
+  if (value === 'image' || value === 'image-prank') return 'image-prank';
+  if (value === 'stories' || value === 'brainrot') return value;
   return null;
 }
 
