@@ -26,6 +26,11 @@ export async function generateMetadata({ searchParams }: { searchParams?: Promis
     openMode,
     hasOpenCategory: category !== null,
   });
+  if (initialOpenMode === 'image') {
+    return {
+      title: `Image | ${TITLE_SUFFIX}`,
+    };
+  }
   if (initialOpenMode === 'stories') {
     return {
       title: `Stories | ${TITLE_SUFFIX}`,

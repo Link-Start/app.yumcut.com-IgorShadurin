@@ -40,7 +40,12 @@ export type MainPageCharacterSearchRow = {
 };
 
 export type MainPageLandingView = 'search' | 'categories' | 'expanded';
-export type MainPageTopLevelMode = 'stories' | 'brainrot';
+export type MainPageTopLevelMode = 'image' | 'stories' | 'brainrot';
+
+const MAIN_PAGE_IMAGE_SEARCH_TEXT: Record<AppLanguageCode, string> = {
+  en: 'image images prank image generation picture photo prompt still ai image',
+  ru: 'картинка картинки изображение изображения генерация изображения фото промпт',
+};
 
 const MAIN_PAGE_STORIES_SEARCH_TEXT: Record<AppLanguageCode, string> = {
   en: 'stories story old story classic story script idea prompt video templates',
@@ -48,7 +53,7 @@ const MAIN_PAGE_STORIES_SEARCH_TEXT: Record<AppLanguageCode, string> = {
 };
 
 export function normalizeMainPageTopLevelMode(value: string | null | undefined): MainPageTopLevelMode | null {
-  if (value === 'stories' || value === 'brainrot') return value;
+  if (value === 'image' || value === 'stories' || value === 'brainrot') return value;
   return null;
 }
 
@@ -121,6 +126,14 @@ export function mainPageStoriesMatchesSearch(
 ): boolean {
   if (!normalizedSearch) return true;
   return MAIN_PAGE_STORIES_SEARCH_TEXT[language].includes(normalizedSearch);
+}
+
+export function mainPageImageMatchesSearch(
+  normalizedSearch: string,
+  language: AppLanguageCode,
+): boolean {
+  if (!normalizedSearch) return true;
+  return MAIN_PAGE_IMAGE_SEARCH_TEXT[language].includes(normalizedSearch);
 }
 
 export function mainPageGroupMatchesSearch(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ import {
   filterMainPageGroupsForSearch,
   findMainPageMatchingCharacters,
   getMainPageGroupById,
+  mainPageImageMatchesSearch,
   mainPageStoriesMatchesSearch,
   normalizeMainPageSearchQuery,
   pickLocalizedText,
@@ -27,6 +28,17 @@ import {
 const CATEGORY_PREVIEW_CELLS = 4;
 const CATEGORY_PREVIEW_SECTIONS = 6;
 const MAX_CHARACTERS_PER_CATEGORY_PAGE = 18;
+const IMAGE_PREVIEW_IMAGES = [
+  '/template/3d/preview.jpg',
+  '/template/anime/preview.jpg',
+  '/template/cyberpunk/preview.jpg',
+  '/template/plastic-toys/preview.jpg',
+  '/template/bubble-gum/preview.jpg',
+  '/template/v2-comics/preview.jpg',
+  '/template/doodling/preview.jpg',
+  '/template/basic/preview.jpg',
+  '/template/noir/preview.jpg',
+];
 const STORIES_PREVIEW_IMAGES = [
   '/template/basic/preview.jpg',
   '/template/v2-comics/preview.jpg',
@@ -52,6 +64,8 @@ const COPY = {
     matchingCharactersLabel: 'Matching characters',
     noResults: 'No categories or characters found.',
     categoriesBack: 'Categories',
+    imageTitle: 'Image',
+    imageSubtitle: 'Prank image generation',
     storiesTitle: 'Stories',
     storiesSubtitle: 'Classic story videos',
     brainrotTitle: 'Brainrot',
@@ -75,6 +89,8 @@ const COPY = {
     matchingCharactersLabel: 'Найденные персонажи',
     noResults: 'Категории или персонажи не найдены.',
     categoriesBack: 'Категории',
+    imageTitle: 'Картинка',
+    imageSubtitle: 'Генерация prank-картинок',
     storiesTitle: 'Истории',
     storiesSubtitle: 'Классические сюжетные видео',
     brainrotTitle: 'Brainrot',
@@ -100,6 +116,8 @@ type LandingCopy = {
   matchingCharactersLabel: string;
   noResults: string;
   categoriesBack: string;
+  imageTitle: string;
+  imageSubtitle: string;
   storiesTitle: string;
   storiesSubtitle: string;
   brainrotTitle: string;
@@ -278,54 +296,78 @@ function GroupCategoryCard({
   group,
   selected,
   onSelect,
+  href,
   language,
 }: {
   group: MainPageGroup;
   selected: boolean;
-  onSelect: () => void;
+  onSelect?: () => void;
+  href?: string;
   language: 'en' | 'ru';
 }) {
   const [activeSection, setActiveSection] = useState<number | null>(null);
   const title = pickLocalizedText(group.title, language);
   const slideshowImages = useMemo(() => group.characters.map((character) => character.imageUrl), [group.characters]);
+  const content = (
+    <article
+      className={cn(
+        'group relative overflow-hidden rounded-2xl border bg-white transition-all duration-200',
+        'focus-within:ring-2 focus-within:ring-blue-500',
+        selected
+          ? 'border-blue-300 shadow-[0_14px_28px_rgba(59,130,246,0.2)] dark:border-blue-700'
+          : 'border-gray-200 dark:border-gray-800',
+      )}
+    >
+      <div className="relative aspect-[9/16] w-full">
+        <GroupHoverGridPreview images={slideshowImages} alt={title} activeSection={activeSection} />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
+        <div className="pointer-events-none absolute bottom-3 left-3 right-3 text-white">
+          <h3 className="truncate text-sm font-semibold leading-none">{title}</h3>
+        </div>
+      </div>
+    </article>
+  );
+
+  const interactionProps = {
+    onMouseMove: (event: MouseEvent<HTMLElement>) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const relativeX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+      const nextSection = Math.min(
+        CATEGORY_PREVIEW_SECTIONS - 1,
+        Math.floor((relativeX / rect.width) * CATEGORY_PREVIEW_SECTIONS),
+      );
+      setActiveSection((currentSection) => (currentSection === nextSection ? currentSection : nextSection));
+    },
+    onMouseLeave: () => setActiveSection(null),
+    onBlur: () => setActiveSection(null),
+  };
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        onClick={onSelect}
+        className="block w-full cursor-pointer text-left focus-visible:outline-none"
+        aria-current={selected ? 'page' : undefined}
+        aria-label={`Open ${title} group`}
+        {...interactionProps}
+      >
+        {content}
+      </a>
+    );
+  }
 
   return (
     <button
       type="button"
       onClick={onSelect}
-      onMouseMove={(event) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-        if (rect.width <= 0) return;
-        const relativeX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
-        const nextSection = Math.min(
-          CATEGORY_PREVIEW_SECTIONS - 1,
-          Math.floor((relativeX / rect.width) * CATEGORY_PREVIEW_SECTIONS),
-        );
-        setActiveSection((currentSection) => (currentSection === nextSection ? currentSection : nextSection));
-      }}
-      onMouseLeave={() => setActiveSection(null)}
-      onBlur={() => setActiveSection(null)}
       className="block w-full cursor-pointer text-left focus-visible:outline-none"
       aria-pressed={selected}
       aria-label={`Open ${title} group`}
+      {...interactionProps}
     >
-      <article
-        className={cn(
-          'group relative overflow-hidden rounded-2xl border bg-white transition-all duration-200',
-          'focus-within:ring-2 focus-within:ring-blue-500',
-          selected
-            ? 'border-blue-300 shadow-[0_14px_28px_rgba(59,130,246,0.2)] dark:border-blue-700'
-            : 'border-gray-200 dark:border-gray-800',
-        )}
-      >
-        <div className="relative aspect-[9/16] w-full">
-          <GroupHoverGridPreview images={slideshowImages} alt={title} activeSection={activeSection} />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
-          <div className="pointer-events-none absolute bottom-3 left-3 right-3 text-white">
-            <h3 className="truncate text-sm font-semibold leading-none">{title}</h3>
-          </div>
-        </div>
-      </article>
+      {content}
     </button>
   );
 }
@@ -358,11 +400,18 @@ export function CharacterLanding({
   const [expandedGroupPage, setExpandedGroupPage] = useState(1);
   const normalizedSearch = normalizeMainPageSearchQuery(searchQuery);
   const isSearchActive = normalizedSearch.length > 0;
+  const imageMatchesSearch = mainPageImageMatchesSearch(normalizedSearch, language);
   const storyMatchesSearch = mainPageStoriesMatchesSearch(normalizedSearch, language);
 
   const topLevelGroups = useMemo(() => {
     const brainrotImages = groups.flatMap((group) => group.characters.map((character) => character.imageUrl));
     return [
+      makeTopLevelGroup({
+        id: 'image',
+        title: { en: COPY.en.imageTitle, ru: COPY.ru.imageTitle },
+        subtitle: { en: COPY.en.imageSubtitle, ru: COPY.ru.imageSubtitle },
+        images: IMAGE_PREVIEW_IMAGES,
+      }),
       makeTopLevelGroup({
         id: 'stories',
         title: { en: COPY.en.storiesTitle, ru: COPY.ru.storiesTitle },
@@ -381,6 +430,9 @@ export function CharacterLanding({
   const filteredTopLevelGroups = useMemo(() => {
     if (!normalizedSearch) return topLevelGroups;
     return topLevelGroups.filter((group) => {
+      if (group.id === 'image') {
+        return imageMatchesSearch;
+      }
       if (group.id === 'stories') {
         return storyMatchesSearch;
       }
@@ -388,7 +440,7 @@ export function CharacterLanding({
         filterMainPageGroupsForSearch([catalogGroup], normalizedSearch, language).length > 0
       ));
     });
-  }, [groups, language, normalizedSearch, storyMatchesSearch, topLevelGroups]);
+  }, [groups, imageMatchesSearch, language, normalizedSearch, storyMatchesSearch, topLevelGroups]);
 
   useEffect(() => {
     const next: Record<string, { isFavorited: boolean; favoritesCount: number }> = {};
@@ -498,11 +550,12 @@ export function CharacterLanding({
   });
   const showTopLevelCategoriesView = !isSearchActive && openMode === null;
   const showSearchView = isSearchActive;
+  const showImageView = !isSearchActive && openMode === 'image';
   const showStoriesView = !isSearchActive && openMode === 'stories';
   const showBrainrotCategoryView = !isSearchActive && openMode === 'brainrot' && landingView === 'categories';
   const showExpandedGroupView = !isSearchActive && openMode === 'brainrot' && landingView === 'expanded' && expandedGroup !== null;
   const showBackButton = !isSearchActive && openMode !== null;
-  const showLandingChrome = !showStoriesView;
+  const showLandingChrome = !showImageView && !showStoriesView;
 
   const syncExpandedStateToUrl = useCallback((
     nextOpenMode: MainPageTopLevelMode | null,
@@ -517,8 +570,8 @@ export function CharacterLanding({
       url.searchParams.delete('openMode');
       url.searchParams.delete('openCategory');
       url.searchParams.delete('page');
-    } else if (nextOpenMode === 'stories') {
-      url.searchParams.set('openMode', 'stories');
+    } else if (nextOpenMode === 'image' || nextOpenMode === 'stories') {
+      url.searchParams.set('openMode', nextOpenMode);
       url.searchParams.delete('openCategory');
       url.searchParams.delete('page');
     } else {
@@ -801,6 +854,7 @@ export function CharacterLanding({
                         group={group}
                         selected={openMode === group.id}
                         onSelect={() => openTopLevelMode(group.id as MainPageTopLevelMode)}
+                        href={`/?openMode=${group.id}`}
                         language={language}
                       />
                     ))}
@@ -872,6 +926,7 @@ export function CharacterLanding({
                     group={group}
                     selected={openMode === group.id}
                     onSelect={() => openTopLevelMode(group.id as MainPageTopLevelMode)}
+                    href={`/?openMode=${group.id}`}
                     language={language}
                   />
                 ))}
@@ -882,12 +937,23 @@ export function CharacterLanding({
           <div
             className={cn(
               'transition-[opacity,transform] duration-180 ease-out will-change-transform',
+              showImageView
+                ? 'relative opacity-100 translate-y-0 scale-100'
+                : 'pointer-events-none absolute inset-0 opacity-0 translate-y-1 scale-[0.995]',
+            )}
+          >
+            {showImageView ? <PromptInput projectType="image" /> : null}
+          </div>
+
+          <div
+            className={cn(
+              'transition-[opacity,transform] duration-180 ease-out will-change-transform',
               showStoriesView
                 ? 'relative opacity-100 translate-y-0 scale-100'
                 : 'pointer-events-none absolute inset-0 opacity-0 translate-y-1 scale-[0.995]',
             )}
           >
-            {showStoriesView ? <PromptInput /> : null}
+            {showStoriesView ? <PromptInput projectType="story" /> : null}
           </div>
 
           <div

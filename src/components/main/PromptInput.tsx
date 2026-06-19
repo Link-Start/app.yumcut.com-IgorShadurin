@@ -25,7 +25,6 @@ import {
   CheckCircle2,
   Coins,
   Video,
-  ImageIcon,
   Crown,
   CreditCard,
 } from 'lucide-react';
@@ -94,10 +93,6 @@ type PromptInputCopy = {
   placeholder: string;
   imagePlaceholder: string;
   verticalFormat: string;
-  videoModeTooltip: string;
-  imageModeTooltip: string;
-  modeVideo: string;
-  modeImage: string;
   settings: string;
   chooseCharacter: string;
   character: string;
@@ -108,7 +103,6 @@ type PromptInputCopy = {
   createProject: string;
   createImageProject: string;
   create: string;
-  createImage: string;
   creationDisabledTitle: string;
   creationDisabledDescription: string;
   creationDisabledReasonLabel: string;
@@ -144,10 +138,6 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     placeholder: 'Describe your idea…',
     imagePlaceholder: 'Describe the image to generate…',
     verticalFormat: 'Vertical 9:16 format',
-    videoModeTooltip: 'Create a finished vertical video.',
-    imageModeTooltip: 'Generate one still image.',
-    modeVideo: 'Video',
-    modeImage: 'Image',
     settings: 'Settings',
     chooseCharacter: 'Choose character',
     character: 'Character',
@@ -158,7 +148,6 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     createProject: 'Create project',
     createImageProject: 'Create image',
     create: 'Create',
-    createImage: 'Image',
     creationDisabledTitle: 'New projects are temporarily disabled',
     creationDisabledDescription: 'Project creation is currently disabled.',
     creationDisabledReasonLabel: 'Reason',
@@ -195,10 +184,6 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     placeholder: 'Опишите вашу идею…',
     imagePlaceholder: 'Опишите изображение для генерации…',
     verticalFormat: 'Вертикальный формат 9:16',
-    videoModeTooltip: 'Создать готовое вертикальное видео.',
-    imageModeTooltip: 'Сгенерировать одно изображение.',
-    modeVideo: 'Видео',
-    modeImage: 'Картинка',
     settings: 'Настройки',
     chooseCharacter: 'Выбрать персонажа',
     character: 'Персонаж',
@@ -209,12 +194,11 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     createProject: 'Создать проект',
     createImageProject: 'Создать изображение',
     create: 'Создать',
-    createImage: 'Картинка',
     creationDisabledTitle: 'Создание проектов временно отключено',
     creationDisabledDescription: 'Создание новых проектов сейчас отключено.',
     creationDisabledReasonLabel: 'Причина',
-  creationDisabledNoReason: 'Не указана.',
-  notEnoughTokensTitle: 'Недостаточно токенов',
+    creationDisabledNoReason: 'Не указана.',
+    notEnoughTokensTitle: 'Недостаточно токенов',
     notEnoughTokensDescription: (projectCost, tokenBalance) =>
       `Для этого проекта нужно ${projectCost} токенов, а у вас ${tokenBalance}.`,
     buyTokens: 'Купить токены',
@@ -240,14 +224,17 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
   },
 };
 
-export function PromptInput() {
+type PromptInputProps = {
+  projectType?: 'story' | 'image';
+};
+
+export function PromptInput({ projectType = 'story' }: PromptInputProps) {
   const { status: authStatus } = useSession();
   const { language } = useAppLanguage();
   const copy = PROMPT_INPUT_COPY[language];
   const { settings, update } = useSettings();
   const { defaultVoiceId, getByExternalId, autoVoices } = useVoices();
   const [text, setText] = useState('');
-  const [outputMode, setOutputMode] = useState<'video' | 'image'>('video');
   const [placeholder, setPlaceholder] = useState('');
   const [useExact, setUseExact] = useState(false);
   const [duration, setDuration] = useState<number>(MAIN_PAGE_DURATION_OPTIONS[0]);
@@ -453,7 +440,7 @@ export function PromptInput() {
   }, [update]);
 
   const primaryLanguage = resolvePrimaryLanguage(languages, DEFAULT_LANGUAGE);
-  const isImageMode = outputMode === 'image';
+  const isImageMode = projectType === 'image';
   const languageMultiplier = Math.max(languages.length, 1);
   const minimumSeconds = tokenSummary?.minimumProjectSeconds ?? TOKEN_COSTS.minimumProjectSeconds;
   const effectiveDuration = useExact ? minimumSeconds : duration;
@@ -849,34 +836,6 @@ export function PromptInput() {
                 </Button>
               </Tooltip>
               ) : null}
-              <div className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 dark:border-gray-800 dark:bg-gray-950">
-                <Tooltip content={copy.videoModeTooltip}>
-                  <Button
-                    type="button"
-                    variant={outputMode === 'video' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 cursor-pointer rounded-full px-2"
-                    aria-pressed={outputMode === 'video'}
-                    onClick={() => setOutputMode('video')}
-                  >
-                    <Video className="h-3.5 w-3.5 sm:mr-1.5" />
-                    <span className="hidden sm:inline">{copy.modeVideo}</span>
-                  </Button>
-                </Tooltip>
-                <Tooltip content={copy.imageModeTooltip}>
-                  <Button
-                    type="button"
-                    variant={outputMode === 'image' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="h-7 cursor-pointer rounded-full px-2"
-                    aria-pressed={outputMode === 'image'}
-                    onClick={() => setOutputMode('image')}
-                  >
-                    <ImageIcon className="h-3.5 w-3.5 sm:mr-1.5" />
-                    <span className="hidden sm:inline">{copy.modeImage}</span>
-                  </Button>
-                </Tooltip>
-              </div>
               {/**
                * Group creation button (hidden)
                * ------------------------------------------------------------
@@ -1027,7 +986,7 @@ export function PromptInput() {
               ) : (
                 <Wand2 className="h-4 w-4" />
               )}
-              <span className="ml-2 sm:hidden">{isImageMode ? copy.createImage : copy.create}</span>
+              <span className="ml-2 sm:hidden">{isImageMode ? copy.createImageProject : copy.create}</span>
             </Button>
           </div>
         </div>

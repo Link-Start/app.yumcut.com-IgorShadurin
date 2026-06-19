@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   filterMainPageGroupsForSearch,
   findMainPageMatchingCharacters,
+  mainPageImageMatchesSearch,
   mainPageStoriesMatchesSearch,
   normalizeMainPageSearchQuery,
   normalizeMainPageTopLevelMode,
@@ -72,6 +73,7 @@ describe('character main page search', () => {
   });
 
   it('normalizes top-level landing modes', () => {
+    expect(normalizeMainPageTopLevelMode('image')).toBe('image');
     expect(normalizeMainPageTopLevelMode('stories')).toBe('stories');
     expect(normalizeMainPageTopLevelMode('brainrot')).toBe('brainrot');
     expect(normalizeMainPageTopLevelMode('cats')).toBeNull();
@@ -86,6 +88,16 @@ describe('character main page search', () => {
       openMode: 'stories',
       hasOpenCategory: true,
     })).toBe('stories');
+    expect(resolveInitialMainPageTopLevelMode({
+      openMode: 'image',
+      hasOpenCategory: true,
+    })).toBe('image');
+  });
+
+  it('matches image searches against the top-level Image category', () => {
+    expect(mainPageImageMatchesSearch(normalizeMainPageSearchQuery('prank image'), 'en')).toBe(true);
+    expect(mainPageImageMatchesSearch(normalizeMainPageSearchQuery('картинка'), 'ru')).toBe(true);
+    expect(mainPageImageMatchesSearch(normalizeMainPageSearchQuery('canine'), 'en')).toBe(false);
   });
 
   it('matches story searches against the top-level Stories category', () => {
