@@ -17,6 +17,7 @@ import {
   ClipboardList,
   AudioLines,
   Ban,
+  ImageIcon,
 } from 'lucide-react';
 import type { PendingProjectDraft } from '@/shared/types';
 import { getLanguageFlag, getLanguageLabel, normalizeLanguageList, DEFAULT_LANGUAGE, type TargetLanguageCode } from '@/shared/constants/languages';
@@ -70,6 +71,7 @@ type OverviewCopy = {
   tokensUnit: string;
   scriptTextLabel: string;
   ideaPromptLabel: string;
+  imagePromptLabel: string;
   multiLanguageBadge: string;
   targetLanguagesPrefix: string;
   targetLanguagePrefix: string;
@@ -95,6 +97,13 @@ type OverviewCopy = {
   voiceSelectionTooltip: string;
   autoSuffix: string;
   costTooltip: (tokenCostBadge: string, balanceLabel: string, hasEnoughTokens: boolean) => string;
+  imageCostTooltip: (tokenCostBadge: string, balanceAfterLabel: string, hasEnoughTokens: boolean) => string;
+  balanceAfterBadge: (balanceAfterLabel: string) => string;
+  balanceAfterTooltip: (balanceAfterLabel: string) => string;
+  imageModeBadge: string;
+  imageModeTooltip: string;
+  imageSizeBadge: string;
+  imageSizeTooltip: string;
   musicTooltip: (enabled: boolean) => string;
   musicOnBadge: string;
   musicOffBadge: string;
@@ -157,6 +166,7 @@ const COPY: Record<AppLanguageCode, OverviewCopy> = {
     tokensUnit: 'tokens',
     scriptTextLabel: 'Script text',
     ideaPromptLabel: 'Idea prompt',
+    imagePromptLabel: 'Image prompt',
     multiLanguageBadge: 'Multi-language',
     targetLanguagesPrefix: 'Target languages',
     targetLanguagePrefix: 'Target language',
@@ -185,6 +195,16 @@ const COPY: Record<AppLanguageCode, OverviewCopy> = {
       hasEnoughTokens
         ? `Project cost: ${tokenCostBadge} • Balance: ${balanceLabel} tokens`
         : `Project cost: ${tokenCostBadge} • Balance: ${balanceLabel} tokens (add more tokens before launch)`,
+    imageCostTooltip: (tokenCostBadge, balanceAfterLabel, hasEnoughTokens) =>
+      hasEnoughTokens
+        ? `Image cost: ${tokenCostBadge} • Balance after generation: ${balanceAfterLabel} tokens`
+        : `Image cost: ${tokenCostBadge} • Balance after generation would be ${balanceAfterLabel} tokens`,
+    balanceAfterBadge: (balanceAfterLabel) => `After: ${balanceAfterLabel}`,
+    balanceAfterTooltip: (balanceAfterLabel) => `Balance after generation: ${balanceAfterLabel} tokens`,
+    imageModeBadge: 'Image',
+    imageModeTooltip: 'Generate one image from your prompt.',
+    imageSizeBadge: '1024x1024',
+    imageSizeTooltip: 'Generated image size: 1024 by 1024 pixels.',
     musicTooltip: (enabled) => `Include default music: ${enabled ? 'Yes' : 'No'}`,
     musicOnBadge: 'Music on',
     musicOffBadge: 'Music off',
@@ -224,6 +244,7 @@ const COPY: Record<AppLanguageCode, OverviewCopy> = {
     tokensUnit: 'токенов',
     scriptTextLabel: 'Текст сценария',
     ideaPromptLabel: 'Идея',
+    imagePromptLabel: 'Промпт изображения',
     multiLanguageBadge: 'Несколько языков',
     targetLanguagesPrefix: 'Языки проекта',
     targetLanguagePrefix: 'Язык проекта',
@@ -252,6 +273,16 @@ const COPY: Record<AppLanguageCode, OverviewCopy> = {
       hasEnoughTokens
         ? `Стоимость проекта: ${tokenCostBadge} • Баланс: ${balanceLabel} токенов`
         : `Стоимость проекта: ${tokenCostBadge} • Баланс: ${balanceLabel} токенов (пополните баланс перед запуском)`,
+    imageCostTooltip: (tokenCostBadge, balanceAfterLabel, hasEnoughTokens) =>
+      hasEnoughTokens
+        ? `Стоимость изображения: ${tokenCostBadge} • Баланс после генерации: ${balanceAfterLabel} токенов`
+        : `Стоимость изображения: ${tokenCostBadge} • Баланс после генерации был бы ${balanceAfterLabel} токенов`,
+    balanceAfterBadge: (balanceAfterLabel) => `После: ${balanceAfterLabel}`,
+    balanceAfterTooltip: (balanceAfterLabel) => `Баланс после генерации: ${balanceAfterLabel} токенов`,
+    imageModeBadge: 'Изображение',
+    imageModeTooltip: 'Создать одно изображение по вашему промпту.',
+    imageSizeBadge: '1024x1024',
+    imageSizeTooltip: 'Размер изображения: 1024 на 1024 пикселя.',
     musicTooltip: (enabled) => `Музыка по умолчанию: ${enabled ? 'включена' : 'выключена'}`,
     musicOnBadge: 'Музыка вкл',
     musicOffBadge: 'Музыка выкл',
@@ -305,6 +336,7 @@ export function buildProjectOverview({
   const voice = buildVoiceInfo(draft, voiceOption, defaultVoiceName, languageVoiceSelections, appLanguage, copy);
   const durationSummary = buildDurationSummary(draft, copy);
   const tokenCostBadge = `${Math.round(draft.tokenCost).toLocaleString(copy.locale)} ${copy.tokensUnit}`;
+  const isImageDraft = draft.outputType === 'image' || draft.payload.projectExperience === 'image-generation';
 
   return {
     language,
@@ -312,9 +344,11 @@ export function buildProjectOverview({
     voice,
     durationSummary,
     tokenCostBadge,
-    summaryItems: buildSummaryItems({ draft, language, character, voice, tokenCostBadge, copy }),
-    guidanceSections: buildGuidanceSections(draft, copy),
-    scriptLabel: draft.useExact ? copy.scriptTextLabel : copy.ideaPromptLabel,
+    summaryItems: isImageDraft
+      ? buildImageSummaryItems({ draft, character, tokenCostBadge, copy })
+      : buildSummaryItems({ draft, language, character, voice, tokenCostBadge, copy }),
+    guidanceSections: isImageDraft ? [] : buildGuidanceSections(draft, copy),
+    scriptLabel: isImageDraft ? copy.imagePromptLabel : (draft.useExact ? copy.scriptTextLabel : copy.ideaPromptLabel),
     scriptCharCount: draft.text.length,
     scriptText: draft.text,
   };
@@ -602,6 +636,79 @@ function buildSummaryItems({
         ? 'hover:border-blue-200 hover:bg-blue-50 dark:hover:border-blue-800 dark:hover:bg-blue-950/40'
         : 'border-gray-200 hover:border-gray-200 hover:bg-gray-50 dark:border-gray-800 dark:hover:border-gray-800 dark:hover:bg-gray-900/60',
       warning: !voice.autoApprove,
+    },
+  ];
+}
+
+function buildImageSummaryItems({
+  draft,
+  character,
+  tokenCostBadge,
+  copy,
+}: {
+  draft: PendingProjectDraft;
+  character: CharacterInfo;
+  tokenCostBadge: string;
+  copy: OverviewCopy;
+}): SummaryItem[] {
+  const balanceAfter = Math.max(0, Math.round(draft.tokenBalance - draft.tokenCost));
+  const balanceAfterLabel = balanceAfter.toLocaleString(copy.locale);
+  return [
+    {
+      key: 'cost',
+      icon: Coins,
+      tooltip: copy.imageCostTooltip(tokenCostBadge, balanceAfterLabel, draft.hasEnoughTokens),
+      badge: tokenCostBadge,
+      iconClass: 'bg-lime-100 text-lime-600 dark:bg-lime-950/30 dark:text-lime-300',
+      containerClass: 'hover:border-lime-200 hover:bg-lime-50 dark:hover:border-lime-800 dark:hover:bg-lime-950/40',
+      warning: !draft.hasEnoughTokens,
+    },
+    {
+      key: 'balance-after',
+      icon: Coins,
+      tooltip: copy.balanceAfterTooltip(balanceAfterLabel),
+      badge: copy.balanceAfterBadge(balanceAfterLabel),
+      iconClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300',
+      containerClass: 'hover:border-emerald-200 hover:bg-emerald-50 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/40',
+      warning: !draft.hasEnoughTokens,
+    },
+    {
+      key: 'mode',
+      icon: ImageIcon,
+      tooltip: copy.imageModeTooltip,
+      badge: copy.imageModeBadge,
+      iconClass: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300',
+      containerClass: 'hover:border-sky-200 hover:bg-sky-50 dark:hover:border-sky-800 dark:hover:bg-sky-950/40',
+    },
+    {
+      key: 'size',
+      icon: Sparkles,
+      tooltip: copy.imageSizeTooltip,
+      badge: copy.imageSizeBadge,
+      iconClass: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-300',
+      containerClass: 'hover:border-violet-200 hover:bg-violet-50 dark:hover:border-violet-800 dark:hover:bg-violet-950/40',
+    },
+    {
+      key: 'character',
+      icon: character.imageUrl ? undefined : UserRound,
+      tooltip: character.summary,
+      badge: character.badge,
+      iconClass: character.imageUrl
+        ? 'p-0 bg-transparent'
+        : 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300',
+      containerClass: 'hover:border-amber-200 hover:bg-amber-50 dark:hover:border-amber-800 dark:hover:bg-amber-950/40',
+      render: character.imageUrl ? (
+        <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={character.imageUrl}
+            alt={character.summary}
+            className="max-h-full max-w-full object-contain"
+            loading="lazy"
+          />
+        </div>
+      ) : undefined,
+      renderClass: character.imageUrl ? 'h-24 w-24' : undefined,
     },
   ];
 }

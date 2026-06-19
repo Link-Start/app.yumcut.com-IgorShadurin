@@ -238,7 +238,7 @@ export interface AdminProjectCreationSettingsDTO {
 
 export type ProjectCreationAttemptResult = 'draft_created' | 'paywall_shown' | 'confirm_shown' | 'project_created';
 export type ProjectCreationAttemptPromptMode = 'idea' | 'script';
-export type ProjectCreationAttemptExperience = 'story' | 'character';
+export type ProjectCreationAttemptExperience = 'story' | 'character' | 'image-generation';
 
 export interface ProjectCreationAttemptContextDTO {
   utmSource?: string | null;
@@ -297,6 +297,22 @@ export interface ProjectDetailDTO {
   statusInfo?: Record<string, unknown>;
   imageEditorEnabled?: boolean;
   templateImages?: ProjectTemplateImageDTO[];
+  imageGeneration?: {
+    prompt: string;
+    provider: string | null;
+    model: string | null;
+    width: number | null;
+    height: number | null;
+    resultImageUrl: string | null;
+    resultImagePath: string | null;
+    resultFormat: string | null;
+    originalImageUrl: string | null;
+    characterTitle: string | null;
+    variationTitle: string | null;
+    source: CharacterSelectionSource | null;
+    estimatedDurationSeconds: number;
+    startedAt: string;
+  } | null;
   tokensUsed?: number;
   creation?: {
     durationSeconds?: number | null;
@@ -482,6 +498,7 @@ export interface PendingProjectDraft {
   tokenCost: number;
   tokenBalance: number;
   hasEnoughTokens: boolean;
+  outputType?: 'video' | 'image';
   settings: ProjectDraftSettingsSnapshot;
   // Selected voice id snapshot for display
   voiceId?: string | null;

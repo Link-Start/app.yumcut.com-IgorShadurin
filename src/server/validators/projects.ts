@@ -102,6 +102,15 @@ export const createProjectSchema = z.object({
     }
   }
 
+  const isImageGeneration = val.projectExperience === 'image-generation';
+
+  if (isImageGeneration) {
+    if (!val.prompt || val.prompt.trim().length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Prompt cannot be empty', path: ['prompt'] });
+    }
+    return;
+  }
+
   // If not using exact script mode, duration is required
   if (!val.useExactTextAsScript && (val.durationSeconds == null)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Duration is required', path: ['durationSeconds'] });

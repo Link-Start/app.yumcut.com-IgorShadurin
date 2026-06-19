@@ -27,6 +27,7 @@ import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
 import { normalizeProjectExperience } from '@/shared/constants/project-experience';
 import { CharacterProjectScreen } from '@/components/project/character/CharacterProjectScreen';
+import { ImageGenerationProjectScreen } from '@/components/project/image/ImageGenerationProjectScreen';
 import { APP_NAME } from '@/shared/constants/app';
 
 type ProjectScreenCopy = {
@@ -145,7 +146,7 @@ export function StoryProjectScreen({ projectId }: { projectId: string }) {
   const projectExperience = normalizeProjectExperience(project?.creation?.projectExperience);
 
   useEffect(() => {
-    if (!project || projectExperience !== 'character') return;
+    if (!project || (projectExperience !== 'character' && projectExperience !== 'image-generation')) return;
     const snippet = makePromptTitleSnippet(project.prompt ?? project.rawScript ?? project.title);
     document.title = snippet ? `${snippet} | ${APP_NAME}` : APP_NAME;
   }, [project, projectExperience]);
@@ -155,6 +156,10 @@ export function StoryProjectScreen({ projectId }: { projectId: string }) {
   }
   if (error) return <div>{t.loadingProjectError}</div>;
   if (!project) return <div>{t.notFound}</div>;
+
+  if (projectExperience === 'image-generation') {
+    return <ImageGenerationProjectScreen project={project} projectId={projectId} />;
+  }
 
   if (projectExperience === 'character') {
     const languageVariants = (project.languageVariants as ProjectLanguageVariantDTO[] | undefined) ?? [];

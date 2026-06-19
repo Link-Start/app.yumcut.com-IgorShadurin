@@ -7,6 +7,7 @@ export const TOKEN_TRANSACTION_TYPES = {
   adminAdjustment: 'ADMIN_ADJUSTMENT',
   projectCreation: 'PROJECT_CREATION',
   scriptRevision: 'SCRIPT_REVISION',
+  imageGeneration: 'IMAGE_GENERATION',
   audioRegeneration: 'AUDIO_REGENERATION',
   imageRegeneration: 'IMAGE_REGENERATION',
   imageRegenerationRefund: 'IMAGE_REGENERATION_REFUND',
@@ -29,6 +30,7 @@ export const TOKEN_COSTS = {
   },
   actions: {
     scriptRevision: 10,
+    imageGeneration: 1,
     audioRegeneration: 40,
     imageRegeneration: 1,
     characterImage: 10,

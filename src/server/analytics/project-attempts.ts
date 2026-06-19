@@ -11,7 +11,7 @@ export const PROJECT_CREATION_ATTEMPT_RESULTS = [
 ] as const;
 
 export const PROJECT_CREATION_ATTEMPT_PROMPT_MODES = ['idea', 'script'] as const;
-export const PROJECT_CREATION_ATTEMPT_EXPERIENCES = ['story', 'character'] as const;
+export const PROJECT_CREATION_ATTEMPT_EXPERIENCES = ['story', 'character', 'image-generation'] as const;
 
 export type ProjectCreationAttemptResult = typeof PROJECT_CREATION_ATTEMPT_RESULTS[number];
 export type ProjectCreationAttemptPromptMode = typeof PROJECT_CREATION_ATTEMPT_PROMPT_MODES[number];

@@ -2,6 +2,7 @@ import { TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
 
 export const PROJECT_RELATED_TOKEN_TYPES = [
   TOKEN_TRANSACTION_TYPES.projectCreation,
+  TOKEN_TRANSACTION_TYPES.imageGeneration,
   TOKEN_TRANSACTION_TYPES.scriptRevision,
   TOKEN_TRANSACTION_TYPES.audioRegeneration,
   TOKEN_TRANSACTION_TYPES.imageRegeneration,
@@ -11,6 +12,7 @@ export const PROJECT_RELATED_TOKEN_TYPES = [
 
 export const PROJECT_ACTION_TOKEN_TYPES = [
   TOKEN_TRANSACTION_TYPES.scriptRevision,
+  TOKEN_TRANSACTION_TYPES.imageGeneration,
   TOKEN_TRANSACTION_TYPES.audioRegeneration,
   TOKEN_TRANSACTION_TYPES.imageRegeneration,
   TOKEN_TRANSACTION_TYPES.imageRegenerationRefund,

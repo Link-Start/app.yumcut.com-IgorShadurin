@@ -54,7 +54,7 @@ export function ProjectList({ items: controlledItems, fetchOnMount = true }: Pro
         <li key={p.id}>
           <Link
             href={`/project/${p.id}`}
-            className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900 min-w-0"
+            className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-900 min-w-0"
             onClick={() => {
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('project:list-clicked'));

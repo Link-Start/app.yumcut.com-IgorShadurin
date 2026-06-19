@@ -97,6 +97,16 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     captionsEnabled,
   } = parsed.data;
   const normalizedProjectExperience = normalizeProjectExperience(projectExperience);
+  if (normalizedProjectExperience === 'image-generation') {
+    return createImageGenerationProject({
+      userId,
+      auth,
+      prompt: prompt ?? '',
+      characterSelection,
+      characterSlug,
+      creationAttemptId,
+    });
+  }
   const isCharacterExperience = normalizedProjectExperience === 'character';
   const requestedDurationSeconds = isCharacterExperience
     ? CHARACTER_PROJECT_TARGET_DURATION_SECONDS
@@ -518,6 +528,252 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     createdAt: project.createdAt.toISOString(),
   } satisfies import('@/shared/types').ProjectListItemDTO);
 }, 'Failed to create project');
+
+async function createImageGenerationProject(params: {
+  userId: string;
+  auth: NonNullable<Awaited<ReturnType<typeof authenticateApiRequest>>>;
+  prompt: string;
+  characterSelection?: unknown;
+  characterSlug?: string;
+  creationAttemptId?: string;
+}) {
+  const prompt = params.prompt.trim();
+  if (!prompt) {
+    return error('VALIDATION_ERROR', 'Prompt cannot be empty', 400);
+  }
+
+  const normalizedCharacterSlug =
+    typeof params.characterSlug === 'string' && params.characterSlug.trim().length > 0
+      ? params.characterSlug.trim().toLowerCase()
+      : null;
+  if (normalizedCharacterSlug && params.characterSelection) {
+    return error('VALIDATION_ERROR', 'Use either character selection or character slug, not both', 400);
+  }
+
+  const imageSpec = {
+    provider: 'runware',
+    model: 'runware:108@1',
+    width: 1024,
+    height: 1024,
+    estimatedDurationSeconds: 300,
+  };
+  const tokenCost = TOKEN_COSTS.actions.imageGeneration;
+  const now = new Date();
+  const title = deriveTitleFromText(prompt, 20);
+  let normalizedSelection: Awaited<ReturnType<typeof resolveImageProjectCharacterSelection>>;
+  try {
+    normalizedSelection = await resolveImageProjectCharacterSelection({
+      userId: params.userId,
+      characterSlug: normalizedCharacterSlug,
+      characterSelection: params.characterSelection,
+    });
+  } catch (err) {
+    return error('VALIDATION_ERROR', err instanceof Error ? err.message : 'Character selection is not available', 400);
+  }
+
+  const project = await prisma.$transaction(async (tx) => {
+    const created = await tx.project.create({
+      data: {
+        user: { connect: { id: params.userId } },
+        title,
+        prompt,
+        rawScript: null,
+        status: ProjectStatus.ProcessImagesGeneration,
+      },
+    });
+
+    await spendTokens({
+      userId: params.userId,
+      amount: tokenCost,
+      type: TOKEN_TRANSACTION_TYPES.imageGeneration,
+      description: 'Image generation',
+      initiator: makeUserInitiator(params.userId),
+      metadata: {
+        projectId: created.id,
+        prompt,
+        provider: imageSpec.provider,
+        model: imageSpec.model,
+        width: imageSpec.width,
+        height: imageSpec.height,
+      },
+    }, tx);
+
+    if (normalizedSelection) {
+      await tx.projectCharacterSelection.create({
+        data: {
+          projectId: created.id,
+          characterId: normalizedSelection.characterId ?? null,
+          userCharacterId: normalizedSelection.userCharacterId ?? null,
+          characterVariationId: normalizedSelection.characterId ? normalizedSelection.variationId ?? null : null,
+          userCharacterVariationId: normalizedSelection.userCharacterId ? normalizedSelection.variationId ?? null : null,
+        },
+      });
+    }
+
+    await tx.projectStatusHistory.create({
+      data: {
+        projectId: created.id,
+        status: ProjectStatus.ProcessImagesGeneration,
+        message: 'Image generation queued',
+        extra: {
+          projectExperience: 'image-generation',
+          progressStartedAt: now.toISOString(),
+          ...imageSpec,
+        },
+      },
+    });
+
+    await tx.job.create({
+      data: {
+        userId: params.userId,
+        projectId: created.id,
+        type: 'images',
+        status: 'queued',
+        payload: {
+          projectExperience: 'image-generation',
+          prompt,
+          ...imageSpec,
+          characterSelection: normalizedSelection ?? null,
+          initiatorUserId: params.userId,
+        },
+      },
+    });
+
+    return created;
+  });
+
+  if (params.creationAttemptId) {
+    try {
+      await linkProjectCreationAttemptToProject({
+        userId: params.userId,
+        attemptId: params.creationAttemptId,
+        projectId: project.id,
+      });
+    } catch (err) {
+      console.error('Failed to link image project creation attempt', { projectId: project.id, creationAttemptId: params.creationAttemptId, err });
+    }
+  }
+
+  let ownerName: string | null = params.auth.sessionUser?.name ?? null;
+  let ownerEmail: string | null = params.auth.sessionUser?.email ?? null;
+  if (!ownerName || !ownerEmail) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: params.userId },
+      select: { name: true, email: true },
+    });
+    ownerName = ownerName ?? dbUser?.name ?? null;
+    ownerEmail = ownerEmail ?? dbUser?.email ?? null;
+  }
+  let projectUrl: string | null = null;
+  const base = config.NEXTAUTH_URL?.trim();
+  if (base) {
+    try {
+      projectUrl = new URL(`/admin/projects/${project.id}`, base).toString();
+    } catch {}
+  }
+  notifyAdminsOfNewProject({
+    projectId: project.id,
+    title: project.title,
+    userId: params.userId,
+    userEmail: ownerEmail,
+    userName: ownerName,
+    projectUrl,
+  }).catch((err) => {
+    console.error('Failed to notify admins about new image project', err);
+  });
+
+  const trunc = (t: string) => (t.length > 30 ? t.slice(0, 27) + '...' : t);
+  return ok({
+    id: project.id,
+    title: trunc(project.title),
+    status: project.status as ProjectStatus,
+    createdAt: project.createdAt.toISOString(),
+  } satisfies import('@/shared/types').ProjectListItemDTO);
+}
+
+async function resolveImageProjectCharacterSelection(params: {
+  userId: string;
+  characterSlug: string | null;
+  characterSelection?: unknown;
+}): Promise<{ characterId?: string; userCharacterId?: string; variationId?: string } | null> {
+  if (params.characterSlug) {
+    const catalogCharacter = await prisma.character.findFirst({
+      where: {
+        slug: params.characterSlug,
+        isCatalogPublic: true,
+      },
+      select: {
+        id: true,
+        variations: {
+          orderBy: [{ priority: 'desc' }, { id: 'asc' }],
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    if (!catalogCharacter) {
+      throw new Error('Character is not available');
+    }
+    return {
+      characterId: catalogCharacter.id,
+      ...(catalogCharacter.variations[0]?.id ? { variationId: catalogCharacter.variations[0].id } : {}),
+    };
+  }
+
+  const selection = params.characterSelection as {
+    source?: unknown;
+    characterId?: unknown;
+    userCharacterId?: unknown;
+    variationId?: unknown;
+  } | null | undefined;
+  if (!selection || selection.source === 'dynamic') return null;
+
+  const characterId = typeof selection.characterId === 'string' ? selection.characterId : undefined;
+  const userCharacterId = typeof selection.userCharacterId === 'string' ? selection.userCharacterId : undefined;
+  const variationId = typeof selection.variationId === 'string' ? selection.variationId : undefined;
+  if (!characterId && !userCharacterId) return null;
+
+  if (characterId) {
+    const variation = variationId
+      ? await prisma.characterVariation.findFirst({
+          where: {
+            id: variationId,
+            characterId,
+            character: { isCatalogPublic: true },
+          },
+          select: { id: true },
+        })
+      : await prisma.characterVariation.findFirst({
+          where: { characterId, character: { isCatalogPublic: true } },
+          orderBy: [{ priority: 'desc' }, { id: 'asc' }],
+          select: { id: true },
+        });
+    if (!variation) {
+      throw new Error('Character variation not available');
+    }
+    return { characterId, variationId: variation.id };
+  }
+
+  if (!variationId) {
+    throw new Error('Character variation is required');
+  }
+  if (!userCharacterId) {
+    return null;
+  }
+  const variation = await prisma.userCharacterVariation.findFirst({
+    where: {
+      id: variationId,
+      userCharacterId,
+      deleted: false,
+      userCharacter: { userId: params.userId, deleted: false },
+    },
+    select: { id: true },
+  });
+  if (!variation) {
+    throw new Error('Character variation not available');
+  }
+  return { userCharacterId, variationId: variation.id };
+}
 
 function buildCharacterVideoGeneration(params: {
   mode: CharacterVideoGenerationMode;

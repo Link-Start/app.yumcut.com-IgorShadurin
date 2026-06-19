@@ -36,12 +36,15 @@ type ProjectConfirmationCopy = {
   startNewProject: string;
   makeGroupTitle: string;
   makeVideoTitle: string;
+  makeImageTitle: string;
   reviewGroupDescription: string;
   reviewVideoDescription: string;
+  reviewImageDescription: string;
   settingsTitle: string;
   backToMainPage: string;
   createGroup: string;
   createVideo: string;
+  createImage: string;
 };
 
 const COPY: Record<AppLanguageCode, ProjectConfirmationCopy> = {
@@ -55,12 +58,15 @@ const COPY: Record<AppLanguageCode, ProjectConfirmationCopy> = {
     startNewProject: 'Start a new project',
     makeGroupTitle: 'Make this group?',
     makeVideoTitle: 'Make this video?',
+    makeImageTitle: 'Generate this image?',
     reviewGroupDescription: 'Review the summary, then create your group.',
     reviewVideoDescription: 'Review the summary, then create your video.',
+    reviewImageDescription: 'Review the prompt, price, and balance before generation starts.',
     settingsTitle: 'Settings',
     backToMainPage: 'Back to main page',
     createGroup: 'Create group',
     createVideo: 'Create video',
+    createImage: 'Create image',
   },
   ru: {
     loadingAria: 'Загрузка',
@@ -72,12 +78,15 @@ const COPY: Record<AppLanguageCode, ProjectConfirmationCopy> = {
     startNewProject: 'Запустить новый проект',
     makeGroupTitle: 'Создать эту группу?',
     makeVideoTitle: 'Создать видео с этими настройками?',
+    makeImageTitle: 'Сгенерировать это изображение?',
     reviewGroupDescription: 'Проверьте черновик и создайте группу.',
     reviewVideoDescription: 'Проверьте черновик и создайте видео.',
+    reviewImageDescription: 'Проверьте промпт, стоимость и баланс перед запуском генерации.',
     settingsTitle: 'Настройки',
     backToMainPage: 'На главную',
     createGroup: 'Создать группу',
     createVideo: 'Создать видео',
+    createImage: 'Создать изображение',
   },
 };
 
@@ -99,6 +108,7 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
   }, [draftId]);
 
   const voiceOption = useMemo(() => getByExternalId(draft?.voiceId ?? defaultVoiceId), [draft?.voiceId, defaultVoiceId, getByExternalId]);
+  const isImageDraft = draft?.outputType === 'image' || draft?.payload.projectExperience === 'image-generation';
 
   const languageVoiceSelections = useMemo(() => {
     if (!draft) return {} as Record<string, { voiceId: string | null; label: string }>;
@@ -196,7 +206,7 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
       <div className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col items-center justify-center gap-4 text-center">
         <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{copy.draftNotFoundTitle}</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">{copy.draftNotFoundDescription}</p>
-        <Button onClick={() => router.push(STORIES_HOME_PATH)}>{copy.startNewProject}</Button>
+        <Button className="cursor-pointer" onClick={() => router.push(STORIES_HOME_PATH)}>{copy.startNewProject}</Button>
       </div>
     );
   }
@@ -207,10 +217,10 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
         <Card>
           <CardHeader className="space-y-1">
             <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              {draft.groupMode ? copy.makeGroupTitle : copy.makeVideoTitle}
+              {draft.groupMode ? copy.makeGroupTitle : isImageDraft ? copy.makeImageTitle : copy.makeVideoTitle}
             </CardTitle>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {draft.groupMode ? copy.reviewGroupDescription : copy.reviewVideoDescription}
+              {draft.groupMode ? copy.reviewGroupDescription : isImageDraft ? copy.reviewImageDescription : copy.reviewVideoDescription}
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -223,10 +233,12 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
               <SummaryGrid items={overview.summaryItems} />
             </section>
 
-            <TemplateSection
-              template={draft.template ?? null}
-              onPreview={() => setPreviewOpen(true)}
-            />
+            {!isImageDraft ? (
+              <TemplateSection
+                template={draft.template ?? null}
+                onPreview={() => setPreviewOpen(true)}
+              />
+            ) : null}
           </CardContent>
         </Card>
 
@@ -234,7 +246,7 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
           <Button
             variant="outline"
             size="lg"
-            className="flex-1 py-3 text-base"
+            className="flex-1 cursor-pointer py-3 text-base"
             onClick={handleBack}
             disabled={submitting}
           >
@@ -242,7 +254,7 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
           </Button>
           <Button
             size="lg"
-            className="flex-1 py-3 text-base"
+            className="flex-1 cursor-pointer py-3 text-base"
             onClick={handleCreate}
             disabled={submitting}
           >
@@ -251,7 +263,7 @@ export function ProjectConfirmation({ draftId }: ProjectConfirmationProps) {
             ) : (
               <span className="inline-flex items-center justify-center gap-2">
                 <Wand2 className="h-4 w-4" />
-                {draft.groupMode ? copy.createGroup : copy.createVideo}
+                {draft.groupMode ? copy.createGroup : isImageDraft ? copy.createImage : copy.createVideo}
               </span>
             )}
           </Button>

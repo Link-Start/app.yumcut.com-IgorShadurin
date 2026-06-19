@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   Coins,
   Video,
+  ImageIcon,
   Crown,
   CreditCard,
 } from 'lucide-react';
@@ -87,9 +88,16 @@ const MAIN_PAGE_DURATION_LABELS: Partial<Record<number, string>> = {
 
 type PromptInputCopy = {
   heading: string;
+  headingImage: string;
   subtitle: string;
+  subtitleImage: string;
   placeholder: string;
+  imagePlaceholder: string;
   verticalFormat: string;
+  videoModeTooltip: string;
+  imageModeTooltip: string;
+  modeVideo: string;
+  modeImage: string;
   settings: string;
   chooseCharacter: string;
   character: string;
@@ -98,7 +106,9 @@ type PromptInputCopy = {
   modeScript: string;
   modeIdea: string;
   createProject: string;
+  createImageProject: string;
   create: string;
+  createImage: string;
   creationDisabledTitle: string;
   creationDisabledDescription: string;
   creationDisabledReasonLabel: string;
@@ -128,9 +138,16 @@ type PromptInputCopy = {
 const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
   en: {
     heading: 'What video to make?',
+    headingImage: 'What image to generate?',
     subtitle: "Describe your concept or paste your text script. We'll create the whole video.",
+    subtitleImage: 'Describe the image you want. You can attach a character as the source reference.',
     placeholder: 'Describe your idea…',
+    imagePlaceholder: 'Describe the image to generate…',
     verticalFormat: 'Vertical 9:16 format',
+    videoModeTooltip: 'Create a finished vertical video.',
+    imageModeTooltip: 'Generate one still image.',
+    modeVideo: 'Video',
+    modeImage: 'Image',
     settings: 'Settings',
     chooseCharacter: 'Choose character',
     character: 'Character',
@@ -138,13 +155,15 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     modeIdeaTooltip: 'Now in Idea mode. AI will write text. Tap for Script mode.',
     modeScript: 'Script',
     modeIdea: 'Idea',
-  createProject: 'Create project',
-  create: 'Create',
-  creationDisabledTitle: 'New projects are temporarily disabled',
-  creationDisabledDescription: 'Project creation is currently disabled.',
-  creationDisabledReasonLabel: 'Reason',
-  creationDisabledNoReason: 'No reason provided.',
-  notEnoughTokensTitle: 'Not enough tokens',
+    createProject: 'Create project',
+    createImageProject: 'Create image',
+    create: 'Create',
+    createImage: 'Image',
+    creationDisabledTitle: 'New projects are temporarily disabled',
+    creationDisabledDescription: 'Project creation is currently disabled.',
+    creationDisabledReasonLabel: 'Reason',
+    creationDisabledNoReason: 'No reason provided.',
+    notEnoughTokensTitle: 'Not enough tokens',
     notEnoughTokensDescription: (projectCost, tokenBalance) =>
       `You need ${projectCost} tokens for this project but have ${tokenBalance}.`,
     buyTokens: 'Buy tokens in the app',
@@ -170,9 +189,16 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
   },
   ru: {
     heading: 'Какое видео создать?',
+    headingImage: 'Какое изображение сгенерировать?',
     subtitle: 'Опишите идею или вставьте готовый текст сценария. ЯмКат соберет ролик целиком.',
+    subtitleImage: 'Опишите изображение. Можно прикрепить персонажа как исходный референс.',
     placeholder: 'Опишите вашу идею…',
+    imagePlaceholder: 'Опишите изображение для генерации…',
     verticalFormat: 'Вертикальный формат 9:16',
+    videoModeTooltip: 'Создать готовое вертикальное видео.',
+    imageModeTooltip: 'Сгенерировать одно изображение.',
+    modeVideo: 'Видео',
+    modeImage: 'Картинка',
     settings: 'Настройки',
     chooseCharacter: 'Выбрать персонажа',
     character: 'Персонаж',
@@ -180,11 +206,13 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     modeIdeaTooltip: 'Сейчас режим идеи. ИИ напишет текст. Нажмите для режима сценария.',
     modeScript: 'Сценарий',
     modeIdea: 'Идея',
-  createProject: 'Создать проект',
-  create: 'Создать',
-  creationDisabledTitle: 'Создание проектов временно отключено',
-  creationDisabledDescription: 'Создание новых проектов сейчас отключено.',
-  creationDisabledReasonLabel: 'Причина',
+    createProject: 'Создать проект',
+    createImageProject: 'Создать изображение',
+    create: 'Создать',
+    createImage: 'Картинка',
+    creationDisabledTitle: 'Создание проектов временно отключено',
+    creationDisabledDescription: 'Создание новых проектов сейчас отключено.',
+    creationDisabledReasonLabel: 'Причина',
   creationDisabledNoReason: 'Не указана.',
   notEnoughTokensTitle: 'Недостаточно токенов',
     notEnoughTokensDescription: (projectCost, tokenBalance) =>
@@ -219,6 +247,7 @@ export function PromptInput() {
   const { settings, update } = useSettings();
   const { defaultVoiceId, getByExternalId, autoVoices } = useVoices();
   const [text, setText] = useState('');
+  const [outputMode, setOutputMode] = useState<'video' | 'image'>('video');
   const [placeholder, setPlaceholder] = useState('');
   const [useExact, setUseExact] = useState(false);
   const [duration, setDuration] = useState<number>(MAIN_PAGE_DURATION_OPTIONS[0]);
@@ -424,12 +453,16 @@ export function PromptInput() {
   }, [update]);
 
   const primaryLanguage = resolvePrimaryLanguage(languages, DEFAULT_LANGUAGE);
+  const isImageMode = outputMode === 'image';
   const languageMultiplier = Math.max(languages.length, 1);
   const minimumSeconds = tokenSummary?.minimumProjectSeconds ?? TOKEN_COSTS.minimumProjectSeconds;
   const effectiveDuration = useExact ? minimumSeconds : duration;
   const baseSeconds = Math.max(effectiveDuration, minimumSeconds);
   const perSecondCost = tokenSummary?.perSecondProject ?? TOKEN_COSTS.perSecondProject;
-  const projectCost = baseSeconds * perSecondCost * languageMultiplier;
+  const imageGenerationCost = tokenSummary?.actionCosts?.imageGeneration ?? TOKEN_COSTS.actions.imageGeneration;
+  const projectCost = isImageMode
+    ? imageGenerationCost
+    : baseSeconds * perSecondCost * languageMultiplier;
   const hasTokensForCurrent = tokenBalance >= projectCost;
   const projectCreationDisabled = settings?.projectCreationEnabled === false;
   const projectCreationReason = (settings?.projectCreationDisabledReason || '').trim();
@@ -489,6 +522,18 @@ export function PromptInput() {
   }, [autoVoices, getByExternalId, languageVoices, languages]);
 
   const projectStateValidation = useMemo(() => {
+    if (isImageMode) {
+      return {
+        issues: [],
+        disabled: {
+          submit: text.trim().length === 0,
+          characters: false,
+          autoApproveScript: false,
+          autoApproveAudio: false,
+        },
+        fieldErrors: {},
+      };
+    }
     return validateProjectState({
       mode: useExact ? 'script' : 'idea',
       text,
@@ -501,7 +546,7 @@ export function PromptInput() {
         elevenlabsExactScriptMax: LIMITS.elevenlabsExactScriptMax,
       },
     });
-  }, [effectiveLanguageVoiceProviders, languages, templateCustomData, text, useExact]);
+  }, [effectiveLanguageVoiceProviders, isImageMode, languages, templateCustomData, text, useExact]);
 
   // Indicator on the Character button should show only for non-default selections.
   // Treat 'dynamic' as the default (no indicator).
@@ -550,19 +595,19 @@ export function PromptInput() {
     const buildAttemptPayload = (result: 'paywall_shown' | 'draft_created', clientAttemptId = createProjectAttemptClientId()) => ({
       ...collectProjectAttemptContext({
         sourceToolSlug,
-        mainPageMode: 'stories',
+        mainPageMode: isImageMode ? 'image' : 'stories',
         templateId: templateSelection?.type === 'custom' ? templateSelection.id : null,
       }),
       clientAttemptId,
       result,
       promptText: trimmed,
-      promptMode: useExact ? 'script' as const : 'idea' as const,
-      projectExperience: 'story' as const,
-      durationSeconds: useExact ? null : duration,
+      promptMode: isImageMode ? 'idea' as const : (useExact ? 'script' as const : 'idea' as const),
+      projectExperience: isImageMode ? 'image-generation' as const : 'story' as const,
+      durationSeconds: isImageMode ? null : (useExact ? null : duration),
       tokenCost: projectCost,
       tokenBalance,
-      languageCodes: [...languages],
-      languageVoices: sanitizedLanguageVoices,
+      languageCodes: isImageMode ? [] : [...languages],
+      languageVoices: isImageMode ? {} : sanitizedLanguageVoices,
       settingsSnapshot,
     });
 
@@ -585,6 +630,71 @@ export function PromptInput() {
     setSubmitting(true);
     const recordedAttempt = await recordProjectCreationAttemptFromClient(buildAttemptPayload('draft_created'));
     const creationAttemptId = recordedAttempt?.id ?? null;
+    if (isImageMode) {
+      const payload: PendingProjectDraft['payload'] = {
+        prompt: trimmed,
+        projectExperience: 'image-generation',
+      };
+      if (creationAttemptId) {
+        payload.creationAttemptId = creationAttemptId;
+      }
+      const allowImageCharacter = selection && selection.source !== 'dynamic' && selection.variationId;
+      if (allowImageCharacter) {
+        payload.characterSelection = {
+          variationId: selection.variationId,
+          ...(selection.characterId ? { characterId: selection.characterId } : {}),
+          ...(selection.userCharacterId ? { userCharacterId: selection.userCharacterId } : {}),
+        };
+        if (selection.status) {
+          payload.customImageStatus = selection.status;
+        }
+      }
+
+      const draftId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2, 10);
+
+      const draft: PendingProjectDraft = {
+        id: draftId,
+        creationAttemptId,
+        createdAt: new Date().toISOString(),
+        text: trimmed,
+        useExact: false,
+        groupMode: false,
+        mode: 'idea',
+        durationSeconds: null,
+        effectiveDurationSeconds: 0,
+        languageCode: primaryLanguage,
+        languageCodes: [primaryLanguage],
+        languageVoices: {},
+        tokenCost: projectCost,
+        tokenBalance,
+        hasEnoughTokens: hasTokensForCurrent,
+        outputType: 'image',
+        settings: settingsSnapshot,
+        voiceId: null,
+        character: allowImageCharacter ? {
+          characterId: selection.characterId ?? undefined,
+          userCharacterId: selection.userCharacterId ?? undefined,
+          variationId: selection.variationId ?? undefined,
+          characterTitle: selection.characterTitle ?? undefined,
+          variationTitle: selection.variationTitle ?? undefined,
+          source: selection.source ?? 'global',
+          imageUrl: selection.imageUrl ?? null,
+        } : null,
+        template: null,
+        payload,
+      };
+
+      try {
+        storeProjectDraft(draft);
+        router.push(`/create/confirm/${draftId}`);
+      } catch (error) {
+        console.error('Failed to initialize image confirmation flow', error);
+        setSubmitting(false);
+      }
+      return;
+    }
     const payload: PendingProjectDraft['payload'] = {
       useExactTextAsScript: useExact,
       projectExperience: 'story',
@@ -683,14 +793,14 @@ export function PromptInput() {
     <div className="mx-auto w-full max-w-3xl px-2 sm:px-0">
       <div className="p-0">
         <div className="mb-3">
-          <h1 className="text-pretty text-center font-semibold tracking-tighter text-gray-900 dark:text-gray-100 sm:text-[32px] md:text-[46px] text-[29px]">{copy.heading}</h1>
-          <p className="mt-1 mb-6 text-center text-[clamp(12px,3.5vw,20px)] sm:text-[20px] text-gray-600 dark:text-gray-300 whitespace-normal text-pretty leading-tight tracking-tight">{copy.subtitle}</p>
+          <h1 className="text-pretty text-center font-semibold tracking-normal text-gray-900 dark:text-gray-100 sm:text-[32px] md:text-[46px] text-[29px]">{isImageMode ? copy.headingImage : copy.heading}</h1>
+          <p className="mt-1 mb-6 text-center text-[clamp(12px,3.5vw,20px)] sm:text-[20px] text-gray-600 dark:text-gray-300 whitespace-normal text-pretty leading-tight tracking-normal">{isImageMode ? copy.subtitleImage : copy.subtitle}</p>
         </div>
         {/* Unified input container: textarea on top, control bar at bottom; same visual block */}
         <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-800">
           <Textarea
             className="min-h-[140px] sm:min-h-[180px] w-full resize-none border-0 bg-transparent p-4 pr-4 text-sm leading-relaxed focus-visible:ring-0 focus-visible:outline-none"
-            placeholder={placeholder || copy.placeholder}
+            placeholder={isImageMode ? copy.imagePlaceholder : (placeholder || copy.placeholder)}
             disabled={projectCreationDisabled}
             value={text}
             onChange={(e) => {
@@ -723,12 +833,13 @@ export function PromptInput() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-2 sm:px-3 py-2">
             <div className="flex flex-wrap items-center gap-2">
               {/* Vertical format indicator (9:16), left-most */}
+              {!isImageMode ? (
               <Tooltip content={copy.verticalFormat}>
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8 rounded-full border-blue-200 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40"
+                  className="h-8 w-8 cursor-pointer rounded-full border-blue-200 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40"
                   aria-label={copy.verticalFormat}
                   aria-pressed="true"
                   aria-disabled="true"
@@ -737,6 +848,35 @@ export function PromptInput() {
                   <Smartphone className="h-4 w-4" />
                 </Button>
               </Tooltip>
+              ) : null}
+              <div className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 dark:border-gray-800 dark:bg-gray-950">
+                <Tooltip content={copy.videoModeTooltip}>
+                  <Button
+                    type="button"
+                    variant={outputMode === 'video' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 cursor-pointer rounded-full px-2"
+                    aria-pressed={outputMode === 'video'}
+                    onClick={() => setOutputMode('video')}
+                  >
+                    <Video className="h-3.5 w-3.5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">{copy.modeVideo}</span>
+                  </Button>
+                </Tooltip>
+                <Tooltip content={copy.imageModeTooltip}>
+                  <Button
+                    type="button"
+                    variant={outputMode === 'image' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 cursor-pointer rounded-full px-2"
+                    aria-pressed={outputMode === 'image'}
+                    onClick={() => setOutputMode('image')}
+                  >
+                    <ImageIcon className="h-3.5 w-3.5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">{copy.modeImage}</span>
+                  </Button>
+                </Tooltip>
+              </div>
               {/**
                * Group creation button (hidden)
                * ------------------------------------------------------------
@@ -762,6 +902,7 @@ export function PromptInput() {
                *   </Button>
                * </Tooltip>
                */}
+              {!isImageMode ? (
               <Popover>
                 <Tooltip content={copy.settings}>
                   <PopoverTrigger asChild>
@@ -769,7 +910,7 @@ export function PromptInput() {
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="relative rounded-full p-0 inline-grid place-items-center leading-none"
+                      className="relative inline-grid cursor-pointer place-items-center rounded-full p-0 leading-none"
                       aria-label={copy.settings}
                     >
                       <Settings className="h-4 w-4" />
@@ -783,6 +924,8 @@ export function PromptInput() {
 	                  <SettingsPopover disabledAutoApprove={projectStateValidation.disabled.autoApproveScript || projectStateValidation.disabled.autoApproveAudio} />
 	                </PopoverContent>
 	              </Popover>
+              ) : null}
+              {!isImageMode ? (
               <DurationDropdown
                 value={duration}
                 options={[...MAIN_PAGE_DURATION_OPTIONS]}
@@ -794,6 +937,8 @@ export function PromptInput() {
                 }}
                 disabled={useExact}
               />
+              ) : null}
+              {!isImageMode ? (
               <LanguageDropdown
                 values={languages}
                 onChange={(codes) => {
@@ -808,13 +953,14 @@ export function PromptInput() {
                 autoVoices={autoVoices}
                 voiceModalOpen={voicePickerOpen}
               />
+              ) : null}
               <Tooltip content={copy.chooseCharacter}>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="relative rounded-full"
+                  className="relative cursor-pointer rounded-full"
                   onClick={() => setCharOpen(true)}
-                  disabled={projectStateValidation.disabled.characters}
+                  disabled={!isImageMode && projectStateValidation.disabled.characters}
                 >
                   <User className="mr-2 h-4 w-4" />
                   {copy.character}
@@ -823,13 +969,14 @@ export function PromptInput() {
                   ) : null}
                 </Button>
               </Tooltip>
+              {!isImageMode ? (
               <Tooltip content={useExact ? copy.modeScriptTooltip : copy.modeIdeaTooltip}>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className={
-                    'rounded-full pl-2 pr-3 ' +
+                    'cursor-pointer rounded-full pl-2 pr-3 ' +
                     (useExact
                       ? 'border-blue-200 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40'
                       : '')
@@ -859,10 +1006,11 @@ export function PromptInput() {
                   {useExact ? copy.modeScript : copy.modeIdea}
                 </Button>
               </Tooltip>
+              ) : null}
             </div>
             <Button
               type="button"
-              className="w-full sm:w-9 sm:h-9 sm:px-0 sm:rounded-full"
+              className="w-full cursor-pointer sm:w-9 sm:h-9 sm:px-0 sm:rounded-full"
               onClick={submit}
               disabled={
                 !text.trim() ||
@@ -871,22 +1019,22 @@ export function PromptInput() {
                 projectCreationDisabled ||
                 (!isEnglish && !tokensLoading && !hasTokensForCurrent)
               }
-              aria-label={copy.createProject}
-              title={copy.createProject}
+              aria-label={isImageMode ? copy.createImageProject : copy.createProject}
+              title={isImageMode ? copy.createImageProject : copy.createProject}
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Wand2 className="h-4 w-4" />
               )}
-              <span className="ml-2 sm:hidden">{copy.create}</span>
+              <span className="ml-2 sm:hidden">{isImageMode ? copy.createImage : copy.create}</span>
             </Button>
           </div>
         </div>
         <div className="mt-3 flex items-center gap-3 flex-wrap">
           {/* Character and exact script controls moved into the textarea control bar above */}
         </div>
-        {(!isEnglish && !tokensLoading && tokenSummary && showLowBalanceWarning) && (
+        {(!isImageMode && !isEnglish && !tokensLoading && tokenSummary && showLowBalanceWarning) && (
           <TokenLowBalanceAlert
             language={language}
             buyTokensLabel={copy.buyTokens}
@@ -990,7 +1138,7 @@ export function PromptInput() {
         </DialogContent>
       </Dialog>
       {/* Templates picker under textarea & settings */}
-      <TemplatePicker onChange={handleTemplateChange} />
+      {!isImageMode ? <TemplatePicker onChange={handleTemplateChange} /> : null}
 
       <CharacterModal
         open={charOpen}

@@ -8,6 +8,7 @@ import { handleTranscriptionPhase } from './executor/transcription-phase';
 import { handleMetadataPhase } from './executor/metadata-phase';
 import { handleCaptionsPhase } from './executor/captions-phase';
 import { handleImagesPhase } from './executor/images-phase';
+import { handleImageGenerationProjectPhase } from './executor/image-generation-project-phase';
 import { handleVideoPartsPhase } from './executor/video-parts-phase';
 import { handleVideoMainPhase } from './executor/video-main-phase';
 import { handleRiggerAnimationPhase } from './executor/rigger-animation-phase';
@@ -86,6 +87,14 @@ export async function executeForProject(projectId: string, status: ProjectStatus
         return;
       }
       case ProjectStatus.ProcessImagesGeneration: {
+        if (cfg.projectExperience === 'image-generation') {
+          await handleImageGenerationProjectPhase({
+            projectId,
+            jobPayload: jobPayload ?? {},
+            daemonConfig,
+          });
+          return;
+        }
         await handleImagesPhase({
           projectId,
           cfg,

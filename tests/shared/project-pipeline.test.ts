@@ -44,6 +44,17 @@ describe('project pipeline by experience', () => {
     });
   });
 
+  it('uses only image generation for standalone image projects', () => {
+    expect(pipelineOrderForExperience('image-generation')).toEqual([
+      ProjectStatus.ProcessImagesGeneration,
+    ]);
+    expect(jobTypeForProjectStatus(ProjectStatus.New, 'image-generation')).toBeNull();
+    expect(jobTypeForProjectStatus(ProjectStatus.ProcessImagesGeneration, 'image-generation')).toBe('images');
+    expect(legalStatusTypePairsForExperience('image-generation')).toEqual([
+      { status: ProjectStatus.ProcessImagesGeneration, type: 'images' },
+    ]);
+  });
+
   it('resets downstream character stages without targeting images', () => {
     expect(downstreamStatusesForExperience(ProjectStatus.New, 'character')).not.toContain(
       ProjectStatus.ProcessImagesGeneration,

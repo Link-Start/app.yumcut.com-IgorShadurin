@@ -16,7 +16,7 @@ import { getAdminImageEditorSettings } from '@/server/admin/image-editor';
 import { normalizeProjectExperience } from '@/shared/constants/project-experience';
 import { normalizeContentTone } from '@/shared/constants/content-tone';
 import { defaultCharacterVideoGeneration } from '@/shared/constants/video-generation';
-import { calculateProjectTokenCost, TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
+import { calculateProjectTokenCost, TOKEN_COSTS, TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
 import {
   CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE,
   normalizeCharacterVideoGenerationMode,
@@ -28,6 +28,7 @@ type Params = { projectId: string };
 
 const PROJECT_RELATED_TOKEN_TYPES = [
   TOKEN_TRANSACTION_TYPES.projectCreation,
+  TOKEN_TRANSACTION_TYPES.imageGeneration,
   TOKEN_TRANSACTION_TYPES.scriptRevision,
   TOKEN_TRANSACTION_TYPES.audioRegeneration,
   TOKEN_TRANSACTION_TYPES.imageRegeneration,
@@ -36,6 +37,7 @@ const PROJECT_RELATED_TOKEN_TYPES = [
 ] as const;
 
 const PROJECT_ACTION_TOKEN_TYPES = [
+  TOKEN_TRANSACTION_TYPES.imageGeneration,
   TOKEN_TRANSACTION_TYPES.scriptRevision,
   TOKEN_TRANSACTION_TYPES.audioRegeneration,
   TOKEN_TRANSACTION_TYPES.imageRegeneration,
@@ -58,6 +60,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       include: {
         scripts: true,
         audios: true,
+        images: { orderBy: { createdAt: 'desc' } },
         videos: true,
         statusLog: { orderBy: { createdAt: 'desc' }, take: 1 },
         selection: true,
@@ -184,6 +187,9 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
     const hasExplicitProjectCreationCharge = projectRelatedTokenTransactions.some(
       (tx) => tx.type === TOKEN_TRANSACTION_TYPES.projectCreation,
     );
+    const hasExplicitImageGenerationCharge = projectRelatedTokenTransactions.some(
+      (tx) => tx.type === TOKEN_TRANSACTION_TYPES.imageGeneration,
+    );
     const actionDeltaForProject = projectRelatedTokenTransactions.reduce((sum, tx) => {
       if (!(PROJECT_ACTION_TOKEN_TYPES as readonly string[]).includes(tx.type)) return sum;
       return sum + tx.delta;
@@ -194,7 +200,11 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         ? (initialJob?.payload as any).durationSeconds
         : null,
     ) * Math.max(languages.length, 1);
-    const tokensUsed = hasExplicitProjectCreationCharge
+    const tokensUsed = projectExperience === 'image-generation'
+      ? (hasExplicitImageGenerationCharge
+        ? toUsedTokensFromDelta(projectDeltaFromLedger)
+        : TOKEN_COSTS.actions.imageGeneration)
+      : hasExplicitProjectCreationCharge
       ? toUsedTokensFromDelta(projectDeltaFromLedger)
       : Math.max(0, estimatedCreationTokens + actionTokensUsed);
 
@@ -223,12 +233,25 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         break;
       }
       case ProjectStatus.Done: {
-        const final = p.videos.find((v: any) => v.isFinal);
-        const finalUrl = (final as any)?.publicUrl || (p as any).finalVideoUrl || normalizeMediaUrl(final?.path || (p as any).finalVideoPath || null);
-        statusInfo = {
-          url: finalUrl,
-          ...(languageVariants.length ? { languageVariants } : {}),
-        };
+        if (projectExperience === 'image-generation') {
+          const finalImage = (p as any).images?.[0] ?? null;
+          const finalImageUrl =
+            typeof (baseStatusInfo as any).finalImageUrl === 'string'
+              ? (baseStatusInfo as any).finalImageUrl
+              : (finalImage?.publicUrl || normalizeMediaUrl(finalImage?.path ?? null));
+          statusInfo = {
+            ...baseStatusInfo,
+            finalImageUrl,
+            finalImagePath: (baseStatusInfo as any).finalImagePath ?? finalImage?.path ?? null,
+          };
+        } else {
+          const final = p.videos.find((v: any) => v.isFinal);
+          const finalUrl = (final as any)?.publicUrl || (p as any).finalVideoUrl || normalizeMediaUrl(final?.path || (p as any).finalVideoPath || null);
+          statusInfo = {
+            url: finalUrl,
+            ...(languageVariants.length ? { languageVariants } : {}),
+          };
+        }
         break;
       }
       default: {
@@ -387,6 +410,56 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       anyP.finalVideoUrl
       || (finalist as any)?.publicUrl
       || normalizeMediaUrl(anyP.finalVideoPath ?? finalist?.path ?? null);
+    const imageAssets = Array.isArray(anyP.images)
+      ? anyP.images as Array<{ id: string; path: string; publicUrl?: string | null; createdAt?: Date }>
+      : [];
+    const resultImageAsset = imageAssets[0] ?? null;
+    const imageStatusInfo = sanitizedStatusInfo as Record<string, any> | undefined;
+    const imageGeneration = projectExperience === 'image-generation'
+      ? {
+          prompt: String((initialJob?.payload as any)?.prompt ?? p.prompt ?? ''),
+          provider: typeof (initialJob?.payload as any)?.provider === 'string'
+            ? (initialJob?.payload as any).provider
+            : (typeof imageStatusInfo?.provider === 'string' ? imageStatusInfo.provider : null),
+          model: typeof (initialJob?.payload as any)?.model === 'string'
+            ? (initialJob?.payload as any).model
+            : (typeof imageStatusInfo?.model === 'string' ? imageStatusInfo.model : null),
+          width: typeof (initialJob?.payload as any)?.width === 'number'
+            ? (initialJob?.payload as any).width
+            : (typeof imageStatusInfo?.width === 'number' ? imageStatusInfo.width : null),
+          height: typeof (initialJob?.payload as any)?.height === 'number'
+            ? (initialJob?.payload as any).height
+            : (typeof imageStatusInfo?.height === 'number' ? imageStatusInfo.height : null),
+          resultImageUrl:
+            (typeof imageStatusInfo?.finalImageUrl === 'string' && imageStatusInfo.finalImageUrl.trim())
+              ? imageStatusInfo.finalImageUrl
+              : (resultImageAsset?.publicUrl || normalizeMediaUrl(resultImageAsset?.path ?? null)),
+          resultImagePath:
+            (typeof imageStatusInfo?.finalImagePath === 'string' && imageStatusInfo.finalImagePath.trim())
+              ? imageStatusInfo.finalImagePath
+              : (resultImageAsset?.path ?? null),
+          resultFormat:
+            (typeof imageStatusInfo?.resultFormat === 'string' && imageStatusInfo.resultFormat.trim())
+              ? imageStatusInfo.resultFormat
+              : inferImageFormat(
+                  (typeof imageStatusInfo?.finalImagePath === 'string' ? imageStatusInfo.finalImagePath : null)
+                  ?? resultImageAsset?.path
+                  ?? resultImageAsset?.publicUrl
+                  ?? null,
+                ),
+          originalImageUrl: characterSelectionPayload?.imageUrl ?? null,
+          characterTitle: characterTitle ?? null,
+          variationTitle: variationTitle ?? null,
+          source: characterSelectionPayload?.source ?? characterSelectionPayload?.type ?? null,
+          estimatedDurationSeconds:
+            typeof (initialJob?.payload as any)?.estimatedDurationSeconds === 'number'
+              ? (initialJob?.payload as any).estimatedDurationSeconds
+              : 300,
+          startedAt:
+            (typeof imageStatusInfo?.progressStartedAt === 'string' && imageStatusInfo.progressStartedAt)
+              || p.createdAt.toISOString(),
+        }
+      : null;
     return ok({
       id: p.id,
       userId: p.userId,
@@ -413,6 +486,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       statusInfo: sanitizedStatusInfo,
       imageEditorEnabled: adminImageEditor.enabled,
       templateImages: templateImageMetadata,
+      imageGeneration,
       creation,
       tokensUsed,
       template: p.template ? {
@@ -429,6 +503,17 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
 export async function PATCH() {
   // Reserved for future updates
   return ok({});
+}
+
+function inferImageFormat(reference: string | null | undefined): string | null {
+  if (!reference) return null;
+  const clean = reference.split('?')[0] ?? reference;
+  const match = clean.match(/\.([a-z0-9]+)$/i);
+  const ext = match?.[1]?.toLowerCase();
+  if (!ext) return null;
+  if (ext === 'jpeg') return 'jpg';
+  if (ext === 'jpg' || ext === 'png' || ext === 'webp') return ext;
+  return null;
 }
 
 export const DELETE = withApiError(async function DELETE(req: NextRequest, { params }: { params: Promise<Params> }) {

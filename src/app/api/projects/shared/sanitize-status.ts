@@ -9,6 +9,8 @@ const SENSITIVE_STATUS_KEYS = new Set([
   'imagesWorkspace',
   'imagesWorkspaceRoot',
   'imagesLog',
+  'imageGenerationWorkspace',
+  'runwareResponse',
   'logs',
 ]);
 

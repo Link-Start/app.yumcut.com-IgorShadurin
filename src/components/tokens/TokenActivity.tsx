@@ -52,6 +52,7 @@ const COPY: Record<AppLanguageCode, TokenActivityCopy> = {
       [TOKEN_TRANSACTION_TYPES.adminAdjustment]: 'Admin Adjustment',
       [TOKEN_TRANSACTION_TYPES.projectCreation]: 'Project Creation',
       [TOKEN_TRANSACTION_TYPES.scriptRevision]: 'Script Revision',
+      [TOKEN_TRANSACTION_TYPES.imageGeneration]: 'Image Generation',
       [TOKEN_TRANSACTION_TYPES.audioRegeneration]: 'Audio Regeneration',
       [TOKEN_TRANSACTION_TYPES.imageRegeneration]: 'Image Regeneration',
       [TOKEN_TRANSACTION_TYPES.imageRegenerationRefund]: 'Image Regeneration Refund',
@@ -88,6 +89,7 @@ const COPY: Record<AppLanguageCode, TokenActivityCopy> = {
       [TOKEN_TRANSACTION_TYPES.adminAdjustment]: 'Корректировка баланса',
       [TOKEN_TRANSACTION_TYPES.projectCreation]: 'Создание проекта',
       [TOKEN_TRANSACTION_TYPES.scriptRevision]: 'Доработка сценария',
+      [TOKEN_TRANSACTION_TYPES.imageGeneration]: 'Генерация изображения',
       [TOKEN_TRANSACTION_TYPES.audioRegeneration]: 'Перегенерация озвучки',
       [TOKEN_TRANSACTION_TYPES.imageRegeneration]: 'Перегенерация изображения',
       [TOKEN_TRANSACTION_TYPES.imageRegenerationRefund]: 'Возврат за изображение',
@@ -152,6 +154,8 @@ function getFallbackDescription(tx: TokenTransactionDTO, language: AppLanguageCo
       return language === 'ru' ? 'Бонус за возвращение к подписке' : 'Subscription return bonus';
     case TOKEN_TRANSACTION_TYPES.scriptRevision:
       return language === 'ru' ? 'Запрос на доработку сценария' : 'Script refinement request';
+    case TOKEN_TRANSACTION_TYPES.imageGeneration:
+      return language === 'ru' ? 'Генерация изображения' : 'Image generation';
     case TOKEN_TRANSACTION_TYPES.audioRegeneration:
       return language === 'ru' ? 'Перегенерация озвучки' : 'Audio regeneration';
     case TOKEN_TRANSACTION_TYPES.imageRegeneration:
@@ -185,6 +189,7 @@ function translateKnownInternalDescription(
     return value.replace(/^project creation \((\d+)s\)$/i, 'Создание проекта ($1с)');
   }
   if (/^script refinement request$/i.test(value)) return 'Запрос на доработку сценария';
+  if (/^image generation$/i.test(value)) return 'Генерация изображения';
   if (/^audio regeneration$/i.test(value)) return 'Перегенерация озвучки';
   if (/^image regeneration$/i.test(value)) return 'Перегенерация изображения';
   if (/^image regeneration failed$/i.test(value)) return 'Возврат за неуспешную перегенерацию изображения';

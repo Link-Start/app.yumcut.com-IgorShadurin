@@ -1,10 +1,10 @@
-export const PROJECT_EXPERIENCES = ['story', 'character', 'rigger-animation'] as const;
+export const PROJECT_EXPERIENCES = ['story', 'character', 'image-generation', 'rigger-animation'] as const;
 
 export type ProjectExperience = (typeof PROJECT_EXPERIENCES)[number];
 
 export const DEFAULT_PROJECT_EXPERIENCE: ProjectExperience = 'story';
 
 export function normalizeProjectExperience(value: unknown): ProjectExperience {
-  if (value === 'character' || value === 'rigger-animation') return value;
+  if (value === 'character' || value === 'image-generation' || value === 'rigger-animation') return value;
   return DEFAULT_PROJECT_EXPERIENCE;
 }

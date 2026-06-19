@@ -53,9 +53,14 @@ export const RIGGER_ANIMATION_PIPELINE_ORDER: ProjectStatus[] = [
   ProjectStatus.ProcessVideoMain,
 ];
 
+export const IMAGE_GENERATION_PIPELINE_ORDER: ProjectStatus[] = [
+  ProjectStatus.ProcessImagesGeneration,
+];
+
 export function pipelineOrderForExperience(projectExperience?: ProjectExperience | null): ProjectStatus[] {
   const experience = normalizeProjectExperience(projectExperience);
   if (experience === 'rigger-animation') return RIGGER_ANIMATION_PIPELINE_ORDER;
+  if (experience === 'image-generation') return IMAGE_GENERATION_PIPELINE_ORDER;
   return experience === 'character' ? CHARACTER_PIPELINE_ORDER : STORY_PIPELINE_ORDER;
 }
 
@@ -100,8 +105,12 @@ export function jobTypeForProjectStatus(
   status: ProjectStatus,
   projectExperience?: ProjectExperience | null,
 ): DaemonJobType | null {
-  if (!isStatusAllowedForExperience(status, projectExperience)) return null;
-  if (normalizeProjectExperience(projectExperience) === 'rigger-animation' && status === ProjectStatus.ProcessVideoMain) {
+  const experience = normalizeProjectExperience(projectExperience);
+  if (!isStatusAllowedForExperience(status, experience)) return null;
+  if (experience === 'image-generation' && status === ProjectStatus.New) {
+    return null;
+  }
+  if (experience === 'rigger-animation' && status === ProjectStatus.ProcessVideoMain) {
     return 'rigger_animation';
   }
   return STATUS_JOB_TYPES[status] ?? null;
@@ -111,8 +120,11 @@ export function legalStatusTypePairsForExperience(
   projectExperience?: ProjectExperience | null,
 ): { status: ProjectStatus; type: DaemonJobType }[] {
   const experience = normalizeProjectExperience(projectExperience);
+  const initialPairs = experience === 'image-generation'
+    ? []
+    : [{ status: ProjectStatus.New, type: 'script' as const }];
   return [
-    { status: ProjectStatus.New, type: 'script' },
+    ...initialPairs,
     ...pipelineOrderForExperience(experience).map((status) => ({
       status,
       type: experience === 'rigger-animation' && status === ProjectStatus.ProcessVideoMain
@@ -126,6 +138,7 @@ export function legalStatusTypePairsForAllExperiences(): { status: ProjectStatus
   const pairs = [
     ...legalStatusTypePairsForExperience(DEFAULT_PROJECT_EXPERIENCE),
     ...legalStatusTypePairsForExperience('character'),
+    ...legalStatusTypePairsForExperience('image-generation'),
     ...legalStatusTypePairsForExperience('rigger-animation'),
   ];
   return Array.from(new Map(pairs.map((pair) => [`${pair.status}:${pair.type}`, pair])).values());

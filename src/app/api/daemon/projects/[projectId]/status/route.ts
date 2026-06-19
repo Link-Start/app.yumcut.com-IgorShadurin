@@ -14,6 +14,7 @@ import { TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
 import { PROJECT_RELATED_TOKEN_TYPES, extractProjectIdFromTokenMetadata, toUsedTokensFromDelta } from '@/server/admin/token-usage';
 import { normalizeMediaUrl } from '@/server/storage';
 import { sendProjectFailedEmail, sendProjectReadyEmail } from '@/server/emails/project-lifecycle';
+import { normalizeProjectExperience } from '@/shared/constants/project-experience';
 
 type Params = { projectId: string };
 
@@ -216,6 +217,16 @@ export const POST = withApiError(async function POST(req: NextRequest, { params 
 
   if (status === ProjectStatus.Done && previousStatus !== ProjectStatus.Done) {
     try {
+      const initialJob = (prisma as any).job?.findFirst
+        ? await (prisma as any).job.findFirst({
+            where: { projectId },
+            orderBy: { createdAt: 'asc' },
+            select: { payload: true },
+          })
+        : null;
+      if (normalizeProjectExperience((initialJob?.payload as any)?.projectExperience) === 'image-generation') {
+        return ok({ ok: true });
+      }
       const updatedProject = await prisma.project.findUnique({
         where: { id: projectId },
         select: {
