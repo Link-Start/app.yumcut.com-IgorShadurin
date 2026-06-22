@@ -44,7 +44,8 @@ const COPY: Record<AppLanguageCode, {
   upload: string;
   replace: string;
   promptLabel: string;
-  promptPlaceholder: string;
+  twoImagePromptPlaceholder: string;
+  oneImagePromptPlaceholder: string;
   twoImageHint: string;
   oneImageHint: string;
   twoImages: string;
@@ -66,9 +67,10 @@ const COPY: Record<AppLanguageCode, {
     upload: 'Upload',
     replace: 'Replace',
     promptLabel: 'Prompt',
-    promptPlaceholder: 'What should happen in the prank?',
-    twoImageHint: 'The prank image will be added to the target image. Use the prompt to describe how it should fit.',
-    oneImageHint: 'Upload one image and describe the prank you want to create.',
+    twoImagePromptPlaceholder: 'Example: place the prank image naturally inside the target photo. You can also say first image and second image.',
+    oneImagePromptPlaceholder: 'Example: turn this image into a funny prank scene.',
+    twoImageHint: 'The prank image is the first image. The target image is the second image. Describe how the first should fit into the second.',
+    oneImageHint: 'Upload one image and describe the prank edit you want to make to it.',
     twoImages: '2 images',
     oneImage: '1 image',
     create: 'Continue',
@@ -88,9 +90,10 @@ const COPY: Record<AppLanguageCode, {
     upload: 'Загрузить',
     replace: 'Заменить',
     promptLabel: 'Промпт',
-    promptPlaceholder: 'Что должно произойти в prank-картинке?',
-    twoImageHint: 'Prank-картинка будет добавлена на целевое изображение. В промпте опишите, как именно она должна вписаться.',
-    oneImageHint: 'Загрузите одно изображение и опишите prank, который нужно создать.',
+    twoImagePromptPlaceholder: 'Например: естественно поместить prank-картинку на целевое фото. Можно писать первое и второе изображение.',
+    oneImagePromptPlaceholder: 'Например: превратить это изображение в смешную prank-сцену.',
+    twoImageHint: 'Prank-картинка - первое изображение. Целевое изображение - второе. Опишите, как первое должно вписаться во второе.',
+    oneImageHint: 'Загрузите одно изображение и опишите prank-правку, которую нужно сделать.',
     twoImages: '2 изображения',
     oneImage: '1 изображение',
     create: 'Продолжить',
@@ -242,6 +245,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
       : 'custom-two-image';
   const itemTitle = pickTitle(item ?? null, language);
   const imageHint = oneImageMode && !item ? copy.oneImageHint : copy.twoImageHint;
+  const promptPlaceholder = oneImageMode && !item ? copy.oneImagePromptPlaceholder : copy.twoImagePromptPlaceholder;
 
   useEffect(() => {
     let cancelled = false;
@@ -400,7 +404,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               id="image-prank-prompt"
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              placeholder={copy.promptPlaceholder}
+              placeholder={promptPlaceholder}
               className="min-h-52 resize-none"
               disabled={submitting}
             />

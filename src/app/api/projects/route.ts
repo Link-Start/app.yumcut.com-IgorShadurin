@@ -569,9 +569,11 @@ const IMAGE_PRANK_SYSTEM_PROMPT = [
   'System instruction for Image Prank generation:',
   'Use the provided reference images in the exact order supplied.',
   'When two reference images are supplied, organically integrate the first reference image into the second reference image as the target scene or background.',
+  'For two reference images, interpret "prank image", "first image", "image 1", or "first reference" as the first supplied image, and interpret "target image", "second image", "image 2", "background", or "target scene" as the second supplied image.',
   'Match perspective, scale, lighting direction, shadows, reflections, color temperature, depth of field, camera style, texture, grain, and natural occlusion so the result looks like a real single image, not a sticker, collage, or copy-paste.',
   'Preserve the target scene unless the user explicitly asks to change it.',
   'When one reference image is supplied, edit that image according to the user prompt while preserving its main subject and camera realism.',
+  'For one reference image, interpret any mention of "the image", "this image", "reference image", "first image", or "target image" as the single supplied image.',
   'Do not add captions, text, UI, logos, watermarks, or random artifacts.',
 ].join('\n');
 
