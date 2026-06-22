@@ -45,6 +45,8 @@ const COPY: Record<AppLanguageCode, {
   replace: string;
   promptLabel: string;
   promptPlaceholder: string;
+  twoImageHint: string;
+  oneImageHint: string;
   twoImages: string;
   oneImage: string;
   create: string;
@@ -65,6 +67,8 @@ const COPY: Record<AppLanguageCode, {
     replace: 'Replace',
     promptLabel: 'Prompt',
     promptPlaceholder: 'What should happen in the prank?',
+    twoImageHint: 'The prank image will be added to the target image. Use the prompt to describe how it should fit.',
+    oneImageHint: 'Upload one image and describe the prank you want to create.',
     twoImages: '2 images',
     oneImage: '1 image',
     create: 'Continue',
@@ -85,6 +89,8 @@ const COPY: Record<AppLanguageCode, {
     replace: 'Заменить',
     promptLabel: 'Промпт',
     promptPlaceholder: 'Что должно произойти в prank-картинке?',
+    twoImageHint: 'Prank-картинка будет добавлена на целевое изображение. В промпте опишите, как именно она должна вписаться.',
+    oneImageHint: 'Загрузите одно изображение и опишите prank, который нужно создать.',
     twoImages: '2 изображения',
     oneImage: '1 изображение',
     create: 'Продолжить',
@@ -235,6 +241,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
       ? 'custom-one-image'
       : 'custom-two-image';
   const itemTitle = pickTitle(item ?? null, language);
+  const imageHint = oneImageMode && !item ? copy.oneImageHint : copy.twoImageHint;
 
   useEffect(() => {
     let cancelled = false;
@@ -379,6 +386,9 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
             onChange={setTargetFile}
             disabled={submitting}
           />
+          <p className="col-span-2 text-sm leading-5 text-gray-600 dark:text-gray-400">
+            {imageHint}
+          </p>
         </div>
 
         <div className="space-y-4">

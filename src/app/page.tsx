@@ -56,7 +56,10 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Se
   const sessionUserId = (session?.user as any)?.id as string | undefined;
   const [groups, imagePrankCatalog] = await Promise.all([
     listCharacterCatalogGroups(sessionUserId ?? null),
-    listPublicImagePrankCatalog(),
+    listPublicImagePrankCatalog().catch((error) => {
+      console.error('Failed to load image prank catalog for home page', error);
+      return { categories: [] };
+    }),
   ]);
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const rawOpenMode = resolvedSearchParams?.openMode;
