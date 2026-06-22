@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ImagePlus, Images, Loader2, UploadCloud, Wand2 } from 'lucide-react';
+import { ArrowLeft, ImagePlus, Images, Loader2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { storeProjectDraft } from '@/lib/project-draft';
@@ -47,8 +47,6 @@ const COPY: Record<AppLanguageCode, {
   promptPlaceholder: string;
   twoImages: string;
   oneImage: string;
-  cost: string;
-  balanceAfter: string;
   create: string;
   uploading: string;
   back: string;
@@ -69,8 +67,6 @@ const COPY: Record<AppLanguageCode, {
     promptPlaceholder: 'What should happen in the prank?',
     twoImages: '2 images',
     oneImage: '1 image',
-    cost: 'Cost',
-    balanceAfter: 'After',
     create: 'Continue',
     uploading: 'Uploading',
     back: 'Back',
@@ -91,8 +87,6 @@ const COPY: Record<AppLanguageCode, {
     promptPlaceholder: 'Что должно произойти в prank-картинке?',
     twoImages: '2 изображения',
     oneImage: '1 изображение',
-    cost: 'Цена',
-    balanceAfter: 'После',
     create: 'Продолжить',
     uploading: 'Загрузка',
     back: 'Назад',
@@ -176,7 +170,7 @@ function UploadSlot({
         type="button"
         onClick={() => ref.current?.click()}
         disabled={disabled}
-        className="group flex aspect-square w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/30"
+        className="group flex aspect-[9/16] w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/30"
       >
         {state.previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -241,7 +235,6 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
       ? 'custom-one-image'
       : 'custom-two-image';
   const itemTitle = pickTitle(item ?? null, language);
-  const balanceAfter = Math.max(tokenBalance - tokenCost, 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -350,7 +343,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5 px-3 pb-14 pt-2 sm:px-4 lg:px-0">
-      <div className="flex items-center justify-between gap-3">
+      <div className="space-y-4">
         <button
           type="button"
           onClick={() => router.back()}
@@ -359,18 +352,15 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
           <ArrowLeft className="h-4 w-4" />
           {copy.back}
         </button>
-        <div className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
-          <Wand2 className="h-4 w-4 text-blue-500" />
-          {copy.title}
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{copy.title}</h1>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-[minmax(220px,1fr)_minmax(0,2fr)]">
+        <div className="grid grid-cols-2 gap-3 self-start">
           {item ? (
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100">{copy.catalogLabel}</Label>
-              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+              <div className="flex aspect-[9/16] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={item.imageUrl} alt={itemTitle} className="h-full w-full object-contain" />
               </div>
@@ -391,7 +381,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
           />
         </div>
 
-        <div className="space-y-4 rounded-lg border border-gray-200 bg-white/80 p-4 dark:border-gray-800 dark:bg-gray-950/60">
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="image-prank-prompt" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               {copy.promptLabel}
@@ -401,7 +391,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               placeholder={copy.promptPlaceholder}
-              className="min-h-36 resize-none"
+              className="min-h-52 resize-none"
               disabled={submitting}
             />
           </div>
@@ -438,17 +428,6 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               })}
             </div>
           ) : null}
-
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-              <div className="text-gray-500 dark:text-gray-400">{copy.cost}</div>
-              <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{tokenCost.toLocaleString()}</div>
-            </div>
-            <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-              <div className="text-gray-500 dark:text-gray-400">{copy.balanceAfter}</div>
-              <div className="mt-1 font-semibold text-gray-900 dark:text-gray-100">{balanceAfter.toLocaleString()}</div>
-            </div>
-          </div>
 
           <Button type="button" className="w-full cursor-pointer" onClick={() => void handleSubmit()} disabled={submitting}>
             {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
