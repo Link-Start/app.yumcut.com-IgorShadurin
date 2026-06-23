@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, ChevronDown, Clock3, Coins, Copy, Download, FileText, ImageIcon, Loader2, MoreVertical, Sparkles, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Download, FileText, ImageIcon, Loader2, MoreVertical, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -50,15 +50,9 @@ const COPY: Record<AppLanguageCode, {
   sourceImage: string;
   referenceImages: string;
   catalogCharacter: string;
-  generationData: string;
   noSourceImage: string;
-  tokensSpent: string;
-  model: string;
-  size: string;
-  created: string;
   source: string;
   unknown: string;
-  tokensUnit: string;
 }> = {
   en: {
     projectActions: 'Project actions',
@@ -87,15 +81,9 @@ const COPY: Record<AppLanguageCode, {
     sourceImage: 'Source image',
     referenceImages: 'Reference images',
     catalogCharacter: 'Catalog character',
-    generationData: 'Generation data',
     noSourceImage: 'No source image was attached.',
-    tokensSpent: 'Tokens spent',
-    model: 'Model',
-    size: 'Size',
-    created: 'Created',
     source: 'Source',
     unknown: 'Unknown',
-    tokensUnit: 'tokens',
   },
   ru: {
     projectActions: 'Действия проекта',
@@ -124,15 +112,9 @@ const COPY: Record<AppLanguageCode, {
     sourceImage: 'Исходное изображение',
     referenceImages: 'Референсные изображения',
     catalogCharacter: 'Персонаж из каталога',
-    generationData: 'Данные генерации',
     noSourceImage: 'Исходное изображение не было прикреплено.',
-    tokensSpent: 'Потрачено токенов',
-    model: 'Модель',
-    size: 'Размер',
-    created: 'Создано',
     source: 'Источник',
     unknown: 'Неизвестно',
-    tokensUnit: 'токенов',
   },
 };
 
@@ -274,20 +256,6 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
     : image?.source === 'user'
       ? t.sourceImage
       : t.unknown;
-  const createdLabel = useMemo(() => {
-    try {
-      return new Intl.DateTimeFormat(language === 'ru' ? 'ru-RU' : 'en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(new Date(project.createdAt));
-    } catch {
-      return project.createdAt;
-    }
-  }, [language, project.createdAt]);
-
   useEffect(() => {
     if (!isProcessing) return;
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -478,59 +446,28 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
             </div>
 
             <div className="space-y-4">
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-                <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                      {t.prompt}
-                    </h2>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="inline-flex cursor-pointer items-center gap-1.5"
-                      onClick={handleCopyPrompt}
-                      disabled={!prompt}
-                    >
-                      {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copied ? t.copied : t.copy}
-                    </Button>
-                  </div>
-                  <div className="whitespace-pre-wrap text-sm leading-6 text-gray-800 dark:text-gray-200">
-                    {prompt || t.unknown}
-                  </div>
-                </section>
-
-                <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
-                  <h2 className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    <Sparkles className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                    {t.generationData}
+              <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    {t.prompt}
                   </h2>
-                  <dl className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400"><Clock3 className="h-3.5 w-3.5" />{t.created}</dt>
-                      <dd className="text-right font-medium text-gray-900 dark:text-gray-100">{createdLabel}</dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-gray-500 dark:text-gray-400">{t.model}</dt>
-                      <dd className="max-w-[160px] truncate text-right font-medium text-gray-900 dark:text-gray-100">{image?.model || t.unknown}</dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-gray-500 dark:text-gray-400">{t.size}</dt>
-                      <dd className="text-right font-medium text-gray-900 dark:text-gray-100">
-                        {image?.width && image?.height ? `${image.width}x${image.height}` : t.unknown}
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400"><Coins className="h-3.5 w-3.5" />{t.tokensSpent}</dt>
-                      <dd className="text-right font-medium text-gray-900 dark:text-gray-100">
-                        {typeof project.tokensUsed === 'number' ? `${project.tokensUsed.toLocaleString()} ${t.tokensUnit}` : t.unknown}
-                      </dd>
-                    </div>
-                  </dl>
-                </section>
-              </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="inline-flex cursor-pointer items-center gap-1.5"
+                    onClick={handleCopyPrompt}
+                    disabled={!prompt}
+                  >
+                    {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? t.copied : t.copy}
+                  </Button>
+                </div>
+                <div className="whitespace-pre-wrap text-sm leading-6 text-gray-800 dark:text-gray-200">
+                  {prompt || t.unknown}
+                </div>
+              </section>
 
               <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
                 <h2 className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
