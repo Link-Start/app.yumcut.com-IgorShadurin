@@ -34,6 +34,8 @@ type ImageSlotState = {
   previewUrl: string | null;
 };
 
+const MAX_STORAGE_IMAGE_DIMENSION = 2000;
+
 const COPY: Record<AppLanguageCode, {
   title: string;
   customTitle: string;
@@ -202,15 +204,16 @@ function UploadSlot({
 }
 
 async function uploadSource(file: File, role: ImagePrankSourceImageRole, label: string, storageBaseUrl: string): Promise<UploadedSource> {
+  const uploadFile = role === 'target' ? await resizeImageForStorage(file) : file;
   const grant = await Api.createCharacterUploadToken();
   if (!grant?.data || !grant.signature) throw new Error('Upload authorization failed');
-  if (!grant.mimeTypes.includes(file.type)) throw new Error('Selected file type is not allowed');
-  if (file.size > grant.maxBytes) {
+  if (!grant.mimeTypes.includes(uploadFile.type)) throw new Error('Selected file type is not allowed');
+  if (uploadFile.size > grant.maxBytes) {
     throw new Error(`File is too large. Maximum size is ${Math.floor(grant.maxBytes / 1024 / 1024)}MB`);
   }
 
   const form = new FormData();
-  form.set('file', file);
+  form.set('file', uploadFile);
   form.set('data', grant.data);
   form.set('signature', grant.signature);
 
@@ -218,7 +221,10 @@ async function uploadSource(file: File, role: ImagePrankSourceImageRole, label: 
     method: 'POST',
     body: form,
   });
-  if (!response.ok) throw new Error(`Storage upload failed (${response.status})`);
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Storage upload failed (${response.status})${text ? `: ${text}` : ''}`);
+  }
   const payload = await response.json();
   if (!payload?.path || !payload?.url) throw new Error('Storage response missing image URL');
   return {
@@ -227,6 +233,73 @@ async function uploadSource(file: File, role: ImagePrankSourceImageRole, label: 
     url: payload.url,
     label,
   };
+}
+
+function imageMimeAndName(file: File) {
+  if (file.type === 'image/png') return { mimeType: 'image/png', extension: 'png' };
+  if (file.type === 'image/webp') return { mimeType: 'image/webp', extension: 'webp' };
+  return { mimeType: 'image/jpeg', extension: 'jpg' };
+}
+
+function fileNameWithExtension(fileName: string, extension: string) {
+  const base = fileName.trim().replace(/\.[a-z0-9]+$/i, '') || 'target-image';
+  return `${base}.${extension}`;
+}
+
+async function decodeImageFile(file: File): Promise<ImageBitmap | HTMLImageElement> {
+  if (typeof createImageBitmap === 'function') {
+    return createImageBitmap(file);
+  }
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to read image'));
+    };
+    image.src = url;
+  });
+}
+
+async function resizeImageForStorage(file: File): Promise<File> {
+  const decoded = await decodeImageFile(file);
+  const isHtmlImage = typeof HTMLImageElement !== 'undefined' && decoded instanceof HTMLImageElement;
+  const width = isHtmlImage ? decoded.naturalWidth : decoded.width;
+  const height = isHtmlImage ? decoded.naturalHeight : decoded.height;
+  const maxDimension = Math.max(width, height);
+  if (!width || !height || maxDimension <= MAX_STORAGE_IMAGE_DIMENSION) return file;
+
+  const scale = MAX_STORAGE_IMAGE_DIMENSION / maxDimension;
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+  const { mimeType, extension } = imageMimeAndName(file);
+  const quality = mimeType === 'image/jpeg' ? 0.94 : mimeType === 'image/webp' ? 0.95 : undefined;
+  const fileName = fileNameWithExtension(file.name, extension);
+
+  if (typeof OffscreenCanvas !== 'undefined') {
+    const canvas = new OffscreenCanvas(targetWidth, targetHeight);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas is not available');
+    ctx.drawImage(decoded as CanvasImageSource, 0, 0, targetWidth, targetHeight);
+    const blob = await canvas.convertToBlob({ type: mimeType, quality });
+    return new File([blob], fileName, { type: mimeType });
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas is not available');
+  ctx.drawImage(decoded as CanvasImageSource, 0, 0, targetWidth, targetHeight);
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((output) => resolve(output), mimeType, quality);
+  });
+  if (!blob) throw new Error('Failed to resize image');
+  return new File([blob], fileName, { type: mimeType });
 }
 
 export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO | null }) {

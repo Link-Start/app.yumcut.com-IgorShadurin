@@ -1,4 +1,5 @@
 import { prisma } from '@/server/db';
+import sharp from 'sharp';
 import {
   deleteStoredCatalogCharacterMedia,
   normalizeMediaUrl,
@@ -43,6 +44,8 @@ export type ListAdminImagePranksResult = {
   totalPages: number;
 };
 
+const MAX_CATALOG_IMAGE_DIMENSION = 2000;
+
 function toIso(value: Date): string {
   return value.toISOString();
 }
@@ -81,6 +84,51 @@ function mapItem(item: any): AdminImagePrankItemDTO {
     createdAt: toIso(item.createdAt),
     updatedAt: toIso(item.updatedAt),
   };
+}
+
+function catalogImageOutput(file: File): { mimeType: 'image/png' | 'image/jpeg' | 'image/webp'; extension: string } {
+  if (file.type === 'image/png') return { mimeType: 'image/png', extension: 'png' };
+  if (file.type === 'image/webp') return { mimeType: 'image/webp', extension: 'webp' };
+  return { mimeType: 'image/jpeg', extension: 'jpg' };
+}
+
+function replaceFileExtension(fileName: string, extension: string) {
+  const base = fileName.trim().replace(/\.[a-z0-9]+$/i, '') || 'image-prank';
+  return `${base}.${extension}`;
+}
+
+async function prepareCatalogImageFile(file: File, fallbackName: string): Promise<File> {
+  const input = Buffer.from(await file.arrayBuffer());
+  const metadata = await sharp(input).metadata();
+  const width = metadata.width ?? 0;
+  const height = metadata.height ?? 0;
+  if (!width || !height) throw new Error('Unable to read image dimensions');
+
+  const { mimeType, extension } = catalogImageOutput(file);
+  const fileName = replaceFileExtension(file.name || fallbackName, extension);
+  if (width <= MAX_CATALOG_IMAGE_DIMENSION && height <= MAX_CATALOG_IMAGE_DIMENSION) {
+    return file.name === fileName && file.type === mimeType ? file : new File([new Uint8Array(input)], fileName, { type: mimeType });
+  }
+
+  let pipeline = sharp(input)
+    .rotate()
+    .resize({
+      width: MAX_CATALOG_IMAGE_DIMENSION,
+      height: MAX_CATALOG_IMAGE_DIMENSION,
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+
+  if (mimeType === 'image/png') {
+    pipeline = pipeline.png({ compressionLevel: 9 });
+  } else if (mimeType === 'image/webp') {
+    pipeline = pipeline.webp({ quality: 95 });
+  } else {
+    pipeline = pipeline.jpeg({ quality: 94, mozjpeg: true });
+  }
+
+  const output = await pipeline.toBuffer();
+  return new File([new Uint8Array(output)], fileName, { type: mimeType });
 }
 
 export async function listAdminImagePrankCategories(): Promise<AdminImagePrankCategoryDTO[]> {
@@ -273,9 +321,10 @@ export async function createAdminImagePrankItem(input: {
   });
   if (!category) throw new Error('Category not found');
 
+  const preparedImage = await prepareCatalogImageFile(input.image, `${slug}.png`);
   const stored = await uploadCharacterAssetToStorage({
-    file: input.image,
-    fileName: input.image.name || `${slug}.png`,
+    file: preparedImage,
+    fileName: preparedImage.name || `${slug}.png`,
     kind: 'character-image',
   });
 
@@ -359,9 +408,10 @@ export async function updateAdminImagePrankItem(
 
   if (input.image) {
     const fileName = input.image.name || `${typeof data.slug === 'string' ? data.slug : id}.png`;
+    const preparedImage = await prepareCatalogImageFile(input.image, fileName);
     const stored = await uploadCharacterAssetToStorage({
-      file: input.image,
-      fileName,
+      file: preparedImage,
+      fileName: preparedImage.name || fileName,
       kind: 'character-image',
     });
     data.imagePath = stored.path;
