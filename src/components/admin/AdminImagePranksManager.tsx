@@ -61,6 +61,8 @@ export function AdminImagePranksManager() {
   const [itemForm, setItemForm] = useState(emptyItemForm);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemImage, setItemImage] = useState<File | null>(null);
+  const [itemImagePreviewUrl, setItemImagePreviewUrl] = useState<string | null>(null);
+  const [editingItemPreviewUrl, setEditingItemPreviewUrl] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [activeTab, setActiveTab] = useState('pranks');
@@ -92,6 +94,18 @@ export function AdminImagePranksManager() {
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!itemImage) {
+      setItemImagePreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(itemImage);
+    setItemImagePreviewUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [itemImage]);
 
   const submitCategory = async (event: FormEvent) => {
     event.preventDefault();
@@ -152,6 +166,7 @@ export function AdminImagePranksManager() {
       setItemForm({ ...emptyItemForm, categoryId: selectedCategory?.id ?? categories[0]?.id ?? '' });
       setEditingItemId(null);
       setItemImage(null);
+      setEditingItemPreviewUrl(null);
       await loadAll();
       toast.success('Prank image saved');
     } finally {
@@ -184,13 +199,17 @@ export function AdminImagePranksManager() {
       isPublic: item.isPublic,
     });
     setItemImage(null);
+    setEditingItemPreviewUrl(item.previewImageUrl);
   };
 
   const resetItemForm = () => {
     setEditingItemId(null);
     setItemImage(null);
+    setEditingItemPreviewUrl(null);
     setItemForm({ ...emptyItemForm, categoryId: categories[0]?.id ?? '' });
   };
+
+  const displayedItemImagePreviewUrl = itemImagePreviewUrl ?? editingItemPreviewUrl;
 
   return (
     <div className="space-y-4">
@@ -249,10 +268,27 @@ export function AdminImagePranksManager() {
               <div className="space-y-1.5">
                 <Label htmlFor="prank-item-search">Search text</Label>
                 <Input id="prank-item-search" value={itemForm.searchText} onChange={(event) => setItemForm((prev) => ({ ...prev, searchText: event.target.value }))} />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Extra keywords, aliases, and phrases used only for catalog search.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="prank-item-image">Image</Label>
                 <Input id="prank-item-image" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setItemImage(event.target.files?.[0] ?? null)} />
+                {displayedItemImagePreviewUrl ? (
+                  <div className="mt-2 flex items-center gap-3 rounded-md border border-gray-200 p-2 dark:border-gray-800">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={displayedItemImagePreviewUrl} alt="Selected prank preview" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="min-w-0 text-sm">
+                      <div className="font-medium">{itemImage ? 'Selected image preview' : 'Current image'}</div>
+                      {itemImage ? (
+                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{itemImage.name}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2 lg:col-span-2">
                 <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 text-sm dark:border-gray-800">
