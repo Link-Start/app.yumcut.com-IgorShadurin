@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
 type Category = {
@@ -62,6 +63,7 @@ export function AdminImagePranksManager() {
   const [itemImage, setItemImage] = useState<File | null>(null);
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [activeTab, setActiveTab] = useState('pranks');
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === itemForm.categoryId) ?? null,
@@ -158,6 +160,7 @@ export function AdminImagePranksManager() {
   };
 
   const editCategory = (category: Category) => {
+    setActiveTab('categories');
     setEditingCategoryId(category.id);
     setCategoryForm({
       slug: category.slug,
@@ -169,6 +172,7 @@ export function AdminImagePranksManager() {
   };
 
   const editItem = (item: Item) => {
+    setActiveTab('pranks');
     setEditingItemId(item.id);
     setItemForm({
       categoryId: item.categoryId,
@@ -198,55 +202,14 @@ export function AdminImagePranksManager() {
         <p className="text-sm text-gray-500 dark:text-gray-300">Manage prank catalog categories and source images.</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle>{editingCategoryId ? 'Edit category' : 'New category'}</CardTitle>
-            <CardDescription>Categories appear on the Image Prank catalog root.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-3" onSubmit={submitCategory}>
-              <div className="space-y-1.5">
-                <Label htmlFor="prank-category-slug">Slug</Label>
-                <Input id="prank-category-slug" value={categoryForm.slug} onChange={(event) => setCategoryForm((prev) => ({ ...prev, slug: event.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="prank-category-title">Title</Label>
-                <Input id="prank-category-title" value={categoryForm.title} onChange={(event) => setCategoryForm((prev) => ({ ...prev, title: event.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="prank-category-subtitle">Subtitle</Label>
-                <Input id="prank-category-subtitle" value={categoryForm.subtitle} onChange={(event) => setCategoryForm((prev) => ({ ...prev, subtitle: event.target.value }))} />
-              </div>
-              <div className="grid grid-cols-[1fr_auto] items-end gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="prank-category-priority">Priority</Label>
-                  <Input id="prank-category-priority" type="number" value={categoryForm.priority} onChange={(event) => setCategoryForm((prev) => ({ ...prev, priority: event.target.value }))} />
-                </div>
-                <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 text-sm dark:border-gray-800">
-                  <input type="checkbox" checked={categoryForm.isActive} onChange={(event) => setCategoryForm((prev) => ({ ...prev, isActive: event.target.checked }))} />
-                  Active
-                </label>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" className="cursor-pointer" disabled={saving}>
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                  Save
-                </Button>
-                {editingCategoryId ? (
-                  <Button type="button" variant="outline" className="cursor-pointer" onClick={() => {
-                    setEditingCategoryId(null);
-                    setCategoryForm(emptyCategoryForm);
-                  }}>
-                    Cancel
-                  </Button>
-                ) : null}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="pranks" className="cursor-pointer">Prank images</TabsTrigger>
+          <TabsTrigger value="categories" className="cursor-pointer">Categories</TabsTrigger>
+        </TabsList>
 
-        <Card>
+        <TabsContent value="pranks" className="space-y-4">
+          <Card>
           <CardHeader>
             <CardTitle>{editingItemId ? 'Edit prank image' : 'New prank image'}</CardTitle>
             <CardDescription>Public images appear after Custom mix in the catalog.</CardDescription>
@@ -306,117 +269,204 @@ export function AdminImagePranksManager() {
               </div>
             </form>
           </CardContent>
-        </Card>
-      </div>
+          </Card>
 
-      <Card>
-        <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Catalog</CardTitle>
-            <CardDescription>{items.length.toLocaleString()} prank images</CardDescription>
-          </div>
-          <Button type="button" variant="outline" className="cursor-pointer" onClick={() => void loadAll()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_240px]">
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pranks" />
-            <select
-              className="h-10 cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
-              value={categoryFilter}
-              onChange={(event) => setCategoryFilter(event.target.value)}
-            >
-              <option value="">All categories</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>{category.titleEn}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <div key={category.id} className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-800">
-                <span>{category.titleEn}</span>
-                <button type="button" className="cursor-pointer text-gray-500 hover:text-gray-900 dark:hover:text-white" onClick={() => editCategory(category)} aria-label="Edit category">
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  className="cursor-pointer text-red-500 hover:text-red-700"
-                  onClick={async () => {
-                    await Api.adminImagePrankCategoriesDelete(category.id, { deleteFiles: true });
-                    await loadAll();
-                  }}
-                  aria-label="Delete category"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+          <Card>
+            <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Catalog</CardTitle>
+                <CardDescription>{items.length.toLocaleString()} prank images</CardDescription>
               </div>
-            ))}
-          </div>
-          {loading ? (
-            <div className="flex h-32 items-center justify-center text-gray-500">
-              <Loader2 className="h-5 w-5 animate-spin" />
-            </div>
-          ) : items.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-500 dark:border-gray-700">
-              No prank images yet.
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {items.map((item) => (
-                <div key={item.id} className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-lg border border-gray-200 p-2 dark:border-gray-800">
-                  <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900">
-                    {item.previewImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.previewImageUrl} alt={item.titleEn} className="h-full w-full object-cover" />
-                    ) : (
-                      <Images className="h-5 w-5 text-gray-400" />
-                    )}
-                  </div>
-                  <div className="min-w-0 space-y-1">
-                    <div className="truncate text-sm font-semibold">{item.titleEn}</div>
-                    <div className="truncate text-xs text-gray-500 dark:text-gray-400">{item.category?.titleEn ?? 'No category'} / {item.slug}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Priority {item.priority} / {item.isPublic ? 'Public' : 'Hidden'}</div>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <Button type="button" size="sm" variant="outline" className="h-8 cursor-pointer" onClick={() => editItem(item)}>
-                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-8 cursor-pointer"
-                        onClick={async () => {
-                          await Api.adminImagePrankUpdate(item.id, { isPublic: !item.isPublic });
-                          await loadAll();
-                        }}
-                      >
-                        {item.isPublic ? 'Hide' : 'Show'}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        className="h-8 cursor-pointer"
-                        onClick={async () => {
-                          await Api.adminImagePrankDelete(item.id, { deleteFiles: true });
-                          await loadAll();
-                        }}
-                      >
-                        <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
+              <Button type="button" variant="outline" className="cursor-pointer" onClick={() => void loadAll()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_240px]">
+                <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pranks" />
+                <select
+                  className="h-10 cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                >
+                  <option value="">All categories</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>{category.titleEn}</option>
+                  ))}
+                </select>
+              </div>
+              {loading ? (
+                <div className="flex h-32 items-center justify-center text-gray-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : items.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-500 dark:border-gray-700">
+                  No prank images yet.
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {items.map((item) => (
+                    <div key={item.id} className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-lg border border-gray-200 p-2 dark:border-gray-800">
+                      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900">
+                        {item.previewImageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={item.previewImageUrl} alt={item.titleEn} className="h-full w-full object-cover" />
+                        ) : (
+                          <Images className="h-5 w-5 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 space-y-1">
+                        <div className="truncate text-sm font-semibold">{item.titleEn}</div>
+                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{item.category?.titleEn ?? 'No category'} / {item.slug}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Priority {item.priority} / {item.isPublic ? 'Public' : 'Hidden'}</div>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Button type="button" size="sm" variant="outline" className="h-8 cursor-pointer" onClick={() => editItem(item)}>
+                            <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 cursor-pointer"
+                            onClick={async () => {
+                              await Api.adminImagePrankUpdate(item.id, { isPublic: !item.isPublic });
+                              await loadAll();
+                            }}
+                          >
+                            {item.isPublic ? 'Hide' : 'Show'}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className="h-8 cursor-pointer"
+                            onClick={async () => {
+                              await Api.adminImagePrankDelete(item.id, { deleteFiles: true });
+                              await loadAll();
+                            }}
+                          >
+                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>{editingCategoryId ? 'Edit category' : 'New category'}</CardTitle>
+              <CardDescription>Categories appear on the Image Prank catalog root.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-3 md:grid-cols-2" onSubmit={submitCategory}>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-category-slug">Slug</Label>
+                  <Input id="prank-category-slug" value={categoryForm.slug} onChange={(event) => setCategoryForm((prev) => ({ ...prev, slug: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-category-title">Title</Label>
+                  <Input id="prank-category-title" value={categoryForm.title} onChange={(event) => setCategoryForm((prev) => ({ ...prev, title: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label htmlFor="prank-category-subtitle">Subtitle</Label>
+                  <Input id="prank-category-subtitle" value={categoryForm.subtitle} onChange={(event) => setCategoryForm((prev) => ({ ...prev, subtitle: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-category-priority">Priority</Label>
+                  <Input id="prank-category-priority" type="number" value={categoryForm.priority} onChange={(event) => setCategoryForm((prev) => ({ ...prev, priority: event.target.value }))} />
+                </div>
+                <div className="flex items-end">
+                  <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 text-sm dark:border-gray-800">
+                    <input type="checkbox" checked={categoryForm.isActive} onChange={(event) => setCategoryForm((prev) => ({ ...prev, isActive: event.target.checked }))} />
+                    Active
+                  </label>
+                </div>
+                <div className="flex gap-2 md:col-span-2">
+                  <Button type="submit" className="cursor-pointer" disabled={saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Save category
+                  </Button>
+                  {editingCategoryId ? (
+                    <Button type="button" variant="outline" className="cursor-pointer" onClick={() => {
+                      setEditingCategoryId(null);
+                      setCategoryForm(emptyCategoryForm);
+                    }}>
+                      Cancel
+                    </Button>
+                  ) : null}
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Categories</CardTitle>
+                <CardDescription>{categories.length.toLocaleString()} categories</CardDescription>
+              </div>
+              <Button type="button" variant="outline" className="cursor-pointer" onClick={() => void loadAll()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex h-32 items-center justify-center text-gray-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : categories.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-500 dark:border-gray-700">
+                  No categories yet.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {categories.map((category) => (
+                    <div key={category.id} className="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">{category.titleEn}</div>
+                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{category.slug}</div>
+                        {category.subtitleEn ? (
+                          <div className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{category.subtitleEn}</div>
+                        ) : null}
+                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Priority {category.priority} / {category.isActive ? 'Active' : 'Hidden'}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="outline" className="h-8 cursor-pointer" onClick={() => editCategory(category)}>
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          className="h-8 cursor-pointer"
+                          onClick={async () => {
+                            await Api.adminImagePrankCategoriesDelete(category.id, { deleteFiles: true });
+                            await loadAll();
+                          }}
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
