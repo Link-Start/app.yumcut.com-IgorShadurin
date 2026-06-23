@@ -36,7 +36,7 @@ const COPY: Record<AppLanguageCode, {
   generationFailed: string;
   imageReady: string;
   progressWaiting: string;
-  progressEstimate: string;
+  progressCountdown: (time: string) => string;
   download: string;
   downloadOriginal: string;
   downloadPng: string;
@@ -73,7 +73,7 @@ const COPY: Record<AppLanguageCode, {
     generationFailed: 'Image generation failed',
     imageReady: 'Image ready',
     progressWaiting: 'Still working. The result will appear here automatically.',
-    progressEstimate: 'Estimated generation time: about 5 minutes.',
+    progressCountdown: (time) => `Time left: ${time}`,
     download: 'Download',
     downloadOriginal: 'Original',
     downloadPng: 'PNG',
@@ -110,7 +110,7 @@ const COPY: Record<AppLanguageCode, {
     generationFailed: 'Генерация изображения завершилась ошибкой',
     imageReady: 'Изображение готово',
     progressWaiting: 'Продолжаем обработку. Результат появится здесь автоматически.',
-    progressEstimate: 'Ожидаемое время генерации: около 5 минут.',
+    progressCountdown: (time) => `Осталось: ${time}`,
     download: 'Скачать',
     downloadOriginal: 'Оригинал',
     downloadPng: 'PNG',
@@ -139,10 +139,27 @@ const COPY: Record<AppLanguageCode, {
 function getProgressPercent(project: ProjectDetailDTO, nowMs: number) {
   if (project.status === ProjectStatus.Done) return 100;
   if (project.status === ProjectStatus.Error || project.status === ProjectStatus.Cancelled) return 100;
-  const startedAt = project.imageGeneration?.startedAt || project.createdAt;
-  const startedMs = Number.isFinite(Date.parse(startedAt)) ? Date.parse(startedAt) : nowMs;
+  const startedMs = getGenerationStartedMs(project, nowMs);
   const elapsed = Math.max(0, nowMs - startedMs);
   return Math.min(95, Math.max(5, Math.round((elapsed / FIVE_MINUTES_MS) * 95)));
+}
+
+function getGenerationStartedMs(project: ProjectDetailDTO, nowMs: number) {
+  const startedAt = project.imageGeneration?.startedAt || project.createdAt;
+  const parsed = Date.parse(startedAt);
+  return Number.isFinite(parsed) ? parsed : nowMs;
+}
+
+function getRemainingGenerationMs(project: ProjectDetailDTO, nowMs: number) {
+  const elapsed = Math.max(0, nowMs - getGenerationStartedMs(project, nowMs));
+  return Math.max(0, FIVE_MINUTES_MS - elapsed);
+}
+
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function sanitizeFilename(input: string | null | undefined) {
@@ -244,6 +261,12 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
   const progress = getProgressPercent(project, nowMs);
   const isProcessing = project.status !== ProjectStatus.Done && project.status !== ProjectStatus.Error && project.status !== ProjectStatus.Cancelled;
   const isError = project.status === ProjectStatus.Error;
+  const remainingGenerationMs = getRemainingGenerationMs(project, nowMs);
+  const progressCaption = isError
+    ? t.generationFailed
+    : remainingGenerationMs > 0
+      ? t.progressCountdown(formatCountdown(remainingGenerationMs))
+      : t.progressWaiting;
   const originalFormat = (image?.resultFormat || 'jpg').toLowerCase();
   const baseFilename = sanitizeFilename(project.title || prompt);
   const sourceLabel = image?.source === 'global'
@@ -447,9 +470,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                           style={{ width: `${progress}%` }}
                         />
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {progress >= 95 && !isError ? t.progressWaiting : t.progressEstimate}
-                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{progressCaption}</p>
                     </div>
                   </div>
                 )}
