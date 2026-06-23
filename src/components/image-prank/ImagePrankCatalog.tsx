@@ -128,18 +128,34 @@ function CategoryCard({
   onSelect: () => void;
 }) {
   const title = pickText(category.title, language);
+  const firstItem = category.items[0] ?? null;
+  const previewContent = (
+    <div className="relative aspect-[9/16] w-full">
+      <PreviewGrid images={category.items.map((item) => item.imageUrl)} label={title} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
+    </div>
+  );
   return (
-    <button type="button" onClick={onSelect} className="block w-full cursor-pointer text-left focus-visible:outline-none">
-      <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
-        <div className="relative aspect-[9/16] w-full">
-          <PreviewGrid images={category.items.map((item) => item.imageUrl)} label={title} />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
-          <div className="pointer-events-none absolute bottom-3 left-3 right-3 text-white">
-            <h3 className="truncate text-sm font-semibold leading-none">{title}</h3>
-          </div>
+    <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
+      {firstItem ? (
+        <Link href={`/image-prank/${encodeURIComponent(firstItem.slug)}`} className="block cursor-pointer focus-visible:outline-none">
+          {previewContent}
+        </Link>
+      ) : (
+        <button type="button" onClick={onSelect} className="block w-full cursor-pointer focus-visible:outline-none">
+          {previewContent}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onSelect}
+        className="block w-full cursor-pointer bg-white px-3 py-3 text-left transition hover:bg-gray-50 focus-visible:outline-none dark:bg-gray-950 dark:hover:bg-gray-900"
+      >
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold leading-none text-gray-950 dark:text-white">{title}</h3>
         </div>
-      </article>
-    </button>
+      </button>
+    </article>
   );
 }
 
