@@ -46,6 +46,8 @@ const COPY: Record<AppLanguageCode, {
   promptLabel: string;
   twoImagePromptPlaceholder: string;
   oneImagePromptPlaceholder: string;
+  twoImageDefaultPrompt: string;
+  oneImageDefaultPrompt: string;
   twoImageHint: string;
   oneImageHint: string;
   twoImages: string;
@@ -69,6 +71,8 @@ const COPY: Record<AppLanguageCode, {
     promptLabel: 'Prompt',
     twoImagePromptPlaceholder: 'Example: place the prank image naturally inside the target photo. You can also say first image and second image.',
     oneImagePromptPlaceholder: 'Example: turn this image into a funny prank scene.',
+    twoImageDefaultPrompt: 'Place the prank image on the target image so it fits the lighting, perspective, scale, and natural position.',
+    oneImageDefaultPrompt: 'Edit this image into a natural prank scene while preserving the lighting, perspective, and realistic placement.',
     twoImageHint: 'The prank image is the first image. The target image is the second image. Describe how the first should fit into the second.',
     oneImageHint: 'Upload one image and describe the prank edit you want to make to it.',
     twoImages: '2 images',
@@ -92,6 +96,8 @@ const COPY: Record<AppLanguageCode, {
     promptLabel: 'Промпт',
     twoImagePromptPlaceholder: 'Например: естественно поместить prank-картинку на целевое фото. Можно писать первое и второе изображение.',
     oneImagePromptPlaceholder: 'Например: превратить это изображение в смешную prank-сцену.',
+    twoImageDefaultPrompt: 'Помести prank-картинку на целевое изображение так, чтобы она подходила по освещению, перспективе, масштабу и естественной позиции.',
+    oneImageDefaultPrompt: 'Преврати это изображение в естественную prank-сцену, сохранив освещение, перспективу и реалистичное размещение.',
     twoImageHint: 'Prank-картинка - первое изображение. Целевое изображение - второе. Опишите, как первое должно вписаться во второе.',
     oneImageHint: 'Загрузите одно изображение и опишите prank-правку, которую нужно сделать.',
     twoImages: '2 изображения',
@@ -228,7 +234,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const copy = COPY[language];
   const router = useRouter();
   const storageBaseUrl = useMemo(resolveStorageBaseUrl, []);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(copy.twoImageDefaultPrompt);
   const [oneImageMode, setOneImageMode] = useState(false);
   const [prankFile, setPrankFile] = useState<File | null>(null);
   const [targetFile, setTargetFile] = useState<File | null>(null);
@@ -246,6 +252,17 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const itemTitle = pickTitle(item ?? null, language);
   const imageHint = oneImageMode && !item ? copy.oneImageHint : copy.twoImageHint;
   const promptPlaceholder = oneImageMode && !item ? copy.oneImagePromptPlaceholder : copy.twoImagePromptPlaceholder;
+  const defaultPrompt = oneImageMode && !item ? copy.oneImageDefaultPrompt : copy.twoImageDefaultPrompt;
+
+  useEffect(() => {
+    setPrompt((current) => {
+      const defaults = Object.values(COPY).flatMap((entry) => [
+        entry.twoImageDefaultPrompt,
+        entry.oneImageDefaultPrompt,
+      ]);
+      return current.trim() === '' || defaults.includes(current) ? defaultPrompt : current;
+    });
+  }, [defaultPrompt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -395,8 +412,8 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
           </p>
         </div>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
+        <div className="flex h-full flex-col gap-4">
+          <div className="flex min-h-[360px] flex-1 flex-col space-y-2">
             <Label htmlFor="image-prank-prompt" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               {copy.promptLabel}
             </Label>
@@ -405,7 +422,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               placeholder={promptPlaceholder}
-              className="min-h-52 resize-none"
+              className="min-h-[320px] flex-1 resize-none"
               disabled={submitting}
             />
           </div>
