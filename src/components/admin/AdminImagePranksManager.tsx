@@ -234,74 +234,80 @@ export function AdminImagePranksManager() {
             <CardDescription>Public images appear after Custom mix in the catalog.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-3 lg:grid-cols-2" onSubmit={submitItem}>
-              <div className="space-y-1.5">
-                <Label htmlFor="prank-item-category">Category</Label>
-                <select
-                  id="prank-item-category"
-                  className="h-10 w-full cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
-                  value={itemForm.categoryId}
-                  onChange={(event) => setItemForm((prev) => ({ ...prev, categoryId: event.target.value }))}
-                >
-                  <option value="">Select category</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>{category.titleEn}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="prank-item-slug">Slug</Label>
-                <Input id="prank-item-slug" value={itemForm.slug} onChange={(event) => setItemForm((prev) => ({ ...prev, slug: event.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="prank-item-title">Title</Label>
-                <Input id="prank-item-title" value={itemForm.title} onChange={(event) => setItemForm((prev) => ({ ...prev, title: event.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="prank-item-priority">Priority</Label>
-                <Input id="prank-item-priority" type="number" value={itemForm.priority} onChange={(event) => setItemForm((prev) => ({ ...prev, priority: event.target.value }))} />
-              </div>
-              <div className="space-y-1.5 lg:col-span-2">
-                <Label htmlFor="prank-item-description">Description</Label>
-                <Textarea id="prank-item-description" value={itemForm.description} onChange={(event) => setItemForm((prev) => ({ ...prev, description: event.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="prank-item-search">Keywords</Label>
-                <Input id="prank-item-search" value={itemForm.searchText} onChange={(event) => setItemForm((prev) => ({ ...prev, searchText: event.target.value }))} />
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Extra keywords, aliases, and phrases used only for catalog search.
-                </p>
+            <form className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]" onSubmit={submitItem}>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-item-category">Category</Label>
+                  <select
+                    id="prank-item-category"
+                    className="h-10 w-full cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
+                    value={itemForm.categoryId}
+                    onChange={(event) => setItemForm((prev) => ({ ...prev, categoryId: event.target.value }))}
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>{category.titleEn}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-item-slug">Slug</Label>
+                  <Input id="prank-item-slug" value={itemForm.slug} onChange={(event) => setItemForm((prev) => ({ ...prev, slug: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-item-title">Title</Label>
+                  <Input id="prank-item-title" value={itemForm.title} onChange={(event) => setItemForm((prev) => ({ ...prev, title: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-item-priority">Priority</Label>
+                  <Input id="prank-item-priority" type="number" value={itemForm.priority} onChange={(event) => setItemForm((prev) => ({ ...prev, priority: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label htmlFor="prank-item-description">Description</Label>
+                  <Textarea id="prank-item-description" value={itemForm.description} onChange={(event) => setItemForm((prev) => ({ ...prev, description: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label htmlFor="prank-item-search">Keywords</Label>
+                  <Input id="prank-item-search" value={itemForm.searchText} onChange={(event) => setItemForm((prev) => ({ ...prev, searchText: event.target.value }))} />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Extra keywords, aliases, and phrases used only for catalog search.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+                  <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 text-sm dark:border-gray-800">
+                    <input type="checkbox" checked={itemForm.isPublic} onChange={(event) => setItemForm((prev) => ({ ...prev, isPublic: event.target.checked }))} />
+                    Public
+                  </label>
+                  <Button type="submit" className="cursor-pointer" disabled={saving || categories.length === 0}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Save prank
+                  </Button>
+                  {editingItemId ? (
+                    <Button type="button" variant="outline" className="cursor-pointer" onClick={resetItemForm}>Cancel</Button>
+                  ) : null}
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="prank-item-image">Image</Label>
                 <Input id="prank-item-image" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setItemImage(event.target.files?.[0] ?? null)} />
-                {displayedItemImagePreviewUrl ? (
-                  <div className="mt-2 flex items-center gap-3 rounded-md border border-gray-200 p-2 dark:border-gray-800">
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={displayedItemImagePreviewUrl} alt="Selected prank preview" className="h-full w-full object-contain" />
+                <div className="flex min-h-80 items-center justify-center rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900/50">
+                  {displayedItemImagePreviewUrl ? (
+                    <div className="w-full space-y-2">
+                      <div className="flex h-72 w-full items-center justify-center overflow-hidden rounded-md bg-white dark:bg-gray-950">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={displayedItemImagePreviewUrl} alt="Selected prank preview" className="max-h-full max-w-full object-contain" />
+                      </div>
+                      <div className="min-w-0 text-sm">
+                        <div className="font-medium">{itemImage ? 'Selected image preview' : 'Current image'}</div>
+                        {itemImage ? (
+                          <div className="truncate text-xs text-gray-500 dark:text-gray-400">{itemImage.name}</div>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="min-w-0 text-sm">
-                      <div className="font-medium">{itemImage ? 'Selected image preview' : 'Current image'}</div>
-                      {itemImage ? (
-                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{itemImage.name}</div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-2 lg:col-span-2">
-                <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 text-sm dark:border-gray-800">
-                  <input type="checkbox" checked={itemForm.isPublic} onChange={(event) => setItemForm((prev) => ({ ...prev, isPublic: event.target.checked }))} />
-                  Public
-                </label>
-                <Button type="submit" className="cursor-pointer" disabled={saving || categories.length === 0}>
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                  Save prank
-                </Button>
-                {editingItemId ? (
-                  <Button type="button" variant="outline" className="cursor-pointer" onClick={resetItemForm}>Cancel</Button>
-                ) : null}
+                  ) : (
+                    <div className="text-center text-sm text-gray-500 dark:text-gray-400">Choose an image to preview it here.</div>
+                  )}
+                </div>
               </div>
             </form>
           </CardContent>
