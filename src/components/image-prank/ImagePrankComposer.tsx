@@ -74,6 +74,7 @@ const COPY: Record<AppLanguageCode, {
   toastPlanAlreadyActive: string;
   toastSubscriptionUpdated: string;
   toastOpenCheckoutFailed: string;
+  loading: string;
   uploading: string;
   back: string;
   missingPrompt: string;
@@ -123,6 +124,7 @@ const COPY: Record<AppLanguageCode, {
     toastPlanAlreadyActive: 'This plan is already active.',
     toastSubscriptionUpdated: 'Subscription updated.',
     toastOpenCheckoutFailed: 'Failed to open checkout',
+    loading: 'Loading',
     uploading: 'Uploading',
     back: 'Back',
     missingPrompt: 'Enter a prompt',
@@ -172,6 +174,7 @@ const COPY: Record<AppLanguageCode, {
     toastPlanAlreadyActive: 'Этот план уже активен.',
     toastSubscriptionUpdated: 'Подписка обновлена.',
     toastOpenCheckoutFailed: 'Не удалось открыть оплату',
+    loading: 'Загрузка',
     uploading: 'Загрузка',
     back: 'Назад',
     missingPrompt: 'Введите промпт',
@@ -356,6 +359,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const [targetFile, setTargetFile] = useState<File | null>(null);
   const [tokenBalance, setTokenBalance] = useState(0);
   const [tokenCost, setTokenCost] = useState(TOKEN_COSTS.actions.imageGeneration);
+  const [tokenInfoLoading, setTokenInfoLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlanKey | null>(null);
@@ -440,27 +444,30 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
 
   const handleContinue = async () => {
     if (submitting || !validate()) return;
+    setConfirmOpen(true);
+    setTokenInfoLoading(true);
     let balanceForDecision = tokenBalance;
-    let costForDecision = tokenCost;
     try {
       const latestSummary = await refresh().catch(() => null);
       if (latestSummary) {
         balanceForDecision = latestSummary.balance;
-        costForDecision = latestSummary.actionCosts.imageGeneration ?? TOKEN_COSTS.actions.imageGeneration;
         setTokenBalance(balanceForDecision);
-        setTokenCost(costForDecision);
       }
-    } catch {}
-    if (balanceForDecision < costForDecision) {
+    } catch {
+      toast.error(copy.tokenLoadFailed);
+    } finally {
+      setTokenInfoLoading(false);
+    }
+    if (balanceForDecision < tokenCost) {
       setSelectedPlanKey('monthly');
+      setConfirmOpen(false);
       setPaywallOpen(true);
       return;
     }
-    setConfirmOpen(true);
   };
 
   const handleSubmit = async () => {
-    if (submitting || !validate()) return;
+    if (submitting || tokenInfoLoading || !validate()) return;
     if (tokenBalance < tokenCost) {
       setConfirmOpen(false);
       setSelectedPlanKey('monthly');
@@ -652,7 +659,9 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
             <span className="font-semibold text-gray-900 dark:text-gray-100">{tokenCost}</span>{' '}
             {copy.confirmWithdrawOutro}{' '}
             {copy.confirmBalanceLabel}{' '}
-            <span className="font-semibold text-gray-900 dark:text-gray-100">{projectedBalance}</span>{' '}
+            <span className="inline-flex min-w-5 items-center justify-center font-semibold text-gray-900 dark:text-gray-100">
+              {tokenInfoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label={copy.loading} /> : projectedBalance}
+            </span>{' '}
             {copy.confirmBalanceOutro}
           </p>
           <div className="mt-4 flex items-center justify-end gap-2">
@@ -669,9 +678,9 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               type="button"
               className="cursor-pointer"
               onClick={() => void handleSubmit()}
-              disabled={submitting}
+              disabled={submitting || tokenInfoLoading}
             >
-              {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {submitting || tokenInfoLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {copy.confirmCreate}
             </Button>
           </div>
