@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -51,6 +52,10 @@ const emptyItemForm = {
   isPublic: false,
 };
 
+type DeleteTarget =
+  | { kind: 'item'; id: string; title: string }
+  | { kind: 'category'; id: string; title: string };
+
 export function AdminImagePranksManager() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -66,6 +71,8 @@ export function AdminImagePranksManager() {
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [activeTab, setActiveTab] = useState('pranks');
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === itemForm.categoryId) ?? null,
@@ -209,6 +216,24 @@ export function AdminImagePranksManager() {
     setItemForm({ ...emptyItemForm, categoryId: categories[0]?.id ?? '' });
   };
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === 'item') {
+        await Api.adminImagePrankDelete(deleteTarget.id, { deleteFiles: true });
+        toast.success('Prank image deleted');
+      } else {
+        await Api.adminImagePrankCategoriesDelete(deleteTarget.id, { deleteFiles: true });
+        toast.success('Category deleted');
+      }
+      setDeleteTarget(null);
+      await loadAll();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const displayedItemImagePreviewUrl = itemImagePreviewUrl ?? editingItemPreviewUrl;
 
   return (
@@ -349,11 +374,11 @@ export function AdminImagePranksManager() {
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {items.map((item) => (
-                    <div key={item.id} className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-lg border border-gray-200 p-2 dark:border-gray-800">
-                      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900">
+                    <div key={item.id} className="grid min-h-32 grid-cols-[128px_minmax(0,1fr)] gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                      <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900">
                         {item.previewImageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={item.previewImageUrl} alt={item.titleEn} className="h-full w-full object-cover" />
+                          <img src={item.previewImageUrl} alt={item.titleEn} className="h-full w-full object-contain" />
                         ) : (
                           <Images className="h-5 w-5 text-gray-400" />
                         )}
@@ -384,10 +409,7 @@ export function AdminImagePranksManager() {
                             size="sm"
                             variant="destructive"
                             className="h-8 cursor-pointer"
-                            onClick={async () => {
-                              await Api.adminImagePrankDelete(item.id, { deleteFiles: true });
-                              await loadAll();
-                            }}
+                            onClick={() => setDeleteTarget({ kind: 'item', id: item.id, title: item.titleEn })}
                           >
                             <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                             Delete
@@ -492,10 +514,7 @@ export function AdminImagePranksManager() {
                           size="sm"
                           variant="destructive"
                           className="h-8 cursor-pointer"
-                          onClick={async () => {
-                            await Api.adminImagePrankCategoriesDelete(category.id, { deleteFiles: true });
-                            await loadAll();
-                          }}
+                          onClick={() => setDeleteTarget({ kind: 'category', id: category.id, title: category.titleEn })}
                         >
                           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                           Delete
@@ -509,6 +528,39 @@ export function AdminImagePranksManager() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleting(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md" ariaDescription="Confirm deleting prank image or category">
+          <DialogHeader>
+            <DialogTitle>{deleteTarget?.kind === 'category' ? 'Delete category?' : 'Delete prank image?'}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Confirm deleting the selected image prank record.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            {deleteTarget
+              ? `This will permanently delete "${deleteTarget.title}" and its stored files. This action cannot be undone.`
+              : ''}
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button type="button" variant="ghost" className="cursor-pointer" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" className="cursor-pointer" onClick={() => void confirmDelete()} disabled={deleting}>
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
