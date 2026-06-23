@@ -266,7 +266,7 @@ export function AdminImagePranksManager() {
                 <Textarea id="prank-item-description" value={itemForm.description} onChange={(event) => setItemForm((prev) => ({ ...prev, description: event.target.value }))} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="prank-item-search">Search text</Label>
+                <Label htmlFor="prank-item-search">Keywords</Label>
                 <Input id="prank-item-search" value={itemForm.searchText} onChange={(event) => setItemForm((prev) => ({ ...prev, searchText: event.target.value }))} />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Extra keywords, aliases, and phrases used only for catalog search.
@@ -279,7 +279,7 @@ export function AdminImagePranksManager() {
                   <div className="mt-2 flex items-center gap-3 rounded-md border border-gray-200 p-2 dark:border-gray-800">
                     <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={displayedItemImagePreviewUrl} alt="Selected prank preview" className="h-full w-full object-cover" />
+                      <img src={displayedItemImagePreviewUrl} alt="Selected prank preview" className="h-full w-full object-contain" />
                     </div>
                     <div className="min-w-0 text-sm">
                       <div className="font-medium">{itemImage ? 'Selected image preview' : 'Current image'}</div>
