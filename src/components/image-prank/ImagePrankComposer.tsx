@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ImagePlus, Images, Loader2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, CreditCard, Crown, ImagePlus, Images, Loader2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { resolveStorageBaseUrl } from '@/components/main/character-modal/storage';
@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { TOKEN_COSTS } from '@/shared/constants/token-costs';
 import { requestTokenRefresh, useTokenSummary } from '@/hooks/useTokenSummary';
+import { formatSubscriptionVideoCountForPaywall, getSubscriptionPlansForUi, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import type {
@@ -61,6 +62,18 @@ const COPY: Record<AppLanguageCode, {
   confirmBalanceOutro: string;
   confirmCreate: string;
   cancel: string;
+  topUpTitle: string;
+  topUpDescription: string;
+  paywallCurrentBalance: (balance: number) => string;
+  tokensPerCharge: string;
+  videosPerPeriod: (videos: string, period: 'week' | 'month') => string;
+  paywallPerPeriod: (period: 'week' | 'month') => string;
+  paywallChipLabel: (planKey: SubscriptionPlanKey) => string;
+  paywallSubscribeWithPrice: (amount: string, periodLabel: string) => string;
+  openingCheckout: string;
+  toastPlanAlreadyActive: string;
+  toastSubscriptionUpdated: string;
+  toastOpenCheckoutFailed: string;
   uploading: string;
   back: string;
   missingPrompt: string;
@@ -94,6 +107,22 @@ const COPY: Record<AppLanguageCode, {
     confirmBalanceOutro: 'tokens.',
     confirmCreate: 'Confirm and create',
     cancel: 'Cancel',
+    topUpTitle: 'Top up with subscription',
+    topUpDescription: 'Subscribe to automatically get more tokens after each successful charge.',
+    paywallCurrentBalance: (balance) => `Current balance: ${balance.toLocaleString()} tokens.`,
+    tokensPerCharge: 'tokens per charge',
+    videosPerPeriod: (videos, period) => `${videos} videos/${period}`,
+    paywallPerPeriod: (period) => period,
+    paywallChipLabel: (planKey) => {
+      if (planKey === 'weekly') return 'Just to try';
+      if (planKey === 'monthly') return 'Most popular';
+      return 'Best choice';
+    },
+    paywallSubscribeWithPrice: (amount, periodLabel) => `Subscribe • ${amount}/${periodLabel}`,
+    openingCheckout: 'Opening checkout...',
+    toastPlanAlreadyActive: 'This plan is already active.',
+    toastSubscriptionUpdated: 'Subscription updated.',
+    toastOpenCheckoutFailed: 'Failed to open checkout',
     uploading: 'Uploading',
     back: 'Back',
     missingPrompt: 'Enter a prompt',
@@ -127,6 +156,22 @@ const COPY: Record<AppLanguageCode, {
     confirmBalanceOutro: 'токенов.',
     confirmCreate: 'Подтвердить и создать',
     cancel: 'Отмена',
+    topUpTitle: 'Пополнение через подписку',
+    topUpDescription: 'Оформите подписку, чтобы автоматически получать токены после каждого успешного списания.',
+    paywallCurrentBalance: (balance) => `Текущий баланс: ${balance.toLocaleString()} токенов.`,
+    tokensPerCharge: 'токенов за списание',
+    videosPerPeriod: (videos, period) => `${videos} видео/${period === 'week' ? 'неделю' : 'месяц'}`,
+    paywallPerPeriod: (period) => (period === 'week' ? 'неделю' : 'месяц'),
+    paywallChipLabel: (planKey) => {
+      if (planKey === 'weekly') return 'Просто попробовать';
+      if (planKey === 'monthly') return 'Самый популярный';
+      return 'Лучший выбор';
+    },
+    paywallSubscribeWithPrice: (amount, periodLabel) => `Подписаться • ${amount}/${periodLabel}`,
+    openingCheckout: 'Открываем оплату...',
+    toastPlanAlreadyActive: 'Этот план уже активен.',
+    toastSubscriptionUpdated: 'Подписка обновлена.',
+    toastOpenCheckoutFailed: 'Не удалось открыть оплату',
     uploading: 'Загрузка',
     back: 'Назад',
     missingPrompt: 'Введите промпт',
@@ -312,6 +357,9 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const [tokenBalance, setTokenBalance] = useState(0);
   const [tokenCost, setTokenCost] = useState(TOKEN_COSTS.actions.imageGeneration);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlanKey | null>(null);
+  const [selectedPlanKey, setSelectedPlanKey] = useState<SubscriptionPlanKey>('monthly');
   const [submitting, setSubmitting] = useState(false);
   const prankPreviewUrl = useObjectUrl(prankFile);
   const targetPreviewUrl = useObjectUrl(targetFile);
@@ -326,6 +374,10 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const promptPlaceholder = oneImageMode && !item ? copy.oneImagePromptPlaceholder : copy.twoImagePromptPlaceholder;
   const defaultPrompt = oneImageMode && !item ? copy.oneImageDefaultPrompt : copy.twoImageDefaultPrompt;
   const projectedBalance = Math.max(tokenBalance - tokenCost, 0);
+  const subscriptionPlans = getSubscriptionPlansForUi();
+  const selectedPlan = subscriptionPlans.find((plan) => plan.planKey === selectedPlanKey) ?? subscriptionPlans[0] ?? null;
+  const selectedPerLabel = selectedPlan ? copy.paywallPerPeriod(selectedPlan.interval) : copy.paywallPerPeriod('month');
+  const selectedPlanAmount = selectedPlan ? `$${selectedPlan.priceUsd.toFixed(2)}` : '$0.00';
 
   useEffect(() => {
     setPrompt((current) => {
@@ -342,6 +394,13 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
     setTokenBalance(summary.balance);
     setTokenCost(summary.actionCosts.imageGeneration ?? TOKEN_COSTS.actions.imageGeneration);
   }, [summary]);
+
+  useEffect(() => {
+    if (subscriptionPlans.some((plan) => plan.planKey === selectedPlanKey)) return;
+    if (subscriptionPlans[0]) {
+      setSelectedPlanKey(subscriptionPlans[0].planKey);
+    }
+  }, [selectedPlanKey, subscriptionPlans]);
 
   useEffect(() => {
     let cancelled = false;
@@ -381,13 +440,22 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
 
   const handleContinue = async () => {
     if (submitting || !validate()) return;
+    let balanceForDecision = tokenBalance;
+    let costForDecision = tokenCost;
     try {
       const latestSummary = await refresh().catch(() => null);
       if (latestSummary) {
-        setTokenBalance(latestSummary.balance);
-        setTokenCost(latestSummary.actionCosts.imageGeneration ?? TOKEN_COSTS.actions.imageGeneration);
+        balanceForDecision = latestSummary.balance;
+        costForDecision = latestSummary.actionCosts.imageGeneration ?? TOKEN_COSTS.actions.imageGeneration;
+        setTokenBalance(balanceForDecision);
+        setTokenCost(costForDecision);
       }
     } catch {}
+    if (balanceForDecision < costForDecision) {
+      setSelectedPlanKey('monthly');
+      setPaywallOpen(true);
+      return;
+    }
     setConfirmOpen(true);
   };
 
@@ -395,7 +463,8 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
     if (submitting || !validate()) return;
     if (tokenBalance < tokenCost) {
       setConfirmOpen(false);
-      router.push('/tokens');
+      setSelectedPlanKey('monthly');
+      setPaywallOpen(true);
       return;
     }
     setSubmitting(true);
@@ -452,6 +521,26 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
     }
     setSubmitting(false);
   };
+
+  async function openSubscriptionCheckout(plan: SubscriptionPlanKey) {
+    if (checkoutPlan) return;
+    setCheckoutPlan(plan);
+    try {
+      const result = await Api.createSubscriptionCheckout(plan);
+      if (result.action === 'checkout') {
+        window.location.href = result.url;
+      } else if (result.action === 'already_on_plan') {
+        toast.info(copy.toastPlanAlreadyActive);
+      } else {
+        toast.success(copy.toastSubscriptionUpdated);
+      }
+    } catch (error) {
+      console.error('Failed to open subscription checkout', error);
+      toast.error(copy.toastOpenCheckoutFailed);
+    } finally {
+      setCheckoutPlan(null);
+    }
+  }
 
   return (
     <>
@@ -586,6 +675,83 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               {copy.confirmCreate}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={paywallOpen} onOpenChange={setPaywallOpen}>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-[1040px]">
+          <DialogHeader>
+            <DialogTitle className="inline-flex items-center gap-2">
+              <Crown className="h-5 w-5 text-amber-500" />
+              {copy.topUpTitle}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {copy.topUpDescription}
+          </p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            {copy.paywallCurrentBalance(tokenBalance)}
+          </p>
+          <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {subscriptionPlans.map((plan) => {
+              const isSelected = selectedPlan?.planKey === plan.planKey;
+              const perLabel = copy.paywallPerPeriod(plan.interval);
+              return (
+                <button
+                  type="button"
+                  key={plan.planKey}
+                  onClick={() => setSelectedPlanKey(plan.planKey)}
+                  disabled={checkoutPlan !== null}
+                  className={[
+                    'relative mt-3 min-w-0 cursor-pointer rounded-2xl border p-5 pt-6 text-left transition-[border-color,box-shadow,background-color,transform] duration-200 ease-out will-change-transform',
+                    isSelected
+                      ? 'border-blue-400 bg-blue-50/60 shadow-[0_12px_28px_rgba(37,99,235,0.18)] dark:border-blue-700 dark:bg-blue-950/25'
+                      : 'border-gray-200 bg-white hover:scale-[1.01] hover:border-blue-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900/40 dark:hover:border-blue-800',
+                  ].join(' ')}
+                >
+                  <div className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 rounded-full border border-amber-300/80 bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-900 shadow-sm dark:border-amber-700/60 dark:bg-amber-900/40 dark:text-amber-200">
+                    {copy.paywallChipLabel(plan.planKey)}
+                  </div>
+                  <div className="flex items-end justify-center gap-1 whitespace-nowrap">
+                    <span className="text-4xl font-bold leading-none text-gray-900 dark:text-gray-100">${plan.priceUsd.toFixed(2)}</span>
+                    <span className="pb-0.5 text-lg text-gray-500 dark:text-gray-400">/{perLabel}</span>
+                  </div>
+                  <div className="mt-4 space-y-1.5 text-base text-gray-700 dark:text-gray-300">
+                    {plan.ui.benefits.map((benefit, benefitIndex) => {
+                      if (benefit.key === 'tokens_per_charge' && typeof benefit.tokens === 'number') {
+                        return <p key={`${plan.planKey}-benefit-${benefitIndex}`}>{benefit.tokens.toLocaleString()} {copy.tokensPerCharge}</p>;
+                      }
+                      if (benefit.key === 'videos_per_period' && typeof benefit.videos === 'number' && benefit.interval) {
+                        return <p key={`${plan.planKey}-benefit-${benefitIndex}`}>{copy.videosPerPeriod(formatSubscriptionVideoCountForPaywall(benefit.videos), benefit.interval)}</p>;
+                      }
+                      return null;
+                    })}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <Button
+            type="button"
+            className="brainrot-cta-gradient mx-auto mt-5 flex h-14 w-full max-w-[352px] cursor-pointer items-center justify-center rounded-full border-0 px-6 text-base font-semibold text-black shadow-lg outline-none transition hover:text-black hover:shadow-xl focus-visible:outline-none"
+            onClick={() => {
+              if (!selectedPlan) return;
+              void openSubscriptionCheckout(selectedPlan.planKey);
+            }}
+            disabled={checkoutPlan !== null || !selectedPlan}
+          >
+            {checkoutPlan ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {copy.openingCheckout}
+              </>
+            ) : (
+              <>
+                <CreditCard className="mr-2 h-4 w-4" />
+                {copy.paywallSubscribeWithPrice(selectedPlanAmount, selectedPerLabel)}
+              </>
+            )}
+          </Button>
         </DialogContent>
       </Dialog>
     </>
