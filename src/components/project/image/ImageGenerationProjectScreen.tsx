@@ -413,154 +413,160 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
             </div>
           ) : null}
         </CardHeader>
-        <CardContent className="space-y-5 pt-5">
-          <div className="mx-auto flex w-full max-w-4xl items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
-            {resultImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={resultImageUrl}
-                alt={t.generatedImage}
-                className="max-h-[72vh] w-full object-contain"
-              />
-            ) : (
-              <div className="flex min-h-[360px] w-full flex-col items-center justify-center gap-4 p-6 text-center">
-                {isError ? (
-                  <AlertTriangle className="h-8 w-8 text-red-500" />
+        <CardContent className="pt-5">
+          <div className="grid gap-5 lg:grid-cols-[minmax(240px,360px)_minmax(0,1fr)] lg:items-start">
+            <div className="flex justify-center lg:justify-start">
+              <div className="flex aspect-[9/16] w-full max-w-[360px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
+                {resultImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={resultImageUrl}
+                    alt={t.generatedImage}
+                    className="h-full w-full object-contain"
+                  />
                 ) : (
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-5 text-center">
+                    {isError ? (
+                      <AlertTriangle className="h-8 w-8 text-red-500" />
+                    ) : (
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    )}
+                    <div className="w-full max-w-[260px] space-y-2">
+                      <div className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                        {isError ? t.generationFailed : t.generatingImage}
+                      </div>
+                      <div
+                        className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress}
+                      >
+                        <div
+                          className="h-full rounded-full bg-blue-600 transition-[width] duration-700 ease-out"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {progress >= 95 && !isError ? t.progressWaiting : t.progressEstimate}
+                      </p>
+                    </div>
+                  </div>
                 )}
-                <div className="w-full max-w-md space-y-2">
-                  <div className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                    {isError ? t.generationFailed : t.generatingImage}
-                  </div>
-                  <div
-                    className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={progress}
-                  >
-                    <div
-                      className="h-full rounded-full bg-blue-600 transition-[width] duration-700 ease-out"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {progress >= 95 && !isError ? t.progressWaiting : t.progressEstimate}
-                  </p>
-                </div>
               </div>
-            )}
-          </div>
+            </div>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-            <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  {t.prompt}
+            <div className="space-y-4">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+                <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      {t.prompt}
+                    </h2>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="inline-flex cursor-pointer items-center gap-1.5"
+                      onClick={handleCopyPrompt}
+                      disabled={!prompt}
+                    >
+                      {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copied ? t.copied : t.copy}
+                    </Button>
+                  </div>
+                  <div className="whitespace-pre-wrap text-sm leading-6 text-gray-800 dark:text-gray-200">
+                    {prompt || t.unknown}
+                  </div>
+                </section>
+
+                <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+                  <h2 className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <Sparkles className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    {t.generationData}
+                  </h2>
+                  <dl className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400"><Clock3 className="h-3.5 w-3.5" />{t.created}</dt>
+                      <dd className="text-right font-medium text-gray-900 dark:text-gray-100">{createdLabel}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-gray-500 dark:text-gray-400">{t.model}</dt>
+                      <dd className="max-w-[160px] truncate text-right font-medium text-gray-900 dark:text-gray-100">{image?.model || t.unknown}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-gray-500 dark:text-gray-400">{t.size}</dt>
+                      <dd className="text-right font-medium text-gray-900 dark:text-gray-100">
+                        {image?.width && image?.height ? `${image.width}x${image.height}` : t.unknown}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400"><Coins className="h-3.5 w-3.5" />{t.tokensSpent}</dt>
+                      <dd className="text-right font-medium text-gray-900 dark:text-gray-100">
+                        {typeof project.tokensUsed === 'number' ? `${project.tokensUsed.toLocaleString()} ${t.tokensUnit}` : t.unknown}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+              </div>
+
+              <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+                <h2 className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  <UserRound className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  {sourceImages.length > 0 ? t.referenceImages : t.sourceImage}
                 </h2>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="inline-flex cursor-pointer items-center gap-1.5"
-                  onClick={handleCopyPrompt}
-                  disabled={!prompt}
-                >
-                  {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copied ? t.copied : t.copy}
-                </Button>
-              </div>
-              <div className="whitespace-pre-wrap text-sm leading-6 text-gray-800 dark:text-gray-200">
-                {prompt || t.unknown}
-              </div>
-            </section>
-
-            <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
-              <h2 className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                <Sparkles className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                {t.generationData}
-              </h2>
-              <dl className="space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400"><Clock3 className="h-3.5 w-3.5" />{t.created}</dt>
-                  <dd className="text-right font-medium text-gray-900 dark:text-gray-100">{createdLabel}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-gray-500 dark:text-gray-400">{t.model}</dt>
-                  <dd className="max-w-[160px] truncate text-right font-medium text-gray-900 dark:text-gray-100">{image?.model || t.unknown}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-gray-500 dark:text-gray-400">{t.size}</dt>
-                  <dd className="text-right font-medium text-gray-900 dark:text-gray-100">
-                    {image?.width && image?.height ? `${image.width}x${image.height}` : t.unknown}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400"><Coins className="h-3.5 w-3.5" />{t.tokensSpent}</dt>
-                  <dd className="text-right font-medium text-gray-900 dark:text-gray-100">
-                    {typeof project.tokensUsed === 'number' ? `${project.tokensUsed.toLocaleString()} ${t.tokensUnit}` : t.unknown}
-                  </dd>
-                </div>
-              </dl>
-            </section>
-          </div>
-
-          <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
-            <h2 className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-              <UserRound className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-              {sourceImages.length > 0 ? t.referenceImages : t.sourceImage}
-            </h2>
-            {sourceImages.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {sourceImages.map((source, index) => (
-                  <div
-                    key={`${source.role}-${source.imagePath ?? source.imageUrl ?? index}`}
-                    className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60"
-                  >
-                    <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-white dark:bg-gray-950">
+                {sourceImages.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {sourceImages.map((source, index) => (
+                      <div
+                        key={`${source.role}-${source.imagePath ?? source.imageUrl ?? index}`}
+                        className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60"
+                      >
+                        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-white dark:bg-gray-950">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={source.imageUrl ?? ''}
+                            alt={source.label || t.referenceImages}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {source.label || t.referenceImages}
+                          </div>
+                          <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            {source.role}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : image?.originalImageUrl ? (
+                  <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+                    <div className="flex h-[120px] w-[120px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={source.imageUrl ?? ''}
-                        alt={source.label || t.referenceImages}
-                        className="h-full w-full object-contain"
-                      />
+                      <img src={image.originalImageUrl} alt={t.sourceImage} className="h-full w-full object-contain" />
                     </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {source.label || t.referenceImages}
+                    <dl className="space-y-2 text-sm">
+                      <div>
+                        <dt className="text-gray-500 dark:text-gray-400">{t.source}</dt>
+                        <dd className="font-medium text-gray-900 dark:text-gray-100">{sourceLabel}</dd>
                       </div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        {source.role}
+                      <div>
+                        <dt className="text-gray-500 dark:text-gray-400">{t.catalogCharacter}</dt>
+                        <dd className="font-medium text-gray-900 dark:text-gray-100">
+                          {[image.characterTitle, image.variationTitle].filter(Boolean).join(' · ') || t.unknown}
+                        </dd>
                       </div>
-                    </div>
+                    </dl>
                   </div>
-                ))}
-              </div>
-            ) : image?.originalImageUrl ? (
-              <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                <div className="flex h-[120px] w-[120px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={image.originalImageUrl} alt={t.sourceImage} className="h-full w-full object-contain" />
-                </div>
-                <dl className="space-y-2 text-sm">
-                  <div>
-                    <dt className="text-gray-500 dark:text-gray-400">{t.source}</dt>
-                    <dd className="font-medium text-gray-900 dark:text-gray-100">{sourceLabel}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-gray-500 dark:text-gray-400">{t.catalogCharacter}</dt>
-                    <dd className="font-medium text-gray-900 dark:text-gray-100">
-                      {[image.characterTitle, image.variationTitle].filter(Boolean).join(' · ') || t.unknown}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-600 dark:text-gray-400">{t.noSourceImage}</p>
-            )}
-          </section>
+                ) : (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{t.noSourceImage}</p>
+                )}
+              </section>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
