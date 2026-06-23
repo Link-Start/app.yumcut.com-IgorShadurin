@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Download, FileText, ImageIcon, Loader2, MoreVertical, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
@@ -34,6 +34,9 @@ const COPY: Record<AppLanguageCode, {
   imagePrank: string;
   generatingImage: string;
   generationFailed: string;
+  generationFailedAdminMessage: string;
+  generationFailedRefund: (tokens: number) => string;
+  generationFailedNoRefund: string;
   imageReady: string;
   progressWaiting: string;
   progressCountdown: (time: string) => string;
@@ -65,6 +68,9 @@ const COPY: Record<AppLanguageCode, {
     imagePrank: 'Image Prank',
     generatingImage: 'Generating image',
     generationFailed: 'Image generation failed',
+    generationFailedAdminMessage: 'Admin will review this project and handle the issue.',
+    generationFailedRefund: (tokens) => `${tokens.toLocaleString()} ${tokens === 1 ? 'token was' : 'tokens were'} returned to your balance.`,
+    generationFailedNoRefund: 'No tokens were charged for this failed generation.',
     imageReady: 'Image ready',
     progressWaiting: 'Still working. The result will appear here automatically.',
     progressCountdown: (time) => `Time left: ${time}`,
@@ -96,6 +102,9 @@ const COPY: Record<AppLanguageCode, {
     imagePrank: 'Image Prank',
     generatingImage: 'Генерация изображения',
     generationFailed: 'Генерация изображения завершилась ошибкой',
+    generationFailedAdminMessage: 'Администратор проверит проект и решит проблему.',
+    generationFailedRefund: (tokens) => `${tokens.toLocaleString()} ${tokens === 1 ? 'токен был возвращён' : 'токенов было возвращено'} на ваш баланс.`,
+    generationFailedNoRefund: 'За эту неудачную генерацию токены не списаны.',
     imageReady: 'Изображение готово',
     progressWaiting: 'Продолжаем обработку. Результат появится здесь автоматически.',
     progressCountdown: (time) => `Осталось: ${time}`,
@@ -243,6 +252,8 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
   const progress = getProgressPercent(project, nowMs);
   const isProcessing = project.status !== ProjectStatus.Done && project.status !== ProjectStatus.Error && project.status !== ProjectStatus.Cancelled;
   const isError = project.status === ProjectStatus.Error;
+  const refundedTokens = typeof project.tokensRefunded === 'number' ? Math.max(0, project.tokensRefunded) : 0;
+  const errorRefundMessage = refundedTokens > 0 ? t.generationFailedRefund(refundedTokens) : t.generationFailedNoRefund;
   const remainingGenerationMs = getRemainingGenerationMs(project, nowMs);
   const progressCaption = isError
     ? t.generationFailed
@@ -426,19 +437,28 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                       <div className="text-base font-semibold text-gray-900 dark:text-gray-100">
                         {isError ? t.generationFailed : t.generatingImage}
                       </div>
-                      <div
-                        className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
-                        role="progressbar"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={progress}
-                      >
-                        <div
-                          className="h-full rounded-full bg-blue-600 transition-[width] duration-700 ease-out"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{progressCaption}</p>
+                      {isError ? (
+                        <div className="space-y-1 text-sm leading-5 text-gray-600 dark:text-gray-400">
+                          <p>{t.generationFailedAdminMessage}</p>
+                          <p>{errorRefundMessage}</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div
+                            className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
+                            role="progressbar"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={progress}
+                          >
+                            <div
+                              className="h-full rounded-full bg-blue-600 transition-[width] duration-700 ease-out"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{progressCaption}</p>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}

@@ -363,6 +363,7 @@ export interface ProjectDetailDTO {
     startedAt: string;
   } | null;
   tokensUsed?: number;
+  tokensRefunded?: number;
   creation?: {
     durationSeconds?: number | null;
     useExactTextAsScript?: boolean | null;

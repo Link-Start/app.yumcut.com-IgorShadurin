@@ -184,6 +184,10 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
         }) as ProjectTokenTransactionRow[]
       : [];
     const projectDeltaFromLedger = projectRelatedTokenTransactions.reduce((sum, tx) => sum + tx.delta, 0);
+    const tokensRefunded = projectRelatedTokenTransactions.reduce((sum, tx) => {
+      if (tx.type !== TOKEN_TRANSACTION_TYPES.projectFailureRefund) return sum;
+      return sum + Math.max(0, tx.delta);
+    }, 0);
     const hasExplicitProjectCreationCharge = projectRelatedTokenTransactions.some(
       (tx) => tx.type === TOKEN_TRANSACTION_TYPES.projectCreation,
     );
@@ -532,6 +536,7 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
       imageGeneration,
       creation,
       tokensUsed,
+      tokensRefunded,
       template: p.template ? {
         id: p.template.id,
         title: p.template.title,
