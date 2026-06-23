@@ -18,6 +18,7 @@ const COPY: Record<AppLanguageCode, {
   searchPlaceholder: string;
   customTitle: string;
   customSubtitle: string;
+  mainBack: string;
   back: string;
   empty: string;
   previous: string;
@@ -28,6 +29,7 @@ const COPY: Record<AppLanguageCode, {
     searchPlaceholder: 'Search prank images...',
     customTitle: 'Custom mix',
     customSubtitle: 'Upload your own prank images',
+    mainBack: 'Main',
     back: 'Categories',
     empty: 'No prank images yet.',
     previous: 'Previous',
@@ -38,6 +40,7 @@ const COPY: Record<AppLanguageCode, {
     searchPlaceholder: 'Поиск prank-картинок...',
     customTitle: 'Свой микс',
     customSubtitle: 'Загрузить свои изображения',
+    mainBack: 'Главная',
     back: 'Категории',
     empty: 'Prank-картинок пока нет.',
     previous: 'Назад',
@@ -211,19 +214,23 @@ export function ImagePrankCatalog({ categories }: Props) {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 pb-14">
       <div className="flex min-h-10 items-center gap-2">
-        <button
-          type="button"
-          onClick={resetCategory}
-          className={cn(
-            'inline-flex h-9 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-full text-sm font-medium text-blue-700 transition-[width,opacity,transform,margin,padding,border] duration-200 ease-out dark:text-blue-300',
-            selectedCategory
-              ? 'pointer-events-auto mr-2 w-36 cursor-pointer border border-blue-200/80 bg-white/80 px-3 opacity-100 translate-x-0 shadow-sm backdrop-blur-sm hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70'
-              : 'pointer-events-none mr-0 h-0 min-h-0 w-0 min-w-0 cursor-default border-0 px-0 opacity-0 -translate-x-2',
-          )}
+        <Link
+          href="/"
+          className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-blue-200/80 bg-white/80 px-3 text-sm font-medium text-blue-700 shadow-sm backdrop-blur-sm transition hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:text-blue-300 dark:hover:border-blue-700 dark:hover:text-blue-200"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>{copy.back}</span>
-        </button>
+          <span>{copy.mainBack}</span>
+        </Link>
+        {selectedCategory ? (
+          <button
+            type="button"
+            onClick={resetCategory}
+            className="inline-flex h-9 w-36 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-full border border-blue-200/80 bg-white/80 px-3 text-sm font-medium text-blue-700 opacity-100 shadow-sm backdrop-blur-sm transition-[width,opacity,transform,margin,padding,border] duration-200 ease-out hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:text-blue-300"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>{copy.back}</span>
+          </button>
+        ) : null}
         <div className="relative w-full">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <Input
