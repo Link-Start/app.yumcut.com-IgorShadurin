@@ -124,6 +124,8 @@ export interface ImagePrankSourceImageDTO {
   label: string;
   imageUrl: string | null;
   imagePath?: string | null;
+  previewImageUrl?: string | null;
+  previewImagePath?: string | null;
 }
 
 export interface ImagePrankCatalogItemDTO {
@@ -134,6 +136,8 @@ export interface ImagePrankCatalogItemDTO {
   hiddenSearchText: LocalizedCatalogTextDTO;
   imageUrl: string;
   imagePath: string;
+  previewImageUrl?: string | null;
+  previewImagePath?: string | null;
   categoryId: string;
   categorySlug: string;
   categoryTitle: LocalizedCatalogTextDTO;

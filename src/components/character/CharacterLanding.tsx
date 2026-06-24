@@ -399,7 +399,9 @@ export function CharacterLanding({
 
   const topLevelGroups = useMemo(() => {
     const brainrotImages = groups.flatMap((group) => group.characters.map((character) => character.imageUrl));
-    const imagePrankImages = imagePrankCategories.flatMap((category) => category.items.map((item) => item.imageUrl));
+    const imagePrankImages = imagePrankCategories.flatMap((category) => (
+      category.items.map((item) => item.previewImageUrl || item.imageUrl)
+    ));
     return [
       makeTopLevelGroup({
         id: 'image-prank',

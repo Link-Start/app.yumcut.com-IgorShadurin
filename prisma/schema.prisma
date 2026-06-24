@@ -8,55 +8,55 @@ generator client {
 }
 
 model User {
-  id                        String                     @id @default(uuid()) @db.Char(36)
-  email                     String                     @unique
-  name                      String?
-  image                     String?
-  emailVerified             DateTime?
-  preferredLanguage         String                     @default("en") @db.VarChar(8)
-  emailReplyBonusGrantedAt  DateTime?
-  emailReplyBonusSourceId   String?                    @db.VarChar(191)
-  subscriptionWinbackBonusPending          Boolean     @default(false)
-  subscriptionWinbackBonusPendingAt        DateTime?
-  subscriptionWinbackBonusGrantedAt        DateTime?
-  subscriptionWinbackBonusGrantedSourceId  String?     @db.VarChar(191)
-  createdAt                 DateTime                   @default(now())
-  tokenBalance              Int                        @default(0)
-  isAdmin                   Boolean                    @default(false)
-  isGuest                   Boolean                    @default(false)
-  guestConvertedAt          DateTime?
-  guestDeviceId             String?                    @db.VarChar(191)
-  deleted                   Boolean                    @default(false)
-  deletedAt                 DateTime?
-  deletionReason            String?                    @db.VarChar(512)
-  deletionSource            String?                    @db.VarChar(32)
-  settings                  UserSettings?
-  projects                  Project[]
-  userCharacters            UserCharacter[]
-  accounts                  Account[]
-  sessions                  Session[]
-  tokenTransactions         TokenTransaction[]
-  telegramAccount           TelegramAccount?
-  telegramLinkTokens        TelegramLinkToken[]
-  characterImageTasks       UserCharacterImageTask[]
+  id                                      String                     @id @default(uuid()) @db.Char(36)
+  email                                   String                     @unique
+  name                                    String?
+  image                                   String?
+  emailVerified                           DateTime?
+  preferredLanguage                       String                     @default("en") @db.VarChar(8)
+  emailReplyBonusGrantedAt                DateTime?
+  emailReplyBonusSourceId                 String?                    @db.VarChar(191)
+  subscriptionWinbackBonusPending         Boolean                    @default(false)
+  subscriptionWinbackBonusPendingAt       DateTime?
+  subscriptionWinbackBonusGrantedAt       DateTime?
+  subscriptionWinbackBonusGrantedSourceId String?                    @db.VarChar(191)
+  createdAt                               DateTime                   @default(now())
+  tokenBalance                            Int                        @default(0)
+  isAdmin                                 Boolean                    @default(false)
+  isGuest                                 Boolean                    @default(false)
+  guestConvertedAt                        DateTime?
+  guestDeviceId                           String?                    @db.VarChar(191)
+  deleted                                 Boolean                    @default(false)
+  deletedAt                               DateTime?
+  deletionReason                          String?                    @db.VarChar(512)
+  deletionSource                          String?                    @db.VarChar(32)
+  settings                                UserSettings?
+  projects                                Project[]
+  userCharacters                          UserCharacter[]
+  accounts                                Account[]
+  sessions                                Session[]
+  tokenTransactions                       TokenTransaction[]
+  telegramAccount                         TelegramAccount?
+  telegramLinkTokens                      TelegramLinkToken[]
+  characterImageTasks                     UserCharacterImageTask[]
   // Template ownerships
-  templates                 Template[]
-  templateArtStyles         TemplateArtStyle[]
-  templateVoiceStyles       TemplateVoiceStyle[]
-  templateMusic             TemplateMusic[]
+  templates                               Template[]
+  templateArtStyles                       TemplateArtStyle[]
+  templateVoiceStyles                     TemplateVoiceStyle[]
+  templateMusic                           TemplateMusic[]
   // Project groups owned by the user
-  projectGroups             ProjectGroup[]
-  mobileSessions            MobileSession[]
-  publishChannels           PublishChannel[]
-  publishChannelLanguages   PublishChannelLanguage[]
-  publishChannelOAuthStates PublishChannelOAuthState[] @relation("UserPublishChannelOAuthStates")
-  publishTasks              PublishTask[]
-  plannedEmails             PlannedEmail[]
-  subscriptionPurchases     SubscriptionPurchase[]
-  guestProfile              GuestProfile?
-  favoriteCharacters        UserFavoriteCharacter[]
-  attribution               UserAttribution?
-  projectCreationAttempts   ProjectCreationAttempt[]
+  projectGroups                           ProjectGroup[]
+  mobileSessions                          MobileSession[]
+  publishChannels                         PublishChannel[]
+  publishChannelLanguages                 PublishChannelLanguage[]
+  publishChannelOAuthStates               PublishChannelOAuthState[] @relation("UserPublishChannelOAuthStates")
+  publishTasks                            PublishTask[]
+  plannedEmails                           PlannedEmail[]
+  subscriptionPurchases                   SubscriptionPurchase[]
+  guestProfile                            GuestProfile?
+  favoriteCharacters                      UserFavoriteCharacter[]
+  attribution                             UserAttribution?
+  projectCreationAttempts                 ProjectCreationAttempt[]
 }
 
 model UserSettings {
@@ -145,31 +145,31 @@ model Project {
 }
 
 model UserAttribution {
-  id                       String   @id @default(uuid()) @db.Char(36)
-  userId                   String   @unique @db.Char(36)
-  firstUtmSource           String?  @db.VarChar(200)
-  lastUtmSource            String?  @db.VarChar(200)
-  firstReferrerOrigin      String?  @db.VarChar(255)
-  firstReferrerPath        String?  @db.VarChar(512)
-  lastReferrerOrigin       String?  @db.VarChar(255)
-  lastReferrerPath         String?  @db.VarChar(512)
-  firstLandingPath         String?  @db.VarChar(512)
-  lastLandingPath          String?  @db.VarChar(512)
-  firstSourceToolSlug      String?  @db.VarChar(191)
-  lastSourceToolSlug       String?  @db.VarChar(191)
-  firstIntent              String?  @db.VarChar(32)
-  lastIntent               String?  @db.VarChar(32)
-  firstProjectPrompt       String?  @db.LongText
-  firstProjectPromptMode   String?  @db.VarChar(16)
-  firstProjectExperience   String?  @db.VarChar(32)
-  firstMainPageMode        String?  @db.VarChar(32)
-  firstMainPageCategoryId  String?  @db.VarChar(64)
-  firstCharacterSlug       String?  @db.VarChar(191)
-  firstTemplateId          String?  @db.Char(36)
-  firstProjectAttemptId    String?  @db.Char(36)
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                      String   @id @default(uuid()) @db.Char(36)
+  userId                  String   @unique @db.Char(36)
+  firstUtmSource          String?  @db.VarChar(200)
+  lastUtmSource           String?  @db.VarChar(200)
+  firstReferrerOrigin     String?  @db.VarChar(255)
+  firstReferrerPath       String?  @db.VarChar(512)
+  lastReferrerOrigin      String?  @db.VarChar(255)
+  lastReferrerPath        String?  @db.VarChar(512)
+  firstLandingPath        String?  @db.VarChar(512)
+  lastLandingPath         String?  @db.VarChar(512)
+  firstSourceToolSlug     String?  @db.VarChar(191)
+  lastSourceToolSlug      String?  @db.VarChar(191)
+  firstIntent             String?  @db.VarChar(32)
+  lastIntent              String?  @db.VarChar(32)
+  firstProjectPrompt      String?  @db.LongText
+  firstProjectPromptMode  String?  @db.VarChar(16)
+  firstProjectExperience  String?  @db.VarChar(32)
+  firstMainPageMode       String?  @db.VarChar(32)
+  firstMainPageCategoryId String?  @db.VarChar(64)
+  firstCharacterSlug      String?  @db.VarChar(191)
+  firstTemplateId         String?  @db.Char(36)
+  firstProjectAttemptId   String?  @db.Char(36)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([firstUtmSource])
   @@index([lastUtmSource])
@@ -178,40 +178,40 @@ model UserAttribution {
 }
 
 model ProjectCreationAttempt {
-  id                   String   @id @default(uuid()) @db.Char(36)
-  userId               String   @db.Char(36)
-  projectId            String?  @db.Char(36)
-  clientAttemptId      String   @db.VarChar(64)
-  result               String   @db.VarChar(32)
-  promptText           String?  @db.LongText
-  promptMode           String?  @db.VarChar(16)
-  projectExperience    String?  @db.VarChar(32)
-  durationSeconds      Int?
-  tokenCost            Int?
-  tokenBalance         Int?
-  mainPageMode         String?  @db.VarChar(32)
-  mainPageCategoryId   String?  @db.VarChar(64)
-  characterSlug        String?  @db.VarChar(191)
-  templateId           String?  @db.Char(36)
-  utmSource            String?  @db.VarChar(200)
-  utmMedium            String?  @db.VarChar(200)
-  utmCampaign          String?  @db.VarChar(200)
-  utmContent           String?  @db.VarChar(200)
-  utmTerm              String?  @db.VarChar(200)
-  intent               String?  @db.VarChar(32)
-  sourceToolSlug       String?  @db.VarChar(191)
-  referrerOrigin       String?  @db.VarChar(255)
-  referrerPath         String?  @db.VarChar(512)
-  landingPath          String?  @db.VarChar(512)
-  query                Json?
-  languageCodes        Json?
-  languageVoices       Json?
-  settingsSnapshot     Json?
-  rawContext           Json?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project              Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  id                 String   @id @default(uuid()) @db.Char(36)
+  userId             String   @db.Char(36)
+  projectId          String?  @db.Char(36)
+  clientAttemptId    String   @db.VarChar(64)
+  result             String   @db.VarChar(32)
+  promptText         String?  @db.LongText
+  promptMode         String?  @db.VarChar(16)
+  projectExperience  String?  @db.VarChar(32)
+  durationSeconds    Int?
+  tokenCost          Int?
+  tokenBalance       Int?
+  mainPageMode       String?  @db.VarChar(32)
+  mainPageCategoryId String?  @db.VarChar(64)
+  characterSlug      String?  @db.VarChar(191)
+  templateId         String?  @db.Char(36)
+  utmSource          String?  @db.VarChar(200)
+  utmMedium          String?  @db.VarChar(200)
+  utmCampaign        String?  @db.VarChar(200)
+  utmContent         String?  @db.VarChar(200)
+  utmTerm            String?  @db.VarChar(200)
+  intent             String?  @db.VarChar(32)
+  sourceToolSlug     String?  @db.VarChar(191)
+  referrerOrigin     String?  @db.VarChar(255)
+  referrerPath       String?  @db.VarChar(512)
+  landingPath        String?  @db.VarChar(512)
+  query              Json?
+  languageCodes      Json?
+  languageVoices     Json?
+  settingsSnapshot   Json?
+  rawContext         Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project            Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@unique([userId, clientAttemptId])
   @@index([userId, createdAt])
@@ -299,29 +299,29 @@ model AudioRequest {
 }
 
 model ImageAsset {
-  id        String   @id @default(uuid()) @db.Char(36)
-  projectId String   @db.Char(36)
-  path      String
-  publicUrl String?  @db.VarChar(512)
-  createdAt DateTime @default(now())
-  project   Project  @relation(fields: [projectId], references: [id])
+  id            String                @id @default(uuid()) @db.Char(36)
+  projectId     String                @db.Char(36)
+  path          String
+  publicUrl     String?               @db.VarChar(512)
+  createdAt     DateTime              @default(now())
+  project       Project               @relation(fields: [projectId], references: [id])
   templateImage ProjectTemplateImage?
 
   @@index([projectId])
 }
 
 model ProjectTemplateImage {
-  id           String   @id @default(uuid()) @db.Char(36)
-  projectId    String   @db.Char(36)
-  imageAssetId String   @unique @db.Char(36)
-  imageName    String   @db.VarChar(256)
-  model        String   @db.VarChar(128)
-  prompt       String   @db.LongText
-  sentence     String?  @db.Text
-  size         String?  @db.VarChar(64)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  project      Project  @relation(fields: [projectId], references: [id])
+  id           String     @id @default(uuid()) @db.Char(36)
+  projectId    String     @db.Char(36)
+  imageAssetId String     @unique @db.Char(36)
+  imageName    String     @db.VarChar(256)
+  model        String     @db.VarChar(128)
+  prompt       String     @db.LongText
+  sentence     String?    @db.Text
+  size         String?    @db.VarChar(64)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  project      Project    @relation(fields: [projectId], references: [id])
   imageAsset   ImageAsset @relation(fields: [imageAssetId], references: [id])
 
   @@unique([projectId, imageName])
@@ -329,16 +329,16 @@ model ProjectTemplateImage {
 }
 
 model ProjectArtifact {
-  id           String   @id @default(uuid()) @db.Char(36)
-  projectId    String   @db.Char(36)
-  kind         String   @db.VarChar(32)
-  variant      String?  @db.VarChar(64)
-  path         String
-  publicUrl    String?  @db.VarChar(512)
-  localPath    String?  @db.Text
-  metadata     Json?
-  createdAt    DateTime @default(now())
-  project      Project  @relation(fields: [projectId], references: [id])
+  id        String   @id @default(uuid()) @db.Char(36)
+  projectId String   @db.Char(36)
+  kind      String   @db.VarChar(32)
+  variant   String?  @db.VarChar(64)
+  path      String
+  publicUrl String?  @db.VarChar(512)
+  localPath String?  @db.Text
+  metadata  Json?
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id])
 
   @@index([projectId])
   @@index([projectId, kind])
@@ -378,33 +378,34 @@ model Job {
   @@index([status, createdAt])
   @@index([daemonId])
 }
+
 model Daemon {
-  id          String    @id @db.VarChar(128)
-  lastSeenAt  DateTime  @default(now())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  projects    Project[]
-  jobs        Job[]
+  id         String    @id @db.VarChar(128)
+  lastSeenAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  projects   Project[]
+  jobs       Job[]
 }
 
 model Character {
-  id                   String                      @id @default(uuid()) @db.Char(36)
+  id                   String                       @id @default(uuid()) @db.Char(36)
   title                String
-  description          String?                     @db.VarChar(300)
-  slug                 String?                     @unique @db.VarChar(191)
-  name                 String?                     @db.VarChar(191)
-  tagline              String?                     @db.VarChar(255)
-  bio                  String?                     @db.VarChar(300)
-  searchTextEn         String?                     @db.Text
-  searchTextRu         String?                     @db.Text
-  priority             Int                         @default(0)
-  previewVideoUrl      String?                     @db.VarChar(512)
-  previewVideoHasAudio Boolean                     @default(true)
-  isCatalogPublic      Boolean                     @default(false)
-  defaultVoiceId       String?                     @db.VarChar(128)
-  defaultVoiceProvider String?                     @db.VarChar(32)
-  createdAt            DateTime                    @default(now())
-  updatedAt            DateTime                    @updatedAt
+  description          String?                      @db.VarChar(300)
+  slug                 String?                      @unique @db.VarChar(191)
+  name                 String?                      @db.VarChar(191)
+  tagline              String?                      @db.VarChar(255)
+  bio                  String?                      @db.VarChar(300)
+  searchTextEn         String?                      @db.Text
+  searchTextRu         String?                      @db.Text
+  priority             Int                          @default(0)
+  previewVideoUrl      String?                      @db.VarChar(512)
+  previewVideoHasAudio Boolean                      @default(true)
+  isCatalogPublic      Boolean                      @default(false)
+  defaultVoiceId       String?                      @db.VarChar(128)
+  defaultVoiceProvider String?                      @db.VarChar(32)
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
   variations           CharacterVariation[]
   categories           CharacterCategoryCharacter[]
   favoritedBy          UserFavoriteCharacter[]
@@ -413,16 +414,16 @@ model Character {
 }
 
 model CharacterVariation {
-  id          String    @id @default(uuid()) @db.Char(36)
-  characterId String    @db.Char(36)
-  title       String
-  description String?   @db.VarChar(300)
-  prompt      String?
-  imagePath   String?   @db.VarChar(512)
-  emptyImagePath String? @db.VarChar(512)
-  priority    Int       @default(0)
-  character   Character @relation(fields: [characterId], references: [id])
-  imageVariants CharacterImageVariant[]
+  id             String                  @id @default(uuid()) @db.Char(36)
+  characterId    String                  @db.Char(36)
+  title          String
+  description    String?                 @db.VarChar(300)
+  prompt         String?
+  imagePath      String?                 @db.VarChar(512)
+  emptyImagePath String?                 @db.VarChar(512)
+  priority       Int                     @default(0)
+  character      Character               @relation(fields: [characterId], references: [id])
+  imageVariants  CharacterImageVariant[]
 
   @@index([characterId])
   @@index([characterId, priority])
@@ -458,20 +459,20 @@ model UserFavoriteCharacter {
 }
 
 model CharacterCategory {
-  id            String                      @id @default(uuid()) @db.Char(36)
-  slug          String                      @unique @db.VarChar(191)
-  titleEn       String                      @db.VarChar(191)
-  titleRu       String                      @db.VarChar(191)
-  subtitleEn    String?                     @db.VarChar(255)
-  subtitleRu    String?                     @db.VarChar(255)
-  descriptionEn String?                     @db.Text
-  descriptionRu String?                     @db.Text
-  searchTextEn  String?                     @db.Text
-  searchTextRu  String?                     @db.Text
-  priority      Int                         @default(0)
-  isActive      Boolean                     @default(true)
-  createdAt     DateTime                    @default(now())
-  updatedAt     DateTime                    @updatedAt
+  id            String                       @id @default(uuid()) @db.Char(36)
+  slug          String                       @unique @db.VarChar(191)
+  titleEn       String                       @db.VarChar(191)
+  titleRu       String                       @db.VarChar(191)
+  subtitleEn    String?                      @db.VarChar(255)
+  subtitleRu    String?                      @db.VarChar(255)
+  descriptionEn String?                      @db.Text
+  descriptionRu String?                      @db.Text
+  searchTextEn  String?                      @db.Text
+  searchTextRu  String?                      @db.Text
+  priority      Int                          @default(0)
+  isActive      Boolean                      @default(true)
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
   characters    CharacterCategoryCharacter[]
 
   @@index([isActive, priority, createdAt])
@@ -511,22 +512,24 @@ model ImagePrankCategory {
 }
 
 model ImagePrankItem {
-  id            String             @id @default(uuid()) @db.Char(36)
-  categoryId    String             @db.Char(36)
-  slug          String             @unique @db.VarChar(191)
-  titleEn       String             @db.VarChar(191)
-  titleRu       String             @db.VarChar(191)
-  descriptionEn String?            @db.VarChar(300)
-  descriptionRu String?            @db.VarChar(300)
-  searchTextEn  String?            @db.Text
-  searchTextRu  String?            @db.Text
-  imagePath     String             @db.VarChar(512)
-  imageUrl      String?            @db.VarChar(512)
-  priority      Int                @default(0)
-  isPublic      Boolean            @default(false)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  category      ImagePrankCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  id               String             @id @default(uuid()) @db.Char(36)
+  categoryId       String             @db.Char(36)
+  slug             String             @unique @db.VarChar(191)
+  titleEn          String             @db.VarChar(191)
+  titleRu          String             @db.VarChar(191)
+  descriptionEn    String?            @db.VarChar(300)
+  descriptionRu    String?            @db.VarChar(300)
+  searchTextEn     String?            @db.Text
+  searchTextRu     String?            @db.Text
+  imagePath        String             @db.VarChar(512)
+  imageUrl         String?            @db.VarChar(512)
+  previewImagePath String?            @db.VarChar(512)
+  previewImageUrl  String?            @db.VarChar(512)
+  priority         Int                @default(0)
+  isPublic         Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  category         ImagePrankCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@index([categoryId, priority])
   @@index([isPublic, priority, createdAt])
@@ -689,21 +692,21 @@ model PublishTask {
 }
 
 model PlannedEmail {
-  id          String   @id @default(uuid()) @db.Char(36)
-  userId      String   @db.Char(36)
-  email       String   @db.VarChar(320)
-  kind        String   @db.VarChar(64)
-  targetLanguage String @default("en") @db.VarChar(8)
-  scheduledAt DateTime
-  status      String   @default("pending") @db.VarChar(32)
-  attempts    Int      @default(0)
-  sentAt      DateTime?
-  lastError   String?  @db.Text
-  lockId      String?  @db.Char(36)
-  lockedAt    DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String    @id @default(uuid()) @db.Char(36)
+  userId         String    @db.Char(36)
+  email          String    @db.VarChar(320)
+  kind           String    @db.VarChar(64)
+  targetLanguage String    @default("en") @db.VarChar(8)
+  scheduledAt    DateTime
+  status         String    @default("pending") @db.VarChar(32)
+  attempts       Int       @default(0)
+  sentAt         DateTime?
+  lastError      String?   @db.Text
+  lockId         String?   @db.Char(36)
+  lockedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, kind])
   @@index([status, scheduledAt])

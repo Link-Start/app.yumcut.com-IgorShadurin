@@ -436,6 +436,10 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
               ? entry.imageUrl
               : normalizeMediaUrl(typeof entry?.imagePath === 'string' ? entry.imagePath : null),
             imagePath: typeof entry?.imagePath === 'string' ? entry.imagePath : null,
+            previewImageUrl: typeof entry?.previewImageUrl === 'string' && entry.previewImageUrl.trim()
+              ? entry.previewImageUrl
+              : normalizeMediaUrl(typeof entry?.previewImagePath === 'string' ? entry.previewImagePath : null),
+            previewImagePath: typeof entry?.previewImagePath === 'string' ? entry.previewImagePath : null,
           }))
       : [];
     const catalogItem = resolvedImagePrank?.catalogItem && typeof resolvedImagePrank.catalogItem === 'object'

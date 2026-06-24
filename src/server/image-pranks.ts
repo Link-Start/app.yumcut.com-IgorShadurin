@@ -27,6 +27,8 @@ function mapItem(
     searchTextRu: string | null;
     imagePath: string;
     imageUrl: string | null;
+    previewImagePath: string | null;
+    previewImageUrl: string | null;
     categoryId: string;
     category: {
       slug: string;
@@ -43,6 +45,13 @@ function mapItem(
     hiddenSearchText: localized(item.searchTextEn, item.searchTextRu),
     imageUrl: item.imageUrl || normalizeMediaUrl(item.imagePath) || '',
     imagePath: item.imagePath,
+    previewImageUrl:
+      item.previewImageUrl
+      || normalizeMediaUrl(item.previewImagePath)
+      || item.imageUrl
+      || normalizeMediaUrl(item.imagePath)
+      || '',
+    previewImagePath: item.previewImagePath,
     categoryId: item.categoryId,
     categorySlug: item.category.slug,
     categoryTitle: localized(item.category.titleEn, item.category.titleRu),

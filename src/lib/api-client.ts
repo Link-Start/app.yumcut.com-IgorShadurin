@@ -293,6 +293,7 @@ export const Api = {
         descriptionRu: string | null;
         imagePath: string;
         imageUrl: string | null;
+        previewImagePath: string | null;
         previewImageUrl: string | null;
         isPublic: boolean;
         priority: number;

@@ -161,12 +161,13 @@ function CategoryCard({
 
 function ItemCard({ item, language }: { item: ImagePrankCatalogItemDTO; language: AppLanguageCode }) {
   const title = pickText(item.title, language);
+  const previewUrl = item.previewImageUrl || item.imageUrl;
   return (
     <Link href={`/image-prank/${encodeURIComponent(item.slug)}`} className="block cursor-pointer focus-visible:outline-none">
       <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
         <div className="relative aspect-[9/16] w-full bg-gray-100 dark:bg-gray-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item.imageUrl} alt={title} className="h-full w-full object-cover" loading="lazy" />
+          <img src={previewUrl} alt={title} className="h-full w-full object-cover" loading="lazy" />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
           <div className="pointer-events-none absolute bottom-3 left-3 right-3 text-white">
             <h3 className="truncate text-sm font-semibold leading-none">{title}</h3>

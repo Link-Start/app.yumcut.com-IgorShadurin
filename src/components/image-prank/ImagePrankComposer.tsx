@@ -568,7 +568,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
                 <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100">{copy.catalogLabel}</Label>
                 <div className="flex aspect-[9/16] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={item.imageUrl} alt={itemTitle} className="h-full w-full object-contain" />
+                  <img src={item.previewImageUrl || item.imageUrl} alt={itemTitle} className="h-full w-full object-contain" />
                 </div>
               </div>
             ) : oneImageMode ? null : (

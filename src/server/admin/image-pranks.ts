@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import {
   deleteStoredCatalogCharacterMedia,
   normalizeMediaUrl,
+  prepareCharacterPreviewImageVariantInStorage,
   uploadCharacterAssetToStorage,
 } from '@/server/storage';
 import { slugify } from '@/server/admin/characters';
@@ -28,6 +29,7 @@ export type AdminImagePrankItemDTO = {
   descriptionRu: string | null;
   imagePath: string;
   imageUrl: string | null;
+  previewImagePath: string | null;
   previewImageUrl: string | null;
   isPublic: boolean;
   priority: number;
@@ -45,6 +47,7 @@ export type ListAdminImagePranksResult = {
 };
 
 const MAX_CATALOG_IMAGE_DIMENSION = 2000;
+const IMAGE_PRANK_PREVIEW_HEIGHT = 896;
 
 function toIso(value: Date): string {
   return value.toISOString();
@@ -75,7 +78,12 @@ function mapItem(item: any): AdminImagePrankItemDTO {
     descriptionRu: item.descriptionRu ?? null,
     imagePath: item.imagePath,
     imageUrl: item.imageUrl ?? null,
-    previewImageUrl: item.imageUrl || normalizeMediaUrl(item.imagePath),
+    previewImagePath: item.previewImagePath ?? null,
+    previewImageUrl:
+      item.previewImageUrl
+      || normalizeMediaUrl(item.previewImagePath)
+      || item.imageUrl
+      || normalizeMediaUrl(item.imagePath),
     isPublic: !!item.isPublic,
     priority: item.priority,
     category: item.category
@@ -129,6 +137,31 @@ async function prepareCatalogImageFile(file: File, fallbackName: string): Promis
 
   const output = await pipeline.toBuffer();
   return new File([new Uint8Array(output)], fileName, { type: mimeType });
+}
+
+async function uploadImagePrankCatalogImage(file: File, fallbackName: string) {
+  const preparedImage = await prepareCatalogImageFile(file, fallbackName);
+  const original = await uploadCharacterAssetToStorage({
+    file: preparedImage,
+    fileName: preparedImage.name || fallbackName,
+    kind: 'character-image',
+  });
+
+  try {
+    const preview = await prepareCharacterPreviewImageVariantInStorage({
+      sourcePath: original.path,
+      height: IMAGE_PRANK_PREVIEW_HEIGHT,
+    });
+    return {
+      imagePath: original.path,
+      imageUrl: original.url,
+      previewImagePath: preview.path,
+      previewImageUrl: preview.url,
+    };
+  } catch (error) {
+    await deleteStoredCatalogCharacterMedia([original.path]).catch(() => {});
+    throw error;
+  }
 }
 
 export async function listAdminImagePrankCategories(): Promise<AdminImagePrankCategoryDTO[]> {
@@ -237,12 +270,12 @@ export async function deleteAdminImagePrankCategory(id: string, deleteFiles: boo
     where: { id },
     include: {
       items: {
-        select: { imagePath: true },
+        select: { imagePath: true, previewImagePath: true },
       },
     },
   });
   if (!existing) return;
-  const paths = existing.items.map((item) => item.imagePath);
+  const paths = existing.items.flatMap((item) => [item.imagePath, item.previewImagePath]);
   await prisma.imagePrankCategory.delete({ where: { id } });
   if (deleteFiles) {
     await deleteStoredCatalogCharacterMedia(paths).catch(() => {});
@@ -321,12 +354,7 @@ export async function createAdminImagePrankItem(input: {
   });
   if (!category) throw new Error('Category not found');
 
-  const preparedImage = await prepareCatalogImageFile(input.image, `${slug}.png`);
-  const stored = await uploadCharacterAssetToStorage({
-    file: preparedImage,
-    fileName: preparedImage.name || `${slug}.png`,
-    kind: 'character-image',
-  });
+  const stored = await uploadImagePrankCatalogImage(input.image, `${slug}.png`);
 
   const description = input.description?.trim() || null;
   const searchText = input.searchText?.trim() || null;
@@ -340,8 +368,10 @@ export async function createAdminImagePrankItem(input: {
       descriptionRu: description,
       searchTextEn: searchText,
       searchTextRu: searchText,
-      imagePath: stored.path,
-      imageUrl: stored.url,
+      imagePath: stored.imagePath,
+      imageUrl: stored.imageUrl,
+      previewImagePath: stored.previewImagePath,
+      previewImageUrl: stored.previewImageUrl,
       isPublic: input.isPublic ?? false,
       priority: Number.isFinite(input.priority) ? Math.floor(input.priority as number) : 0,
     },
@@ -369,7 +399,7 @@ export async function updateAdminImagePrankItem(
 ): Promise<AdminImagePrankItemDTO> {
   const existing = await prisma.imagePrankItem.findUnique({
     where: { id },
-    select: { imagePath: true },
+    select: { imagePath: true, previewImagePath: true },
   });
   if (!existing) throw new Error('Prank image not found');
 
@@ -408,14 +438,11 @@ export async function updateAdminImagePrankItem(
 
   if (input.image) {
     const fileName = input.image.name || `${typeof data.slug === 'string' ? data.slug : id}.png`;
-    const preparedImage = await prepareCatalogImageFile(input.image, fileName);
-    const stored = await uploadCharacterAssetToStorage({
-      file: preparedImage,
-      fileName: preparedImage.name || fileName,
-      kind: 'character-image',
-    });
-    data.imagePath = stored.path;
-    data.imageUrl = stored.url;
+    const stored = await uploadImagePrankCatalogImage(input.image, fileName);
+    data.imagePath = stored.imagePath;
+    data.imageUrl = stored.imageUrl;
+    data.previewImagePath = stored.previewImagePath;
+    data.previewImageUrl = stored.previewImageUrl;
   }
 
   const updated = await prisma.imagePrankItem.update({
@@ -429,7 +456,7 @@ export async function updateAdminImagePrankItem(
   });
 
   if (input.image) {
-    await deleteStoredCatalogCharacterMedia([existing.imagePath]).catch(() => {});
+    await deleteStoredCatalogCharacterMedia([existing.imagePath, existing.previewImagePath]).catch(() => {});
   }
 
   return mapItem(updated);
@@ -438,11 +465,11 @@ export async function updateAdminImagePrankItem(
 export async function deleteAdminImagePrankItem(id: string, deleteFiles: boolean): Promise<void> {
   const existing = await prisma.imagePrankItem.findUnique({
     where: { id },
-    select: { imagePath: true },
+    select: { imagePath: true, previewImagePath: true },
   });
   if (!existing) return;
   await prisma.imagePrankItem.delete({ where: { id } });
   if (deleteFiles) {
-    await deleteStoredCatalogCharacterMedia([existing.imagePath]).catch(() => {});
+    await deleteStoredCatalogCharacterMedia([existing.imagePath, existing.previewImagePath]).catch(() => {});
   }
 }

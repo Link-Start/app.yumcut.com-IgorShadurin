@@ -631,6 +631,8 @@ async function resolveImagePrankPayload(input: {
         label: localizedTitle(catalogItem),
         imagePath: catalogItem.imagePath,
         imageUrl: catalogItem.imageUrl,
+        previewImagePath: catalogItem.previewImagePath,
+        previewImageUrl: catalogItem.previewImageUrl,
       },
       {
         ...target,
