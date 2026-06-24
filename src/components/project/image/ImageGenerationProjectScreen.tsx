@@ -529,9 +529,6 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                               <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {source.label || t.referenceImages}
                               </div>
-                              <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                {source.role}
-                              </div>
                             </div>
                           </>
                         );
