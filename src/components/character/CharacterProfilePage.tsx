@@ -104,6 +104,7 @@ type CharacterProfileCopy = {
   topUpDescription: string;
   paywallCurrentBalance: (balance: number) => string;
   tokensPerCharge: string;
+  imagesPerPeriod: (images: string, period: 'week' | 'month') => string;
   videosPerPeriod: (videos: string, period: 'week' | 'month') => string;
   paywallPerPeriod: (period: 'week' | 'month') => string;
   paywallChipLabel: (planKey: SubscriptionPlanKey) => string;
@@ -175,6 +176,7 @@ const COPY: Record<AppLanguageCode, CharacterProfileCopy> = {
     topUpDescription: 'Subscribe to automatically get more tokens after each successful charge.',
     paywallCurrentBalance: (currentBalance) => `Current balance: ${currentBalance.toLocaleString()} tokens.`,
     tokensPerCharge: 'tokens per charge',
+    imagesPerPeriod: (images, period) => `${images} images/${period}`,
     videosPerPeriod: (videos, period) => `${videos} videos/${period}`,
     paywallPerPeriod: (period) => period,
     paywallChipLabel: (planKey) => {
@@ -248,6 +250,7 @@ const COPY: Record<AppLanguageCode, CharacterProfileCopy> = {
     topUpDescription: 'Оформите подписку, чтобы автоматически получать токены после каждого успешного списания.',
     paywallCurrentBalance: (currentBalance) => `Текущий баланс: ${currentBalance.toLocaleString()} токенов.`,
     tokensPerCharge: 'токенов за списание',
+    imagesPerPeriod: (images, period) => `${images} изображений/${period === 'week' ? 'неделю' : 'месяц'}`,
     videosPerPeriod: (videos, period) => `${videos} видео/${period === 'week' ? 'неделю' : 'месяц'}`,
     paywallPerPeriod: (period) => (period === 'week' ? 'неделю' : 'месяц'),
     paywallChipLabel: (planKey) => {
@@ -1132,6 +1135,9 @@ export function CharacterProfilePage({
                     {plan.ui.benefits.map((benefit, benefitIndex) => {
                       if (benefit.key === 'tokens_per_charge' && typeof benefit.tokens === 'number') {
                         return <p key={`${plan.planKey}-benefit-${benefitIndex}`}>{benefit.tokens.toLocaleString()} {copy.tokensPerCharge}</p>;
+                      }
+                      if (benefit.key === 'images_per_period' && typeof benefit.images === 'number' && benefit.interval) {
+                        return <p key={`${plan.planKey}-benefit-${benefitIndex}`}>{copy.imagesPerPeriod(benefit.images.toLocaleString(), benefit.interval)}</p>;
                       }
                       if (benefit.key === 'videos_per_period' && typeof benefit.videos === 'number' && benefit.interval) {
                         return <p key={`${plan.planKey}-benefit-${benefitIndex}`}>{copy.videosPerPeriod(formatSubscriptionVideoCountForPaywall(benefit.videos), benefit.interval)}</p>;

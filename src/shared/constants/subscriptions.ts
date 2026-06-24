@@ -1,4 +1,4 @@
-import { CHARACTER_PROJECT_CREATION_TOKENS as HIGH_QUALITY_CHARACTER_PROJECT_CREATION_TOKENS } from './token-costs';
+import { CHARACTER_PROJECT_CREATION_TOKENS as HIGH_QUALITY_CHARACTER_PROJECT_CREATION_TOKENS, TOKEN_COSTS } from './token-costs';
 
 export type SubscriptionPlanKey = 'weekly' | 'monthly' | 'monthly_pro';
 export type SubscriptionInterval = 'week' | 'month';
@@ -19,12 +19,14 @@ export type SubscriptionProductConfig = {
 
 export type SubscriptionBenefitKey =
   | 'tokens_per_charge'
+  | 'images_per_period'
   | 'videos_per_period'
   | 'most_popular';
 
 export type SubscriptionBenefit = {
   key: SubscriptionBenefitKey;
   tokens?: number;
+  images?: number;
   videos?: number;
   interval?: SubscriptionInterval;
 };
@@ -65,6 +67,10 @@ export function formatSubscriptionVideoCountForPaywall(videos: number) {
   return `${Math.floor(videos).toLocaleString()}+`;
 }
 
+export function getSubscriptionImageCountForPaywall(tokens: number) {
+  return Math.floor(tokens / TOKEN_COSTS.actions.imageGeneration);
+}
+
 export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, SubscriptionPlanDefinition> = {
   weekly: {
     planKey: 'weekly',
@@ -81,6 +87,7 @@ export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, Subscription
       i18nChooseKey: 'subscription.action.choose_plan',
       i18nCurrentPlanKey: 'subscription.action.current_plan',
       benefits: [
+        { key: 'images_per_period', images: getSubscriptionImageCountForPaywall(75), interval: 'week' },
         { key: 'videos_per_period', videos: SUBSCRIPTION_PLAN_MAX_VALUES.weekly.videos, interval: 'week' },
         { key: 'tokens_per_charge', tokens: 75 },
       ],
@@ -102,6 +109,7 @@ export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, Subscription
       i18nCurrentPlanKey: 'subscription.action.current_plan',
       i18nBadgeKey: 'subscription.badge.popular',
       benefits: [
+        { key: 'images_per_period', images: getSubscriptionImageCountForPaywall(750), interval: 'month' },
         { key: 'videos_per_period', videos: SUBSCRIPTION_PLAN_MAX_VALUES.monthly.videos, interval: 'month' },
         { key: 'tokens_per_charge', tokens: 750 },
         { key: 'most_popular' },
@@ -123,6 +131,7 @@ export const SUBSCRIPTION_ACTIVE_PLANS: Record<SubscriptionPlanKey, Subscription
       i18nChooseKey: 'subscription.action.choose_plan',
       i18nCurrentPlanKey: 'subscription.action.current_plan',
       benefits: [
+        { key: 'images_per_period', images: getSubscriptionImageCountForPaywall(1500), interval: 'month' },
         { key: 'videos_per_period', videos: SUBSCRIPTION_PLAN_MAX_VALUES.monthly_pro.videos, interval: 'month' },
         { key: 'tokens_per_charge', tokens: 1500 },
       ],

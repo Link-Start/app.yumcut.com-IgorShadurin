@@ -24,6 +24,7 @@ type SubscriptionCardCopy = {
   expiresAt: string;
   currentPlan: string;
   planTokens: (tokens: number) => string;
+  planImages: (images: string, interval: 'week' | 'month') => string;
   planVideos: (videos: string, interval: 'week' | 'month') => string;
   per: {
     week: string;
@@ -54,6 +55,7 @@ const COPY: Record<AppLanguageCode, SubscriptionCardCopy> = {
     expiresAt: 'Current period ends',
     currentPlan: 'Current plan',
     planTokens: (tokens) => `${tokens.toLocaleString()} tokens per charge`,
+    planImages: (images, interval) => `${images} images/${interval}`,
     planVideos: (videos, interval) => `${videos} videos/${interval}`,
     per: {
       week: 'week',
@@ -82,6 +84,7 @@ const COPY: Record<AppLanguageCode, SubscriptionCardCopy> = {
     expiresAt: 'Текущий период до',
     currentPlan: 'Текущий план',
     planTokens: (tokens) => `${tokens.toLocaleString()} токенов за списание`,
+    planImages: (images, interval) => `${images} изображений/${interval === 'week' ? 'неделя' : 'месяц'}`,
     planVideos: (videos, interval) => `${videos} видео/${interval === 'week' ? 'неделя' : 'месяц'}`,
     per: {
       week: 'неделю',
@@ -301,6 +304,9 @@ export function SubscriptionPlansCard({ initialStatus }: { initialStatus: Subscr
                     {plan.benefits.map((benefit, index) => {
                       if (benefit.key === 'tokens_per_charge' && typeof benefit.tokens === 'number') {
                         return <p key={`${plan.planKey}-benefit-${index}`}>{t.planTokens(benefit.tokens)}</p>;
+                      }
+                      if (benefit.key === 'images_per_period' && typeof benefit.images === 'number' && benefit.interval) {
+                        return <p key={`${plan.planKey}-benefit-${index}`}>{t.planImages(benefit.images.toLocaleString(), benefit.interval)}</p>;
                       }
                       if (benefit.key === 'videos_per_period' && typeof benefit.videos === 'number' && benefit.interval) {
                         return <p key={`${plan.planKey}-benefit-${index}`}>{t.planVideos(formatSubscriptionVideoCountForPaywall(benefit.videos), benefit.interval)}</p>;

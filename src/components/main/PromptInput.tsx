@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Coins,
+  Images,
   Video,
   Crown,
   CreditCard,
@@ -114,6 +115,7 @@ type PromptInputCopy = {
   paywallTitle: string;
   paywallDescription: (projectCost: number, tokenBalance: number) => string;
   paywallPerCharge: string;
+  paywallImagesPerPeriod: (images: string, interval: 'week' | 'month') => string;
   paywallVideosPerPeriod: (videos: string, interval: 'week' | 'month') => string;
   paywallChoosePlan: string;
   paywallOpeningCheckout: string;
@@ -162,6 +164,7 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     paywallDescription: (projectCost, tokenBalance) =>
       `You need ${projectCost} tokens but have ${tokenBalance}. Subscribe to add tokens automatically after each charge.`,
     paywallPerCharge: 'tokens per charge',
+    paywallImagesPerPeriod: (images, interval) => `${images} images/${interval}`,
     paywallVideosPerPeriod: (videos, interval) => `${videos} videos/${interval}`,
     paywallChoosePlan: 'Choose plan',
     paywallOpeningCheckout: 'Opening checkout…',
@@ -208,6 +211,7 @@ const PROMPT_INPUT_COPY: Record<AppLanguageCode, PromptInputCopy> = {
     paywallDescription: (projectCost, tokenBalance) =>
       `Для проекта нужно ${projectCost} токенов, а у вас ${tokenBalance}. Подписка будет автоматически пополнять токены после каждого успешного списания.`,
     paywallPerCharge: 'токенов за списание',
+    paywallImagesPerPeriod: (images, interval) => `${images} изображений/${interval === 'week' ? 'неделя' : 'месяц'}`,
     paywallVideosPerPeriod: (videos, interval) => `${videos} видео/${interval === 'week' ? 'неделя' : 'месяц'}`,
     paywallChoosePlan: 'Выбрать план',
     paywallOpeningCheckout: 'Открываем оплату…',
@@ -1042,6 +1046,14 @@ export function PromptInput({ projectType = 'story' }: PromptInputProps) {
                     </div>
                     <div className="mt-4 flex-1 space-y-2 rounded-lg border border-gray-200/80 bg-white/70 p-3 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-950/30 dark:text-gray-300">
                       {plan.ui.benefits.map((benefit, benefitIndex) => {
+                        if (benefit.key === 'images_per_period' && typeof benefit.images === 'number' && benefit.interval) {
+                          return (
+                            <p key={`${plan.planKey}-benefit-${benefitIndex}`} className="flex items-center gap-2">
+                              <Images className="h-4 w-4 text-purple-600 dark:text-purple-300" />
+                              <span>{copy.paywallImagesPerPeriod(benefit.images.toLocaleString(), benefit.interval)}</span>
+                            </p>
+                          );
+                        }
                         if (benefit.key === 'videos_per_period' && typeof benefit.videos === 'number' && benefit.interval) {
                           return (
                             <p key={`${plan.planKey}-benefit-${benefitIndex}`} className="flex items-center gap-2">

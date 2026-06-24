@@ -486,8 +486,9 @@ export interface SubscriptionPlanDTO {
     videos: number;
   };
   benefits: Array<{
-    key: 'tokens_per_charge' | 'videos_per_period' | 'most_popular';
+    key: 'tokens_per_charge' | 'images_per_period' | 'videos_per_period' | 'most_popular';
     tokens?: number;
+    images?: number;
     videos?: number;
     interval?: 'week' | 'month';
   }>;
