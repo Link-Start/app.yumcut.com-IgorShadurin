@@ -9,8 +9,46 @@ type AdminProjectErrorDetailsProps = {
   extra?: Record<string, unknown> | null;
 };
 
+const OMITTED_EXTRA_KEYS = new Set([
+  'command',
+  'sourceImages',
+]);
+
+function sanitizeExtraValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map(sanitizeExtraValue);
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(record)) {
+      if (OMITTED_EXTRA_KEYS.has(key)) continue;
+      if (key === 'imagePrank' && entry && typeof entry === 'object' && !Array.isArray(entry)) {
+        const imagePrank = entry as Record<string, unknown>;
+        const sourceImages = Array.isArray(imagePrank.sourceImages) ? imagePrank.sourceImages : [];
+        sanitized[key] = {
+          mode: imagePrank.mode,
+          catalogItem: imagePrank.catalogItem,
+          sourceImageCount: sourceImages.length,
+        };
+        continue;
+      }
+      sanitized[key] = sanitizeExtraValue(entry);
+    }
+    return sanitized;
+  }
+
+  if (typeof value === 'string' && value.length > 1000) {
+    return `${value.slice(0, 1000)}…`;
+  }
+
+  return value;
+}
+
 export function AdminProjectErrorDetails({ occurredAt, details = [], logFile, extra }: AdminProjectErrorDetailsProps) {
-  if (details.length === 0 && !logFile && !extra && !occurredAt) return null;
+  const sanitizedExtra = extra ? sanitizeExtraValue(extra) : null;
+  if (details.length === 0 && !logFile && !sanitizedExtra && !occurredAt) return null;
 
   return (
     <Card>
@@ -59,11 +97,11 @@ export function AdminProjectErrorDetails({ occurredAt, details = [], logFile, ex
           </div>
         ) : null}
 
-        {extra ? (
+        {sanitizedExtra ? (
           <div>
-            <div className="mb-2 font-medium text-gray-500 dark:text-gray-400">Raw status extra</div>
+            <div className="mb-2 font-medium text-gray-500 dark:text-gray-400">Status extra preview</div>
             <pre className="max-h-80 overflow-auto rounded-md border bg-gray-950 p-3 text-xs leading-5 text-gray-100">
-              {JSON.stringify(extra, null, 2)}
+              {JSON.stringify(sanitizedExtra, null, 2)}
             </pre>
           </div>
         ) : null}

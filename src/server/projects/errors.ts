@@ -105,7 +105,6 @@ function collectErrorDetails(extra: Record<string, unknown> | null, nestedMeta: 
   add('Language', extra?.failedLanguage ?? extra?.languageCode);
   add('Reason', extra?.reason ?? nestedMeta?.reason);
   add('Error', extra?.error ?? nestedMeta?.error);
-  add('Command', extra?.command);
   add('Log path', extra?.logPath);
   add('Log directory', extra?.logDir);
   add('Workspace', extra?.workspace ?? extra?.workspaceRoot);
