@@ -317,13 +317,6 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
     <div className="mx-auto w-full max-w-6xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          {isError ? (
-            <AlertTriangle className="h-5 w-5 shrink-0 text-red-500" />
-          ) : project.status === ProjectStatus.Done ? (
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-          ) : (
-            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-blue-500" />
-          )}
           <h1 className="truncate text-xl font-semibold leading-6 text-gray-900 dark:text-gray-100">
             {project.title}
           </h1>
