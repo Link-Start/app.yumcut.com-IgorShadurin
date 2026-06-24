@@ -418,7 +418,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
           ) : null}
         </CardHeader>
         <CardContent className="pt-5">
-          <div className="grid gap-5 lg:grid-cols-[minmax(240px,360px)_minmax(0,1fr)] lg:items-start">
+          <div className="grid gap-5 lg:grid-cols-[minmax(240px,360px)_minmax(0,1fr)] lg:items-stretch">
             <div className="flex justify-center lg:justify-start">
               <div className="flex aspect-[9/16] w-full max-w-[360px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                 {resultImageUrl ? (
@@ -467,7 +467,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="flex h-full flex-col gap-4">
               <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -491,20 +491,20 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                 </div>
               </section>
 
-              <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+              <section className="flex flex-1 flex-col rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
                 <h2 className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
                   <UserRound className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                   {sourceImages.length > 0 ? t.referenceImages : t.sourceImage}
                 </h2>
                 {sourceImages.length > 0 ? (
-                  <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid flex-1 gap-3 md:grid-cols-2">
                     {sourceImages.map((source, index) => (
                       (() => {
                         const key = `${source.role}-${source.imagePath ?? source.imageUrl ?? index}`;
                         const isCatalogPrankCard = source.role === 'prank' && Boolean(catalogItemHref);
                         const cardContent = (
                           <>
-                            <div className="flex min-h-[240px] items-center justify-center overflow-hidden rounded-md bg-white p-3 dark:bg-gray-950 md:min-h-[300px]">
+                            <div className="flex min-h-[240px] flex-1 items-center justify-center overflow-hidden rounded-md bg-white p-3 dark:bg-gray-950 md:min-h-[300px]">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={source.imageUrl ?? ''}
@@ -528,7 +528,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                             <Link
                               key={key}
                               href={catalogItemHref}
-                              className="grid cursor-pointer gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900/60 dark:hover:bg-gray-900"
+                              className="grid h-full cursor-pointer gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900/60 dark:hover:bg-gray-900"
                             >
                               {cardContent}
                             </Link>
@@ -538,7 +538,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                         return (
                           <div
                             key={key}
-                            className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60"
+                            className="grid h-full gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60"
                           >
                             {cardContent}
                           </div>
