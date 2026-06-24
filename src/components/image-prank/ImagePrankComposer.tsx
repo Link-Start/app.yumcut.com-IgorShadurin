@@ -291,13 +291,11 @@ function fileNameWithExtension(fileName: string, extension: string) {
   return `${base}.${extension}`;
 }
 
-async function decodeImageFile(file: File): Promise<ImageBitmap | HTMLImageElement> {
-  if (typeof createImageBitmap === 'function') {
-    return createImageBitmap(file);
-  }
+async function decodeImageFile(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const image = new Image();
+    image.decoding = 'async';
     image.onload = () => {
       URL.revokeObjectURL(url);
       resolve(image);
@@ -312,9 +310,8 @@ async function decodeImageFile(file: File): Promise<ImageBitmap | HTMLImageEleme
 
 async function resizeImageForStorage(file: File): Promise<File> {
   const decoded = await decodeImageFile(file);
-  const isHtmlImage = typeof HTMLImageElement !== 'undefined' && decoded instanceof HTMLImageElement;
-  const width = isHtmlImage ? decoded.naturalWidth : decoded.width;
-  const height = isHtmlImage ? decoded.naturalHeight : decoded.height;
+  const width = decoded.naturalWidth;
+  const height = decoded.naturalHeight;
   const maxDimension = Math.max(width, height);
   if (!width || !height || maxDimension <= MAX_STORAGE_IMAGE_DIMENSION) return file;
 
@@ -329,7 +326,7 @@ async function resizeImageForStorage(file: File): Promise<File> {
     const canvas = new OffscreenCanvas(targetWidth, targetHeight);
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas is not available');
-    ctx.drawImage(decoded as CanvasImageSource, 0, 0, targetWidth, targetHeight);
+    ctx.drawImage(decoded, 0, 0, targetWidth, targetHeight);
     const blob = await canvas.convertToBlob({ type: mimeType, quality });
     return new File([blob], fileName, { type: mimeType });
   }
@@ -339,7 +336,7 @@ async function resizeImageForStorage(file: File): Promise<File> {
   canvas.height = targetHeight;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas is not available');
-  ctx.drawImage(decoded as CanvasImageSource, 0, 0, targetWidth, targetHeight);
+  ctx.drawImage(decoded, 0, 0, targetWidth, targetHeight);
   const blob = await new Promise<Blob | null>((resolve) => {
     canvas.toBlob((output) => resolve(output), mimeType, quality);
   });
