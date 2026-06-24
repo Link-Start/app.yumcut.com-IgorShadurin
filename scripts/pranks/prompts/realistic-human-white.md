@@ -4,11 +4,14 @@ Character request:
 {{USER_PROMPT}}
 
 Hard requirements:
-- Generate exactly one realistic adult human character.
+- Generate exactly one realistic adult human character. Use this prompt only for adult characters.
 - The person must be fully visible head-to-toe, centered, and isolated.
 - Use a neutral natural standing pose with direct eye contact.
 - Keep clothing public-safe, everyday, fully covered, and non-explicit.
 - Use realistic photography/CGI realism: natural anatomy, believable skin, hair, fabric, shoes, and proportions.
+- For adult women, make the character very appealing, glamorous, stylish, and subtly flirtatious through posture, styling, hair, makeup, and flattering clothes while staying age-rating 9+.
+- For adult men, make the character visually appealing and expressive through styling, posture, face, and outfit while staying natural and non-explicit.
+- Do not use nudity, underwear-only looks, fetish styling, see-through clothing, explicit posing, body-part focus, or sexual acts.
 - Use pure flat white background (#FFFFFF) only.
 - Do not add a room, street, props, furniture, floor, horizon, gradient, colored backdrop, or environmental context.
 - Do not add ground contact shadows, cast shadows, ambient shadows, reflections, glows, halos, or matte fringe.
