@@ -47,7 +47,7 @@ export async function runImageGenerationTool(options: RunImageGenerationToolOpti
   const args = [
     'run',
     '-s',
-    'image:prank',
+    'image:mix',
     '--',
     '--prompt',
     options.prompt,

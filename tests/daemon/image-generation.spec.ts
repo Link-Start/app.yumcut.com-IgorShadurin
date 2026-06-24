@@ -7,7 +7,7 @@ const runNpmCommandMock = vi.fn(async ({ logDir }: any) => {
   await fs.mkdir(logDir, { recursive: true });
   const logPath = path.join(logDir, 'image-prank.log');
   await fs.writeFile(logPath, 'ok', 'utf8');
-  return { logPath, displayCommand: 'npm run -s image:prank -- ...' };
+  return { logPath, displayCommand: 'npm run -s image:mix -- ...' };
 });
 
 vi.mock('../../scripts/daemon/helpers/video/run-npm-command', () => ({
@@ -34,7 +34,7 @@ describe('runImageGenerationTool', () => {
     await fs.rm(baseDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  it('invokes image:prank CLI with reference images and returns parsed response JSON', async () => {
+  it('invokes image:mix CLI with reference images and returns parsed response JSON', async () => {
     runNpmCommandMock.mockImplementationOnce(async ({ logDir: runLogDir, args }: any) => {
       await fs.mkdir(runLogDir, { recursive: true });
       const logPath = path.join(runLogDir, 'image-prank.log');
@@ -44,7 +44,7 @@ describe('runImageGenerationTool', () => {
       await fs.mkdir(path.dirname(outputPath), { recursive: true });
       await fs.writeFile(outputPath, 'image-bytes', 'utf8');
       await fs.writeFile(responseJsonPath, JSON.stringify({ data: [{ imageURL: 'https://example.com/image.jpg' }] }), 'utf8');
-      return { logPath, displayCommand: 'npm run -s image:prank -- ...' };
+      return { logPath, displayCommand: 'npm run -s image:mix -- ...' };
     });
 
     const result = await runImageGenerationTool({
@@ -65,7 +65,7 @@ describe('runImageGenerationTool', () => {
     expect(args).toEqual([
       'run',
       '-s',
-      'image:prank',
+      'image:mix',
       '--',
       '--prompt',
       'Place the first image naturally into the second image',
@@ -88,7 +88,7 @@ describe('runImageGenerationTool', () => {
       '--reference-image',
       'https://example.com/target.jpg',
     ]);
-    expect(result.command).toBe('npm run -s image:prank -- ...');
+    expect(result.command).toBe('npm run -s image:mix -- ...');
     expect(result.responseJson).toEqual({ data: [{ imageURL: 'https://example.com/image.jpg' }] });
     await expect(fs.access(result.outputPath)).resolves.toBeUndefined();
   });
@@ -101,7 +101,7 @@ describe('runImageGenerationTool', () => {
       const outputPath = args[args.indexOf('--output') + 1];
       await fs.mkdir(path.dirname(outputPath), { recursive: true });
       await fs.writeFile(outputPath, 'image-bytes', 'utf8');
-      return { logPath, displayCommand: 'npm run -s image:prank -- ...' };
+      return { logPath, displayCommand: 'npm run -s image:mix -- ...' };
     });
 
     const result = await runImageGenerationTool({
