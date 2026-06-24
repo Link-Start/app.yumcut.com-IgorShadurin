@@ -12,7 +12,7 @@ export const LIMITS = {
   audioStyleGuidanceMax: 500,
   imagePromptMax: 1_899,
   imageMinPixels: 1_024,
-  imageMaxPixels: 1_048_576,
+  imageMaxPixels: 4_194_304,
   imageSizeMultiple: 32,
   titleMax: 191,
   descriptionMax: 191,

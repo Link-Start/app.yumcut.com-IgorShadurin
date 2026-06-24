@@ -2,6 +2,10 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { ProjectStatus } from '@/shared/constants/status';
 import { QWEN_DEFAULT_NEGATIVE_PROMPT } from '@/server/image-generation/runware';
+import {
+  DEFAULT_IMAGE_GENERATION_HEIGHT,
+  DEFAULT_IMAGE_GENERATION_WIDTH,
+} from '@/shared/constants/image-generation';
 import type { DaemonConfig } from '../config';
 import { addImageAsset, setStatus } from '../db';
 import { runImageGenerationTool } from '../image-generation';
@@ -48,8 +52,8 @@ export async function handleImageGenerationProjectPhase({
 
   const provider = 'runware';
   const model = stringFromPayload(jobPayload.model, 'runware:108@1');
-  const width = numberFromPayload(jobPayload.width, 1024);
-  const height = numberFromPayload(jobPayload.height, 1024);
+  const width = numberFromPayload(jobPayload.width, DEFAULT_IMAGE_GENERATION_WIDTH);
+  const height = numberFromPayload(jobPayload.height, DEFAULT_IMAGE_GENERATION_HEIGHT);
   const imageKind = stringFromPayload(jobPayload.imageKind, 'standalone');
   const imagePrank = (jobPayload.imagePrank && typeof jobPayload.imagePrank === 'object')
     ? jobPayload.imagePrank as Record<string, unknown>

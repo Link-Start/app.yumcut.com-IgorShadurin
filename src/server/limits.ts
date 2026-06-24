@@ -13,7 +13,7 @@ export const LIMITS = {
   audioStyleGuidanceMax: 500,
   imagePromptMax: 1_899,
   imageMinPixels: 1_024,
-  imageMaxPixels: 1_048_576,
+  imageMaxPixels: 4_194_304,
   imageSizeMultiple: 32,
   // reference values for other varchar fields still at 191 chars
   titleMax: 191,

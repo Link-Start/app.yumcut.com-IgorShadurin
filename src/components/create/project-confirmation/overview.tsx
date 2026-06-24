@@ -21,6 +21,11 @@ import {
 } from 'lucide-react';
 import type { PendingProjectDraft } from '@/shared/types';
 import { getLanguageFlag, getLanguageLabel, normalizeLanguageList, DEFAULT_LANGUAGE, type TargetLanguageCode } from '@/shared/constants/languages';
+import {
+  DEFAULT_IMAGE_GENERATION_HEIGHT,
+  DEFAULT_IMAGE_GENERATION_SIZE_LABEL,
+  DEFAULT_IMAGE_GENERATION_WIDTH,
+} from '@/shared/constants/image-generation';
 import type { SummaryItem, GuidanceSection } from './types';
 import { features } from '@/lib/feature-flags';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
@@ -203,8 +208,8 @@ const COPY: Record<AppLanguageCode, OverviewCopy> = {
     balanceAfterTooltip: (balanceAfterLabel) => `Balance after generation: ${balanceAfterLabel} tokens`,
     imageModeBadge: 'Image Prank',
     imageModeTooltip: 'Generate one image from your prompt.',
-    imageSizeBadge: '1024x1024',
-    imageSizeTooltip: 'Generated image size: 1024 by 1024 pixels.',
+    imageSizeBadge: DEFAULT_IMAGE_GENERATION_SIZE_LABEL,
+    imageSizeTooltip: `Generated image size: ${DEFAULT_IMAGE_GENERATION_WIDTH} by ${DEFAULT_IMAGE_GENERATION_HEIGHT} pixels.`,
     musicTooltip: (enabled) => `Include default music: ${enabled ? 'Yes' : 'No'}`,
     musicOnBadge: 'Music on',
     musicOffBadge: 'Music off',
@@ -281,8 +286,8 @@ const COPY: Record<AppLanguageCode, OverviewCopy> = {
     balanceAfterTooltip: (balanceAfterLabel) => `Баланс после генерации: ${balanceAfterLabel} токенов`,
     imageModeBadge: 'Image Prank',
     imageModeTooltip: 'Создать одно изображение по вашему промпту.',
-    imageSizeBadge: '1024x1024',
-    imageSizeTooltip: 'Размер изображения: 1024 на 1024 пикселя.',
+    imageSizeBadge: DEFAULT_IMAGE_GENERATION_SIZE_LABEL,
+    imageSizeTooltip: `Размер изображения: ${DEFAULT_IMAGE_GENERATION_WIDTH} на ${DEFAULT_IMAGE_GENERATION_HEIGHT} пикселей.`,
     musicTooltip: (enabled) => `Музыка по умолчанию: ${enabled ? 'включена' : 'выключена'}`,
     musicOnBadge: 'Музыка вкл',
     musicOffBadge: 'Музыка выкл',

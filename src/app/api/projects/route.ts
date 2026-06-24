@@ -7,6 +7,10 @@ import { listPublicVoices, resolveVoiceInfo } from '@/server/voices';
 import { LIMITS } from '@/server/limits';
 import { deriveTitleFromText } from '@/server/title';
 import { ProjectStatus } from '@/shared/constants/status';
+import {
+  DEFAULT_IMAGE_GENERATION_HEIGHT,
+  DEFAULT_IMAGE_GENERATION_WIDTH,
+} from '@/shared/constants/image-generation';
 import { spendTokens, makeUserInitiator, TOKEN_TRANSACTION_TYPES } from '@/server/tokens';
 import { calculateCharacterProjectTokenCost, calculateProjectTokenCost, TOKEN_COSTS } from '@/shared/constants/token-costs';
 import { notifyAdminsOfNewProject } from '@/server/telegram';
@@ -704,8 +708,8 @@ async function createImageGenerationProject(params: {
   const imageSpec = {
     provider: 'runware',
     model: resolvedImagePrank ? 'runware:108@22' : 'runware:108@1',
-    width: 1024,
-    height: 1024,
+    width: DEFAULT_IMAGE_GENERATION_WIDTH,
+    height: DEFAULT_IMAGE_GENERATION_HEIGHT,
     estimatedDurationSeconds: 300,
   };
   const tokenCost = TOKEN_COSTS.actions.imageGeneration;
