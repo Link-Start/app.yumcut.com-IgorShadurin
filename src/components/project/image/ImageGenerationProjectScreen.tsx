@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Download, FileText, ImageIcon, Loader2, MoreVertical, Trash2, UserRound } from 'lucide-react';
@@ -262,6 +263,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
       : t.progressWaiting;
   const originalFormat = (image?.resultFormat || 'jpg').toLowerCase();
   const baseFilename = sanitizeFilename(project.title || prompt);
+  const catalogItemHref = image?.catalogItem?.slug ? `/image-prank/${encodeURIComponent(image.catalogItem.slug)}` : null;
   const sourceLabel = image?.source === 'global'
     ? t.catalogCharacter
     : image?.source === 'user'
@@ -495,34 +497,58 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                   {sourceImages.length > 0 ? t.referenceImages : t.sourceImage}
                 </h2>
                 {sourceImages.length > 0 ? (
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-3 md:grid-cols-2">
                     {sourceImages.map((source, index) => (
-                      <div
-                        key={`${source.role}-${source.imagePath ?? source.imageUrl ?? index}`}
-                        className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60"
-                      >
-                        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-white dark:bg-gray-950">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={source.imageUrl ?? ''}
-                            alt={source.label || t.referenceImages}
-                            className="h-full w-full object-contain"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {source.label || t.referenceImages}
+                      (() => {
+                        const key = `${source.role}-${source.imagePath ?? source.imageUrl ?? index}`;
+                        const isCatalogPrankCard = source.role === 'prank' && Boolean(catalogItemHref);
+                        const cardContent = (
+                          <>
+                            <div className="flex min-h-[240px] items-center justify-center overflow-hidden rounded-md bg-white p-3 dark:bg-gray-950 md:min-h-[300px]">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={source.imageUrl ?? ''}
+                                alt={source.label || t.referenceImages}
+                                className="h-full max-h-[320px] w-full object-contain"
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {source.label || t.referenceImages}
+                              </div>
+                              <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                {source.role}
+                              </div>
+                            </div>
+                          </>
+                        );
+
+                        if (isCatalogPrankCard && catalogItemHref) {
+                          return (
+                            <Link
+                              key={key}
+                              href={catalogItemHref}
+                              className="grid cursor-pointer gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900/60 dark:hover:bg-gray-900"
+                            >
+                              {cardContent}
+                            </Link>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={key}
+                            className="grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60"
+                          >
+                            {cardContent}
                           </div>
-                          <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            {source.role}
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })()
                     ))}
                   </div>
                 ) : image?.originalImageUrl ? (
-                  <div className="grid gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                    <div className="flex h-[120px] w-[120px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+                  <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
+                    <div className="flex h-[160px] w-[160px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={image.originalImageUrl} alt={t.sourceImage} className="h-full w-full object-contain" />
                     </div>
