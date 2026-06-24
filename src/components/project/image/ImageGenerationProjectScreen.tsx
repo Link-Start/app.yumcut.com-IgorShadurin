@@ -442,7 +442,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                       {isError ? (
                         <div className="space-y-1 text-sm leading-5 text-gray-600 dark:text-gray-400">
                           <p>{t.generationFailedAdminMessage}</p>
-                          <p>{errorRefundMessage}</p>
+                          <p className="font-semibold text-gray-900 dark:text-gray-100">{errorRefundMessage}</p>
                         </div>
                       ) : (
                         <>
