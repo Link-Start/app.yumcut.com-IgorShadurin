@@ -18,9 +18,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Api } from '@/lib/api-client';
-import { AlertTriangle, MoreVertical, Trash2, FileText } from 'lucide-react';
+import { AlertTriangle, MoreVertical, Trash2, FileText, ImageIcon, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ProjectLanguageVariantDTO } from '@/shared/types';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
@@ -136,14 +136,84 @@ function ProjectLoadingSkeleton() {
   );
 }
 
+function ImagePrankProjectLoadingSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-6xl space-y-5">
+      <div className="flex items-center gap-2">
+        <div className="h-5 w-5 rounded-full skeleton" />
+        <div className="h-6 w-44 rounded-md skeleton" />
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+        <div className="flex flex-col gap-3 border-b border-gray-200/80 px-6 py-4 dark:border-gray-800/80 sm:flex-row sm:items-center sm:justify-between">
+          <div className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+            <ImageIcon className="h-4 w-4 text-blue-500" />
+            <div className="h-4 w-28 rounded skeleton" />
+          </div>
+        </div>
+
+        <div className="px-6 py-5">
+          <div className="grid gap-5 lg:grid-cols-[minmax(240px,360px)_minmax(0,1fr)] lg:items-stretch">
+            <div className="flex justify-center lg:justify-start">
+              <div className="aspect-[9/16] w-full max-w-[360px] rounded-lg skeleton" />
+            </div>
+
+            <div className="flex h-full flex-col gap-4">
+              <section className="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="inline-flex items-center gap-1.5">
+                    <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <div className="h-5 w-20 rounded skeleton" />
+                  </div>
+                  <div className="h-9 w-24 rounded-xl skeleton" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 w-full rounded skeleton" />
+                  <div className="h-4 w-11/12 rounded skeleton" />
+                  <div className="h-4 w-9/12 rounded skeleton" />
+                </div>
+              </section>
+
+              <section className="flex flex-1 flex-col rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-800 dark:bg-gray-950/50">
+                <div className="mb-3 inline-flex items-center gap-1.5">
+                  <UserRound className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <div className="h-5 w-36 rounded skeleton" />
+                </div>
+                <div className="grid flex-1 gap-3 md:grid-cols-2">
+                  <div className="grid h-full gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60">
+                    <div className="min-h-[240px] rounded-md skeleton md:min-h-[300px]" />
+                    <div className="space-y-2">
+                      <div className="h-5 w-28 rounded skeleton" />
+                      <div className="h-4 w-16 rounded skeleton" />
+                    </div>
+                  </div>
+                  <div className="grid h-full gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60">
+                    <div className="min-h-[240px] rounded-md skeleton md:min-h-[300px]" />
+                    <div className="space-y-2">
+                      <div className="h-5 w-32 rounded skeleton" />
+                      <div className="h-4 w-16 rounded skeleton" />
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function StoryProjectScreen({ projectId }: { projectId: string }) {
   const { language } = useAppLanguage();
   const t = COPY[language];
   const { project, loading, error, refresh } = useProject(projectId);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const projectExperience = normalizeProjectExperience(project?.creation?.projectExperience);
+  const placeholderMode = searchParams.get('placeholder');
 
   useEffect(() => {
     if (!project || (projectExperience !== 'character' && projectExperience !== 'image-generation')) return;
@@ -152,7 +222,9 @@ export function StoryProjectScreen({ projectId }: { projectId: string }) {
   }, [project, projectExperience]);
 
   if (loading) {
-    return <ProjectLoadingSkeleton />;
+    return placeholderMode === 'image-prank'
+      ? <ImagePrankProjectLoadingSkeleton />
+      : <ProjectLoadingSkeleton />;
   }
   if (error) return <div>{t.loadingProjectError}</div>;
   if (!project) return <div>{t.notFound}</div>;

@@ -516,7 +516,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
       }
       requestTokenRefresh();
       setConfirmOpen(false);
-      router.replace(`/project/${res.id}`);
+      router.replace(`/project/${res.id}?placeholder=image-prank`);
     } catch (err) {
       console.error('Image prank creation failed', err);
       toast.error(err instanceof Error ? err.message : copy.createFailed);
