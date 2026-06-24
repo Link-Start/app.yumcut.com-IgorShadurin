@@ -53,6 +53,10 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
   const errorMessage = project.status === ProjectStatus.Error
     ? ((statusInfo?.message as string | undefined) ?? latestLogMessage ?? undefined)
     : undefined;
+  const isImageGenerationProject = project.creation?.projectExperience === 'image-generation' || !!project.imageGeneration;
+  const errorDescription = project.status === ProjectStatus.Error && isImageGenerationProject
+    ? 'Admin will review this project and handle the issue.'
+    : undefined;
   const errorOccurredAt = project.status === ProjectStatus.Error && typeof statusInfo?.occurredAt === 'string'
     ? statusInfo.occurredAt
     : null;
@@ -136,7 +140,7 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
         </Card>
       ) : null}
 
-      {errorMessage ? <ProjectErrorCard message={errorMessage} /> : null}
+      {errorMessage ? <ProjectErrorCard message={errorMessage} description={errorDescription} /> : null}
       <AdminProjectErrorDetails occurredAt={errorOccurredAt} details={errorDetails} logFile={errorLogFile} extra={errorExtra} />
       <ProjectFinalVideoCard
         variants={languageVariants}

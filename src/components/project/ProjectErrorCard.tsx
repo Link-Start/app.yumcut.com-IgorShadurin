@@ -6,7 +6,12 @@ import { CONTACT_EMAIL } from '@/shared/constants/app';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
 
-export function ProjectErrorCard({ message }: { message?: string | null }) {
+type ProjectErrorCardProps = {
+  message?: string | null;
+  description?: string | null;
+};
+
+export function ProjectErrorCard({ message, description }: ProjectErrorCardProps) {
   const { language } = useAppLanguage();
   const copy: Record<AppLanguageCode, {
     title: string;
@@ -45,7 +50,7 @@ export function ProjectErrorCard({ message }: { message?: string | null }) {
       <CardContent>
         <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">
           <p className="text-sm leading-6">
-            {t.description}
+            {description || t.description}
           </p>
           <p className="mt-2 text-sm leading-6">
             {t.problem}: <span className="font-medium">{message || t.unknownError}</span>
