@@ -30,7 +30,7 @@ export const TOKEN_COSTS = {
   },
   actions: {
     scriptRevision: 10,
-    imageGeneration: 1,
+    imageGeneration: 3,
     audioRegeneration: 40,
     imageRegeneration: 1,
     characterImage: 10,
