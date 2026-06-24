@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Image as ImageIcon, Search, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button-1';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from '@/components/ui/pagination';
+import { Tooltip } from '@/components/common/Tooltip';
 import { PromptInput } from '@/components/main/PromptInput';
 import { ImagePrankCatalog } from '@/components/image-prank/ImagePrankCatalog';
 import { CharacterPreviewCard } from './CharacterPreviewCard';
@@ -57,8 +58,10 @@ const COPY = {
     categoriesBack: 'Categories',
     imageTitle: 'Image Prank',
     imageSubtitle: 'Prank image generation',
+    imageGenerationTooltip: 'Images will be generated',
     storiesTitle: 'Stories',
     storiesSubtitle: 'Classic story videos',
+    videoGenerationTooltip: 'Videos will be generated',
     brainrotTitle: 'Brainrot',
     brainrotSubtitle: 'Character videos',
     previous: 'Previous',
@@ -82,8 +85,10 @@ const COPY = {
     categoriesBack: 'Категории',
     imageTitle: 'Image Prank',
     imageSubtitle: 'Генерация prank-картинок',
+    imageGenerationTooltip: 'Будут генерироваться изображения',
     storiesTitle: 'Истории',
     storiesSubtitle: 'Классические сюжетные видео',
+    videoGenerationTooltip: 'Будут генерироваться видео',
     brainrotTitle: 'Brainrot',
     brainrotSubtitle: 'Видео с персонажами',
     previous: 'Назад',
@@ -109,8 +114,10 @@ type LandingCopy = {
   categoriesBack: string;
   imageTitle: string;
   imageSubtitle: string;
+  imageGenerationTooltip: string;
   storiesTitle: string;
   storiesSubtitle: string;
+  videoGenerationTooltip: string;
   brainrotTitle: string;
   brainrotSubtitle: string;
   previous: string;
@@ -300,6 +307,13 @@ function GroupCategoryCard({
   const [activeSection, setActiveSection] = useState<number | null>(null);
   const title = pickLocalizedText(group.title, language);
   const slideshowImages = useMemo(() => group.characters.map((character) => character.imageUrl), [group.characters]);
+  const generationKind = group.id === 'image-prank'
+    ? 'image'
+    : (group.id === 'stories' || group.id === 'brainrot' ? 'video' : null);
+  const generationTooltip = generationKind === 'image'
+    ? COPY[language].imageGenerationTooltip
+    : COPY[language].videoGenerationTooltip;
+  const GenerationIcon = generationKind === 'image' ? ImageIcon : Video;
   const content = (
     <article
       className={cn(
@@ -312,6 +326,16 @@ function GroupCategoryCard({
     >
       <div className="relative aspect-[9/16] w-full">
         <GroupHoverGridPreview images={slideshowImages} alt={title} activeSection={activeSection} />
+        {generationKind ? (
+          <Tooltip content={generationTooltip} side="top">
+            <span
+              className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/90 text-gray-900 shadow-sm backdrop-blur transition-colors dark:border-gray-700/80 dark:bg-gray-950/80 dark:text-gray-100"
+              aria-label={generationTooltip}
+            >
+              <GenerationIcon className="h-4 w-4" aria-hidden="true" />
+            </span>
+          </Tooltip>
+        ) : null}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="pointer-events-none absolute bottom-3 left-3 right-3 text-white">
           <h3 className="truncate text-sm font-semibold leading-none">{title}</h3>
