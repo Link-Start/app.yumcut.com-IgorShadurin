@@ -22,9 +22,22 @@ type Category = {
   priority: number;
 };
 
+type Subcategory = {
+  id: string;
+  categoryId: string;
+  slug: string;
+  titleEn: string;
+  titleRu: string;
+  subtitleEn: string | null;
+  isActive: boolean;
+  priority: number;
+  category: { id: string; slug: string; titleEn: string } | null;
+};
+
 type Item = {
   id: string;
   categoryId: string;
+  subcategoryId: string | null;
   slug: string;
   titleEn: string;
   descriptionEn: string | null;
@@ -32,11 +45,14 @@ type Item = {
   isPublic: boolean;
   priority: number;
   category: { id: string; slug: string; titleEn: string } | null;
+  subcategory: { id: string; slug: string; titleEn: string } | null;
 };
 
 type BulkImportMetadata = {
   categorySlug?: string;
   categoryTitle?: string;
+  subcategorySlug?: string;
+  subcategoryTitle?: string;
   slug?: string;
   title?: string;
   description?: string;
@@ -55,7 +71,22 @@ type BulkImportItem = {
   error: string | null;
 };
 
+type BulkPathInfo = {
+  folderName: string;
+  categoryTitle: string | null;
+  subcategoryTitle: string | null;
+};
+
 const emptyCategoryForm = {
+  slug: '',
+  title: '',
+  subtitle: '',
+  priority: '0',
+  isActive: true,
+};
+
+const emptySubcategoryForm = {
+  categoryId: '',
   slug: '',
   title: '',
   subtitle: '',
@@ -65,6 +96,7 @@ const emptyCategoryForm = {
 
 const emptyItemForm = {
   categoryId: '',
+  subcategoryId: '',
   slug: '',
   title: '',
   description: '',
@@ -80,7 +112,8 @@ const directoryInputProps = {
 
 type DeleteTarget =
   | { kind: 'item'; id: string; title: string }
-  | { kind: 'category'; id: string; title: string };
+  | { kind: 'category'; id: string; title: string }
+  | { kind: 'subcategory'; id: string; title: string };
 
 function slugifyImportValue(value: string) {
   return value
@@ -92,19 +125,27 @@ function slugifyImportValue(value: string) {
     || 'image-prank';
 }
 
-function toBulkMetadata(raw: unknown, folderName: string): Required<BulkImportMetadata> {
+function toBulkMetadata(raw: unknown, pathInfo: BulkPathInfo): Required<BulkImportMetadata> {
   const source = raw && typeof raw === 'object' ? raw as BulkImportMetadata : {};
+  const folderName = pathInfo.folderName;
   const title = typeof source.title === 'string' && source.title.trim()
     ? source.title.trim()
     : folderName.replace(/[-_]+/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
   const categoryTitle = typeof source.categoryTitle === 'string' && source.categoryTitle.trim()
     ? source.categoryTitle.trim()
-    : 'Main';
+    : pathInfo.categoryTitle || 'Main';
+  const subcategoryTitle = typeof source.subcategoryTitle === 'string' && source.subcategoryTitle.trim()
+    ? source.subcategoryTitle.trim()
+    : pathInfo.subcategoryTitle || '';
   return {
     categorySlug: typeof source.categorySlug === 'string' && source.categorySlug.trim()
       ? slugifyImportValue(source.categorySlug)
       : slugifyImportValue(categoryTitle),
     categoryTitle,
+    subcategorySlug: typeof source.subcategorySlug === 'string' && source.subcategorySlug.trim()
+      ? slugifyImportValue(source.subcategorySlug)
+      : subcategoryTitle ? slugifyImportValue(subcategoryTitle) : '',
+    subcategoryTitle,
     slug: typeof source.slug === 'string' && source.slug.trim()
       ? slugifyImportValue(source.slug)
       : slugifyImportValue(title),
@@ -116,12 +157,17 @@ function toBulkMetadata(raw: unknown, folderName: string): Required<BulkImportMe
   };
 }
 
-function itemFolderName(file: File) {
+function bulkPathInfo(file: File): BulkPathInfo | null {
   const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
   const parts = relativePath.split('/').filter(Boolean);
-  if (parts.length >= 3) return parts[1];
-  if (parts.length >= 2) return parts[0];
-  return '';
+  if (parts.length < 2) return null;
+  const folderName = parts.at(-2) ?? '';
+  if (!folderName) return null;
+  return {
+    folderName,
+    categoryTitle: parts.length >= 4 ? parts.at(-4) ?? null : parts.length >= 3 ? parts.at(-3) ?? null : null,
+    subcategoryTitle: parts.length >= 4 ? parts.at(-3) ?? null : null,
+  };
 }
 
 function isBulkImageFile(file: File) {
@@ -139,11 +185,14 @@ async function readJsonFile(file: File): Promise<unknown> {
 
 export function AdminImagePranksManager() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categoryForm, setCategoryForm] = useState(emptyCategoryForm);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [subcategoryForm, setSubcategoryForm] = useState(emptySubcategoryForm);
+  const [editingSubcategoryId, setEditingSubcategoryId] = useState<string | null>(null);
   const [itemForm, setItemForm] = useState(emptyItemForm);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [itemImage, setItemImage] = useState<File | null>(null);
@@ -151,6 +200,7 @@ export function AdminImagePranksManager() {
   const [editingItemPreviewUrl, setEditingItemPreviewUrl] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [subcategoryFilter, setSubcategoryFilter] = useState('');
   const [activeTab, setActiveTab] = useState('pranks');
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -163,17 +213,33 @@ export function AdminImagePranksManager() {
     () => categories.find((category) => category.id === itemForm.categoryId) ?? null,
     [categories, itemForm.categoryId],
   );
+  const itemSubcategoryOptions = useMemo(
+    () => subcategories.filter((subcategory) => subcategory.categoryId === itemForm.categoryId),
+    [itemForm.categoryId, subcategories],
+  );
 
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [categoryResult, itemResult] = await Promise.all([
+      const [categoryResult, subcategoryResult, itemResult] = await Promise.all([
         Api.adminImagePrankCategoriesList(),
-        Api.adminImagePranksList({ q: query, categoryId: categoryFilter || null, page: 1, pageSize: 100 }),
+        Api.adminImagePrankSubcategoriesList(),
+        Api.adminImagePranksList({
+          q: query,
+          categoryId: categoryFilter || null,
+          subcategoryId: subcategoryFilter || null,
+          page: 1,
+          pageSize: 100,
+        }),
       ]);
       setCategories(categoryResult.items);
+      setSubcategories(subcategoryResult.items as Subcategory[]);
       setItems(itemResult.items as Item[]);
       setItemForm((prev) => ({
+        ...prev,
+        categoryId: prev.categoryId || categoryResult.items[0]?.id || '',
+      }));
+      setSubcategoryForm((prev) => ({
         ...prev,
         categoryId: prev.categoryId || categoryResult.items[0]?.id || '',
       }));
@@ -232,6 +298,36 @@ export function AdminImagePranksManager() {
     }
   };
 
+  const submitSubcategory = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!subcategoryForm.categoryId || !subcategoryForm.slug.trim() || !subcategoryForm.title.trim()) {
+      toast.error('Category, slug, and title are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        categoryId: subcategoryForm.categoryId,
+        slug: subcategoryForm.slug,
+        title: subcategoryForm.title,
+        subtitle: subcategoryForm.subtitle || undefined,
+        priority: Number.parseInt(subcategoryForm.priority, 10) || 0,
+        isActive: subcategoryForm.isActive,
+      };
+      if (editingSubcategoryId) {
+        await Api.adminImagePrankSubcategoriesUpdate(editingSubcategoryId, payload);
+      } else {
+        await Api.adminImagePrankSubcategoriesCreate(payload);
+      }
+      setSubcategoryForm({ ...emptySubcategoryForm, categoryId: categories[0]?.id ?? '' });
+      setEditingSubcategoryId(null);
+      await loadAll();
+      toast.success('Subcategory saved');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submitItem = async (event: FormEvent) => {
     event.preventDefault();
     if (!itemForm.categoryId || !itemForm.slug.trim() || !itemForm.title.trim()) {
@@ -246,6 +342,7 @@ export function AdminImagePranksManager() {
     try {
       const payload = {
         categoryId: itemForm.categoryId,
+        subcategoryId: itemForm.subcategoryId || null,
         slug: itemForm.slug,
         title: itemForm.title,
         description: itemForm.description,
@@ -282,11 +379,25 @@ export function AdminImagePranksManager() {
     });
   };
 
+  const editSubcategory = (subcategory: Subcategory) => {
+    setActiveTab('subcategories');
+    setEditingSubcategoryId(subcategory.id);
+    setSubcategoryForm({
+      categoryId: subcategory.categoryId,
+      slug: subcategory.slug,
+      title: subcategory.titleEn,
+      subtitle: subcategory.subtitleEn ?? '',
+      priority: String(subcategory.priority),
+      isActive: subcategory.isActive,
+    });
+  };
+
   const editItem = (item: Item) => {
     setActiveTab('pranks');
     setEditingItemId(item.id);
     setItemForm({
       categoryId: item.categoryId,
+      subcategoryId: item.subcategoryId ?? '',
       slug: item.slug,
       title: item.titleEn,
       description: item.descriptionEn ?? '',
@@ -302,7 +413,7 @@ export function AdminImagePranksManager() {
     setEditingItemId(null);
     setItemImage(null);
     setEditingItemPreviewUrl(null);
-    setItemForm({ ...emptyItemForm, categoryId: categories[0]?.id ?? '' });
+    setItemForm({ ...emptyItemForm, categoryId: categories[0]?.id ?? '', subcategoryId: '' });
   };
 
   const replaceBulkItems = (nextItems: BulkImportItem[]) => {
@@ -316,27 +427,32 @@ export function AdminImagePranksManager() {
     if (selectedFiles.length === 0) return;
     setBulkParsing(true);
     try {
-      const grouped = new Map<string, { image?: File; metadata?: File }>();
+      const grouped = new Map<string, { image?: File; metadata?: File; pathInfo: BulkPathInfo }>();
       for (const file of selectedFiles) {
-        const folderName = itemFolderName(file);
-        if (!folderName) continue;
-        const group = grouped.get(folderName) ?? {};
+        const pathInfo = bulkPathInfo(file);
+        if (!pathInfo) continue;
+        const groupKey = [
+          pathInfo.categoryTitle ?? '',
+          pathInfo.subcategoryTitle ?? '',
+          pathInfo.folderName,
+        ].join('/');
+        const group = grouped.get(groupKey) ?? { pathInfo };
         if (isBulkImageFile(file) && !group.image) {
           group.image = file;
         } else if (isMetadataFile(file) && !group.metadata) {
           group.metadata = file;
         }
-        grouped.set(folderName, group);
+        grouped.set(groupKey, group);
       }
 
       const nextItems: BulkImportItem[] = [];
-      for (const [folderName, group] of grouped.entries()) {
+      for (const group of grouped.values()) {
         if (!group.image || !group.metadata) continue;
         const parsedMetadata = await readJsonFile(group.metadata);
-        const metadata = toBulkMetadata(parsedMetadata, folderName);
+        const metadata = toBulkMetadata(parsedMetadata, group.pathInfo);
         nextItems.push({
-          id: `${folderName}-${group.image.name}`,
-          folderName,
+          id: `${group.pathInfo.folderName}-${group.image.name}`,
+          folderName: group.pathInfo.folderName,
           file: group.image,
           previewUrl: URL.createObjectURL(group.image),
           metadata,
@@ -364,6 +480,7 @@ export function AdminImagePranksManager() {
     setBulkUploading(true);
     try {
       const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
+      const subcategoryByKey = new Map(subcategories.map((subcategory) => [`${subcategory.categoryId}:${subcategory.slug}`, subcategory]));
       for (const item of bulkItems) {
         if (item.status === 'done') continue;
         setBulkItems((current) => current.map((candidate) => (
@@ -381,9 +498,26 @@ export function AdminImagePranksManager() {
             }) as Category;
             categoryBySlug.set(category.slug, category);
           }
+          let subcategoryId: string | null = null;
+          if (item.metadata.subcategorySlug) {
+            const key = `${category.id}:${item.metadata.subcategorySlug}`;
+            let subcategory = subcategoryByKey.get(key);
+            if (!subcategory) {
+              subcategory = await Api.adminImagePrankSubcategoriesCreate({
+                categoryId: category.id,
+                slug: item.metadata.subcategorySlug,
+                title: item.metadata.subcategoryTitle || item.metadata.subcategorySlug,
+                isActive: true,
+                priority: 0,
+              }) as Subcategory;
+              subcategoryByKey.set(key, subcategory);
+            }
+            subcategoryId = subcategory.id;
+          }
 
           await Api.adminImagePrankCreate({
             categoryId: category.id,
+            subcategoryId,
             slug: item.metadata.slug,
             title: item.metadata.title,
             description: item.metadata.description,
@@ -418,6 +552,9 @@ export function AdminImagePranksManager() {
       if (deleteTarget.kind === 'item') {
         await Api.adminImagePrankDelete(deleteTarget.id, { deleteFiles: true });
         toast.success('Prank image deleted');
+      } else if (deleteTarget.kind === 'subcategory') {
+        await Api.adminImagePrankSubcategoriesDelete(deleteTarget.id, { deleteFiles: true });
+        toast.success('Subcategory deleted');
       } else {
         await Api.adminImagePrankCategoriesDelete(deleteTarget.id, { deleteFiles: true });
         toast.success('Category deleted');
@@ -445,6 +582,7 @@ export function AdminImagePranksManager() {
         <TabsList>
           <TabsTrigger value="pranks" className="cursor-pointer">Prank images</TabsTrigger>
           <TabsTrigger value="categories" className="cursor-pointer">Categories</TabsTrigger>
+          <TabsTrigger value="subcategories" className="cursor-pointer">Subcategories</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pranks" className="space-y-4">
@@ -483,7 +621,7 @@ export function AdminImagePranksManager() {
             {bulkItems.length > 0 ? (
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  Previewing {bulkItems.length.toLocaleString()} items. Upload uses each item metadata and creates missing categories.
+                  Previewing {bulkItems.length.toLocaleString()} items. Upload uses metadata and creates missing categories/subcategories.
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {bulkItems.map((item) => (
@@ -494,7 +632,12 @@ export function AdminImagePranksManager() {
                       </div>
                       <div className="mt-2 min-w-0 space-y-1 text-sm">
                         <div className="truncate font-semibold text-gray-900 dark:text-gray-100">{item.metadata.title}</div>
-                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{item.metadata.categoryTitle} / {item.metadata.slug}</div>
+                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">
+                          {item.metadata.categoryTitle}
+                          {item.metadata.subcategoryTitle ? ` / ${item.metadata.subcategoryTitle}` : ''}
+                          {' / '}
+                          {item.metadata.slug}
+                        </div>
                         <div className="flex items-center gap-1.5 text-xs">
                           {item.status === 'uploading' ? (
                             <>
@@ -534,11 +677,25 @@ export function AdminImagePranksManager() {
                     id="prank-item-category"
                     className="h-10 w-full cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
                     value={itemForm.categoryId}
-                    onChange={(event) => setItemForm((prev) => ({ ...prev, categoryId: event.target.value }))}
+                    onChange={(event) => setItemForm((prev) => ({ ...prev, categoryId: event.target.value, subcategoryId: '' }))}
                   >
                     <option value="">Select category</option>
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>{category.titleEn}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-item-subcategory">Subcategory</Label>
+                  <select
+                    id="prank-item-subcategory"
+                    className="h-10 w-full cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
+                    value={itemForm.subcategoryId}
+                    onChange={(event) => setItemForm((prev) => ({ ...prev, subcategoryId: event.target.value }))}
+                  >
+                    <option value="">No subcategory</option>
+                    {itemSubcategoryOptions.map((subcategory) => (
+                      <option key={subcategory.id} value={subcategory.id}>{subcategory.titleEn}</option>
                     ))}
                   </select>
                 </div>
@@ -617,17 +774,32 @@ export function AdminImagePranksManager() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_240px]">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
                 <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pranks" />
                 <select
                   className="h-10 cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
                   value={categoryFilter}
-                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  onChange={(event) => {
+                    setCategoryFilter(event.target.value);
+                    setSubcategoryFilter('');
+                  }}
                 >
                   <option value="">All categories</option>
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>{category.titleEn}</option>
                   ))}
+                </select>
+                <select
+                  className="h-10 cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
+                  value={subcategoryFilter}
+                  onChange={(event) => setSubcategoryFilter(event.target.value)}
+                >
+                  <option value="">All subcategories</option>
+                  {subcategories
+                    .filter((subcategory) => !categoryFilter || subcategory.categoryId === categoryFilter)
+                    .map((subcategory) => (
+                      <option key={subcategory.id} value={subcategory.id}>{subcategory.titleEn}</option>
+                    ))}
                 </select>
               </div>
               {loading ? (
@@ -652,7 +824,12 @@ export function AdminImagePranksManager() {
                       </div>
                       <div className="min-w-0 space-y-1">
                         <div className="truncate text-sm font-semibold">{item.titleEn}</div>
-                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{item.category?.titleEn ?? 'No category'} / {item.slug}</div>
+                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">
+                          {item.category?.titleEn ?? 'No category'}
+                          {item.subcategory ? ` / ${item.subcategory.titleEn}` : ''}
+                          {' / '}
+                          {item.slug}
+                        </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">Priority {item.priority} / {item.isPublic ? 'Public' : 'Hidden'}</div>
                         <div className="flex flex-wrap gap-2 pt-1">
                           <Button type="button" size="sm" variant="outline" className="h-8 cursor-pointer" onClick={() => editItem(item)}>
@@ -682,6 +859,124 @@ export function AdminImagePranksManager() {
                             Delete
                           </Button>
                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="subcategories" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>{editingSubcategoryId ? 'Edit subcategory' : 'New subcategory'}</CardTitle>
+              <CardDescription>Subcategories appear as cards inside their parent Image Prank category.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-3 md:grid-cols-2" onSubmit={submitSubcategory}>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-subcategory-category">Category</Label>
+                  <select
+                    id="prank-subcategory-category"
+                    className="h-10 w-full cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
+                    value={subcategoryForm.categoryId}
+                    onChange={(event) => setSubcategoryForm((prev) => ({ ...prev, categoryId: event.target.value }))}
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>{category.titleEn}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-subcategory-slug">Slug</Label>
+                  <Input id="prank-subcategory-slug" value={subcategoryForm.slug} onChange={(event) => setSubcategoryForm((prev) => ({ ...prev, slug: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-subcategory-title">Title</Label>
+                  <Input id="prank-subcategory-title" value={subcategoryForm.title} onChange={(event) => setSubcategoryForm((prev) => ({ ...prev, title: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prank-subcategory-priority">Priority</Label>
+                  <Input id="prank-subcategory-priority" type="number" value={subcategoryForm.priority} onChange={(event) => setSubcategoryForm((prev) => ({ ...prev, priority: event.target.value }))} />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label htmlFor="prank-subcategory-subtitle">Subtitle</Label>
+                  <Input id="prank-subcategory-subtitle" value={subcategoryForm.subtitle} onChange={(event) => setSubcategoryForm((prev) => ({ ...prev, subtitle: event.target.value }))} />
+                </div>
+                <div className="flex items-end">
+                  <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 text-sm dark:border-gray-800">
+                    <input type="checkbox" checked={subcategoryForm.isActive} onChange={(event) => setSubcategoryForm((prev) => ({ ...prev, isActive: event.target.checked }))} />
+                    Active
+                  </label>
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button type="submit" className="cursor-pointer" disabled={saving || categories.length === 0}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Save subcategory
+                  </Button>
+                  {editingSubcategoryId ? (
+                    <Button type="button" variant="outline" className="cursor-pointer" onClick={() => {
+                      setEditingSubcategoryId(null);
+                      setSubcategoryForm({ ...emptySubcategoryForm, categoryId: categories[0]?.id ?? '' });
+                    }}>
+                      Cancel
+                    </Button>
+                  ) : null}
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Subcategories</CardTitle>
+                <CardDescription>{subcategories.length.toLocaleString()} subcategories</CardDescription>
+              </div>
+              <Button type="button" variant="outline" className="cursor-pointer" onClick={() => void loadAll()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex h-32 items-center justify-center text-gray-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : subcategories.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-500 dark:border-gray-700">
+                  No subcategories yet.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {subcategories.map((subcategory) => (
+                    <div key={subcategory.id} className="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">{subcategory.titleEn}</div>
+                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{subcategory.category?.titleEn ?? 'No category'} / {subcategory.slug}</div>
+                        {subcategory.subtitleEn ? (
+                          <div className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{subcategory.subtitleEn}</div>
+                        ) : null}
+                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Priority {subcategory.priority} / {subcategory.isActive ? 'Active' : 'Hidden'}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="outline" className="h-8 cursor-pointer" onClick={() => editSubcategory(subcategory)}>
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          className="h-8 cursor-pointer"
+                          onClick={() => setDeleteTarget({ kind: 'subcategory', id: subcategory.id, title: subcategory.titleEn })}
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Delete
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -807,7 +1102,13 @@ export function AdminImagePranksManager() {
       >
         <DialogContent className="max-w-md" ariaDescription="Confirm deleting prank image or category">
           <DialogHeader>
-            <DialogTitle>{deleteTarget?.kind === 'category' ? 'Delete category?' : 'Delete prank image?'}</DialogTitle>
+            <DialogTitle>
+              {deleteTarget?.kind === 'category'
+                ? 'Delete category?'
+                : deleteTarget?.kind === 'subcategory'
+                  ? 'Delete subcategory?'
+                  : 'Delete prank image?'}
+            </DialogTitle>
             <DialogDescription className="sr-only">
               Confirm deleting the selected image prank record.
             </DialogDescription>

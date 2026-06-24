@@ -24,11 +24,13 @@ export const GET = withApiError(async function GET(req: NextRequest) {
 
   const q = (req.nextUrl.searchParams.get('q') || '').trim();
   const categoryId = (req.nextUrl.searchParams.get('categoryId') || '').trim();
+  const subcategoryId = (req.nextUrl.searchParams.get('subcategoryId') || '').trim();
   const pageRaw = Number.parseInt(req.nextUrl.searchParams.get('page') || '1', 10);
   const pageSizeRaw = Number.parseInt(req.nextUrl.searchParams.get('pageSize') || '20', 10);
   const result = await listAdminImagePranks({
     query: q,
     categoryId: categoryId || null,
+    subcategoryId: subcategoryId || null,
     page: Number.isFinite(pageRaw) ? pageRaw : 1,
     pageSize: Number.isFinite(pageSizeRaw) ? pageSizeRaw : 20,
   });
@@ -55,6 +57,7 @@ export const POST = withApiError(async function POST(req: NextRequest) {
 
   const created = await createAdminImagePrankItem({
     categoryId,
+    subcategoryId: typeof form.get('subcategoryId') === 'string' ? String(form.get('subcategoryId')).trim() || null : null,
     slug,
     title,
     description: typeof form.get('description') === 'string' ? String(form.get('description')) : null,

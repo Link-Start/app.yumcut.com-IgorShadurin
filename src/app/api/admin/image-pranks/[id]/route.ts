@@ -15,7 +15,7 @@ function formString(form: FormData, key: string): string | undefined {
 function formNullableString(form: FormData, key: string): string | null | undefined {
   const value = form.get(key);
   if (value === null) return undefined;
-  return typeof value === 'string' ? value : undefined;
+  return typeof value === 'string' ? value.trim() || null : undefined;
 }
 
 function formBoolean(form: FormData, key: string): boolean | undefined {
@@ -43,6 +43,7 @@ export const PATCH = withApiError(async function PATCH(
   const image = form.get('image');
   const updated = await updateAdminImagePrankItem(id, {
     categoryId: formString(form, 'categoryId'),
+    subcategoryId: formNullableString(form, 'subcategoryId'),
     slug: formString(form, 'slug'),
     title: formString(form, 'title'),
     description: formNullableString(form, 'description'),

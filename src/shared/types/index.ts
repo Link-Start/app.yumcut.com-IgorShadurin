@@ -141,6 +141,20 @@ export interface ImagePrankCatalogItemDTO {
   categoryId: string;
   categorySlug: string;
   categoryTitle: LocalizedCatalogTextDTO;
+  subcategoryId?: string | null;
+  subcategorySlug?: string | null;
+  subcategoryTitle?: LocalizedCatalogTextDTO | null;
+}
+
+export interface ImagePrankCatalogSubcategoryDTO {
+  id: string;
+  categoryId: string;
+  slug: string;
+  title: LocalizedCatalogTextDTO;
+  subtitle: LocalizedCatalogTextDTO;
+  description: LocalizedCatalogTextDTO;
+  hiddenSearchText: LocalizedCatalogTextDTO;
+  items: ImagePrankCatalogItemDTO[];
 }
 
 export interface ImagePrankCatalogCategoryDTO {
@@ -150,6 +164,7 @@ export interface ImagePrankCatalogCategoryDTO {
   subtitle: LocalizedCatalogTextDTO;
   description: LocalizedCatalogTextDTO;
   hiddenSearchText: LocalizedCatalogTextDTO;
+  subcategories?: ImagePrankCatalogSubcategoryDTO[];
   items: ImagePrankCatalogItemDTO[];
 }
 

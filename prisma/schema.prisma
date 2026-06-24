@@ -506,14 +506,39 @@ model ImagePrankCategory {
   isActive      Boolean          @default(true)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+  subcategories ImagePrankSubcategory[]
   items         ImagePrankItem[]
 
   @@index([isActive, priority, createdAt])
 }
 
+model ImagePrankSubcategory {
+  id            String             @id @default(uuid()) @db.Char(36)
+  categoryId    String             @db.Char(36)
+  slug          String             @db.VarChar(191)
+  titleEn       String             @db.VarChar(191)
+  titleRu       String             @db.VarChar(191)
+  subtitleEn    String?            @db.VarChar(255)
+  subtitleRu    String?            @db.VarChar(255)
+  descriptionEn String?            @db.Text
+  descriptionRu String?            @db.Text
+  searchTextEn  String?            @db.Text
+  searchTextRu  String?            @db.Text
+  priority      Int                @default(0)
+  isActive      Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  category      ImagePrankCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  items         ImagePrankItem[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId, isActive, priority, createdAt])
+}
+
 model ImagePrankItem {
   id               String             @id @default(uuid()) @db.Char(36)
   categoryId       String             @db.Char(36)
+  subcategoryId    String?            @db.Char(36)
   slug             String             @unique @db.VarChar(191)
   titleEn          String             @db.VarChar(191)
   titleRu          String             @db.VarChar(191)
@@ -530,8 +555,10 @@ model ImagePrankItem {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   category         ImagePrankCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subcategory      ImagePrankSubcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
 
   @@index([categoryId, priority])
+  @@index([subcategoryId, priority])
   @@index([isPublic, priority, createdAt])
 }
 

@@ -4,6 +4,7 @@ import type {
   ImagePrankCatalogCategoryDTO,
   ImagePrankCatalogDTO,
   ImagePrankCatalogItemDTO,
+  ImagePrankCatalogSubcategoryDTO,
   LocalizedCatalogTextDTO,
 } from '@/shared/types';
 
@@ -35,6 +36,12 @@ function mapItem(
       titleEn: string;
       titleRu: string;
     };
+    subcategory: {
+      id: string;
+      slug: string;
+      titleEn: string;
+      titleRu: string;
+    } | null;
   },
 ): ImagePrankCatalogItemDTO {
   return {
@@ -55,6 +62,39 @@ function mapItem(
     categoryId: item.categoryId,
     categorySlug: item.category.slug,
     categoryTitle: localized(item.category.titleEn, item.category.titleRu),
+    subcategoryId: item.subcategory?.id ?? null,
+    subcategorySlug: item.subcategory?.slug ?? null,
+    subcategoryTitle: item.subcategory
+      ? localized(item.subcategory.titleEn, item.subcategory.titleRu)
+      : null,
+  };
+}
+
+function mapSubcategory(
+  subcategory: {
+    id: string;
+    categoryId: string;
+    slug: string;
+    titleEn: string;
+    titleRu: string;
+    subtitleEn: string | null;
+    subtitleRu: string | null;
+    descriptionEn: string | null;
+    descriptionRu: string | null;
+    searchTextEn: string | null;
+    searchTextRu: string | null;
+    items: Array<Parameters<typeof mapItem>[0]>;
+  },
+): ImagePrankCatalogSubcategoryDTO {
+  return {
+    id: subcategory.id,
+    categoryId: subcategory.categoryId,
+    slug: subcategory.slug,
+    title: localized(subcategory.titleEn, subcategory.titleRu),
+    subtitle: localized(subcategory.subtitleEn, subcategory.subtitleRu),
+    description: localized(subcategory.descriptionEn, subcategory.descriptionRu),
+    hiddenSearchText: localized(subcategory.searchTextEn, subcategory.searchTextRu),
+    items: subcategory.items.map(mapItem),
   };
 }
 
@@ -70,6 +110,7 @@ function mapCategory(
     descriptionRu: string | null;
     searchTextEn: string | null;
     searchTextRu: string | null;
+    subcategories: Array<Parameters<typeof mapSubcategory>[0]>;
     items: Array<Parameters<typeof mapItem>[0]>;
   },
 ): ImagePrankCatalogCategoryDTO {
@@ -80,6 +121,7 @@ function mapCategory(
     subtitle: localized(category.subtitleEn, category.subtitleRu),
     description: localized(category.descriptionEn, category.descriptionRu),
     hiddenSearchText: localized(category.searchTextEn, category.searchTextRu),
+    subcategories: category.subcategories.map(mapSubcategory),
     items: category.items.map(mapItem),
   };
 }
@@ -98,6 +140,41 @@ export async function listPublicImagePrankCatalog(): Promise<ImagePrankCatalogDT
               slug: true,
               titleEn: true,
               titleRu: true,
+            },
+          },
+          subcategory: {
+            select: {
+              id: true,
+              slug: true,
+              titleEn: true,
+              titleRu: true,
+            },
+          },
+        },
+      },
+      subcategories: {
+        where: { isActive: true },
+        orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+        include: {
+          items: {
+            where: { isPublic: true },
+            orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+            include: {
+              category: {
+                select: {
+                  slug: true,
+                  titleEn: true,
+                  titleRu: true,
+                },
+              },
+              subcategory: {
+                select: {
+                  id: true,
+                  slug: true,
+                  titleEn: true,
+                  titleRu: true,
+                },
+              },
             },
           },
         },
@@ -126,6 +203,14 @@ export async function getPublicImagePrankItemBySlug(slug: string): Promise<Image
           titleRu: true,
         },
       },
+      subcategory: {
+        select: {
+          id: true,
+          slug: true,
+          titleEn: true,
+          titleRu: true,
+        },
+      },
     },
   });
 
@@ -144,6 +229,14 @@ export async function getPublicImagePrankItemById(id: string): Promise<ImagePran
     include: {
       category: {
         select: {
+          slug: true,
+          titleEn: true,
+          titleRu: true,
+        },
+      },
+      subcategory: {
+        select: {
+          id: true,
           slug: true,
           titleEn: true,
           titleRu: true,

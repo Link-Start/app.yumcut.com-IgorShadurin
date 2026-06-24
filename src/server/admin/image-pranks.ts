@@ -19,9 +19,23 @@ export type AdminImagePrankCategoryDTO = {
   priority: number;
 };
 
+export type AdminImagePrankSubcategoryDTO = {
+  id: string;
+  categoryId: string;
+  slug: string;
+  titleEn: string;
+  titleRu: string;
+  subtitleEn: string | null;
+  subtitleRu: string | null;
+  isActive: boolean;
+  priority: number;
+  category: { id: string; slug: string; titleEn: string } | null;
+};
+
 export type AdminImagePrankItemDTO = {
   id: string;
   categoryId: string;
+  subcategoryId: string | null;
   slug: string;
   titleEn: string;
   titleRu: string;
@@ -34,6 +48,7 @@ export type AdminImagePrankItemDTO = {
   isPublic: boolean;
   priority: number;
   category: { id: string; slug: string; titleEn: string } | null;
+  subcategory: { id: string; slug: string; titleEn: string } | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -67,10 +82,28 @@ function mapCategory(category: AdminImagePrankCategoryDTO): AdminImagePrankCateg
   return category;
 }
 
+function mapSubcategory(subcategory: any): AdminImagePrankSubcategoryDTO {
+  return {
+    id: subcategory.id,
+    categoryId: subcategory.categoryId,
+    slug: subcategory.slug,
+    titleEn: subcategory.titleEn,
+    titleRu: subcategory.titleRu,
+    subtitleEn: subcategory.subtitleEn ?? null,
+    subtitleRu: subcategory.subtitleRu ?? null,
+    isActive: !!subcategory.isActive,
+    priority: subcategory.priority,
+    category: subcategory.category
+      ? { id: subcategory.category.id, slug: subcategory.category.slug, titleEn: subcategory.category.titleEn }
+      : null,
+  };
+}
+
 function mapItem(item: any): AdminImagePrankItemDTO {
   return {
     id: item.id,
     categoryId: item.categoryId,
+    subcategoryId: item.subcategoryId ?? null,
     slug: item.slug,
     titleEn: item.titleEn,
     titleRu: item.titleRu,
@@ -88,6 +121,9 @@ function mapItem(item: any): AdminImagePrankItemDTO {
     priority: item.priority,
     category: item.category
       ? { id: item.category.id, slug: item.category.slug, titleEn: item.category.titleEn }
+      : null,
+    subcategory: item.subcategory
+      ? { id: item.subcategory.id, slug: item.subcategory.slug, titleEn: item.subcategory.titleEn }
       : null,
     createdAt: toIso(item.createdAt),
     updatedAt: toIso(item.updatedAt),
@@ -282,9 +318,141 @@ export async function deleteAdminImagePrankCategory(id: string, deleteFiles: boo
   }
 }
 
+export async function listAdminImagePrankSubcategories(input?: {
+  categoryId?: string | null;
+}): Promise<AdminImagePrankSubcategoryDTO[]> {
+  const items = await prisma.imagePrankSubcategory.findMany({
+    where: input?.categoryId ? { categoryId: input.categoryId } : undefined,
+    orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+    include: {
+      category: {
+        select: { id: true, slug: true, titleEn: true },
+      },
+    },
+  });
+  return items.map(mapSubcategory);
+}
+
+export async function createAdminImagePrankSubcategory(input: {
+  categoryId: string;
+  slug: string;
+  title: string;
+  subtitle?: string | null;
+  isActive?: boolean;
+  priority?: number;
+}): Promise<AdminImagePrankSubcategoryDTO> {
+  const categoryId = input.categoryId.trim();
+  const slug = slugify(input.slug);
+  const title = input.title.trim();
+  const subtitle = input.subtitle?.trim() || null;
+  if (!categoryId) throw new Error('Category is required');
+  if (!slug) throw new Error('Slug is required');
+  if (!title) throw new Error('Title is required');
+
+  const category = await prisma.imagePrankCategory.findUnique({
+    where: { id: categoryId },
+    select: { id: true },
+  });
+  if (!category) throw new Error('Category not found');
+
+  const created = await prisma.imagePrankSubcategory.create({
+    data: {
+      categoryId,
+      slug,
+      titleEn: title,
+      titleRu: title,
+      subtitleEn: subtitle,
+      subtitleRu: subtitle,
+      isActive: input.isActive ?? true,
+      priority: Number.isFinite(input.priority) ? Math.floor(input.priority as number) : 0,
+    },
+    include: {
+      category: {
+        select: { id: true, slug: true, titleEn: true },
+      },
+    },
+  });
+  return mapSubcategory(created);
+}
+
+export async function updateAdminImagePrankSubcategory(
+  id: string,
+  input: {
+    categoryId?: string;
+    slug?: string;
+    title?: string;
+    subtitle?: string | null;
+    isActive?: boolean;
+    priority?: number;
+  },
+): Promise<AdminImagePrankSubcategoryDTO> {
+  const data: Record<string, unknown> = {};
+  if (typeof input.categoryId === 'string') {
+    const categoryId = input.categoryId.trim();
+    const category = await prisma.imagePrankCategory.findUnique({
+      where: { id: categoryId },
+      select: { id: true },
+    });
+    if (!category) throw new Error('Category not found');
+    data.categoryId = categoryId;
+  }
+  if (typeof input.slug === 'string') {
+    const slug = slugify(input.slug);
+    if (slug) data.slug = slug;
+  }
+  if (typeof input.title === 'string') {
+    const title = input.title.trim();
+    if (title) {
+      data.titleEn = title;
+      data.titleRu = title;
+    }
+  }
+  if (input.subtitle === null || typeof input.subtitle === 'string') {
+    const subtitle = input.subtitle?.trim() || null;
+    data.subtitleEn = subtitle;
+    data.subtitleRu = subtitle;
+  }
+  if (typeof input.isActive === 'boolean') data.isActive = input.isActive;
+  if (typeof input.priority === 'number' && Number.isFinite(input.priority)) data.priority = Math.floor(input.priority);
+
+  const updated = await prisma.imagePrankSubcategory.update({
+    where: { id },
+    data,
+    include: {
+      category: {
+        select: { id: true, slug: true, titleEn: true },
+      },
+    },
+  });
+  return mapSubcategory(updated);
+}
+
+export async function deleteAdminImagePrankSubcategory(id: string, deleteFiles: boolean): Promise<void> {
+  const existing = await prisma.imagePrankSubcategory.findUnique({
+    where: { id },
+    include: {
+      items: {
+        select: { id: true, imagePath: true, previewImagePath: true },
+      },
+    },
+  });
+  if (!existing) return;
+
+  if (deleteFiles) {
+    const paths = existing.items.flatMap((item) => [item.imagePath, item.previewImagePath]);
+    await prisma.imagePrankItem.deleteMany({ where: { subcategoryId: id } });
+    await prisma.imagePrankSubcategory.delete({ where: { id } });
+    await deleteStoredCatalogCharacterMedia(paths).catch(() => {});
+    return;
+  }
+
+  await prisma.imagePrankSubcategory.delete({ where: { id } });
+}
+
 export async function listAdminImagePranks(input: {
   query?: string;
   categoryId?: string | null;
+  subcategoryId?: string | null;
   page?: number;
   pageSize?: number;
 }): Promise<ListAdminImagePranksResult> {
@@ -295,6 +463,9 @@ export async function listAdminImagePranks(input: {
 
   if (input.categoryId) {
     where.categoryId = input.categoryId;
+  }
+  if (input.subcategoryId) {
+    where.subcategoryId = input.subcategoryId;
   }
   if (query) {
     where.OR = [
@@ -313,6 +484,9 @@ export async function listAdminImagePranks(input: {
       where,
       include: {
         category: {
+          select: { id: true, slug: true, titleEn: true },
+        },
+        subcategory: {
           select: { id: true, slug: true, titleEn: true },
         },
       },
@@ -334,6 +508,7 @@ export async function listAdminImagePranks(input: {
 
 export async function createAdminImagePrankItem(input: {
   categoryId: string;
+  subcategoryId?: string | null;
   slug: string;
   title: string;
   description?: string | null;
@@ -353,6 +528,13 @@ export async function createAdminImagePrankItem(input: {
     select: { id: true },
   });
   if (!category) throw new Error('Category not found');
+  if (input.subcategoryId) {
+    const subcategory = await prisma.imagePrankSubcategory.findFirst({
+      where: { id: input.subcategoryId, categoryId: input.categoryId },
+      select: { id: true },
+    });
+    if (!subcategory) throw new Error('Subcategory not found');
+  }
 
   const stored = await uploadImagePrankCatalogImage(input.image, `${slug}.png`);
 
@@ -361,6 +543,7 @@ export async function createAdminImagePrankItem(input: {
   const created = await prisma.imagePrankItem.create({
     data: {
       categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId || null,
       slug,
       titleEn: title,
       titleRu: title,
@@ -379,6 +562,9 @@ export async function createAdminImagePrankItem(input: {
       category: {
         select: { id: true, slug: true, titleEn: true },
       },
+      subcategory: {
+        select: { id: true, slug: true, titleEn: true },
+      },
     },
   });
   return mapItem(created);
@@ -388,6 +574,7 @@ export async function updateAdminImagePrankItem(
   id: string,
   input: {
     categoryId?: string;
+    subcategoryId?: string | null;
     slug?: string;
     title?: string;
     description?: string | null;
@@ -399,7 +586,7 @@ export async function updateAdminImagePrankItem(
 ): Promise<AdminImagePrankItemDTO> {
   const existing = await prisma.imagePrankItem.findUnique({
     where: { id },
-    select: { imagePath: true, previewImagePath: true },
+    select: { categoryId: true, imagePath: true, previewImagePath: true },
   });
   if (!existing) throw new Error('Prank image not found');
 
@@ -411,6 +598,19 @@ export async function updateAdminImagePrankItem(
     });
     if (!category) throw new Error('Category not found');
     data.categoryId = input.categoryId;
+  }
+  if (input.subcategoryId === null) {
+    data.subcategoryId = null;
+  } else if (typeof input.subcategoryId === 'string') {
+    const categoryId = typeof data.categoryId === 'string' ? data.categoryId : existing.categoryId;
+    const subcategory = await prisma.imagePrankSubcategory.findFirst({
+      where: { id: input.subcategoryId, categoryId },
+      select: { id: true },
+    });
+    if (!subcategory) throw new Error('Subcategory not found');
+    data.subcategoryId = input.subcategoryId;
+  } else if (typeof data.categoryId === 'string') {
+    data.subcategoryId = null;
   }
   if (typeof input.slug === 'string') {
     const slug = slugify(input.slug);
@@ -450,6 +650,9 @@ export async function updateAdminImagePrankItem(
     data,
     include: {
       category: {
+        select: { id: true, slug: true, titleEn: true },
+      },
+      subcategory: {
         select: { id: true, slug: true, titleEn: true },
       },
     },

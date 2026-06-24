@@ -277,11 +277,35 @@ export const Api = {
     const suffix = query ? `?${query}` : '';
     return api<{ ok: boolean }>(`/api/admin/image-prank-categories/${id}${suffix}`, { method: 'DELETE' });
   },
-  adminImagePranksList: (params?: { q?: string; categoryId?: string | null; page?: number; pageSize?: number }) => {
+  adminImagePrankSubcategoriesList: (params?: { categoryId?: string | null }) => {
+    const qp = new URLSearchParams();
+    if (params?.categoryId) qp.set('categoryId', params.categoryId);
+    const query = qp.toString() ? `?${qp.toString()}` : '';
+    return api<{ items: Array<{ id: string; categoryId: string; slug: string; titleEn: string; titleRu: string; subtitleEn: string | null; subtitleRu: string | null; isActive: boolean; priority: number; category: { id: string; slug: string; titleEn: string } | null }> }>(`/api/admin/image-prank-subcategories${query}`);
+  },
+  adminImagePrankSubcategoriesCreate: (body: { categoryId: string; slug: string; title: string; subtitle?: string; isActive?: boolean; priority?: number }) =>
+    api<{ id: string; categoryId: string; slug: string; titleEn: string; titleRu: string; subtitleEn: string | null; subtitleRu: string | null; isActive: boolean; priority: number; category: { id: string; slug: string; titleEn: string } | null }>('/api/admin/image-prank-subcategories', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  adminImagePrankSubcategoriesUpdate: (id: string, body: { categoryId?: string; slug?: string; title?: string; subtitle?: string | null; isActive?: boolean; priority?: number }) =>
+    api<{ id: string; categoryId: string; slug: string; titleEn: string; titleRu: string; subtitleEn: string | null; subtitleRu: string | null; isActive: boolean; priority: number; category: { id: string; slug: string; titleEn: string } | null }>(`/api/admin/image-prank-subcategories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  adminImagePrankSubcategoriesDelete: (id: string, options?: { deleteFiles?: boolean }) => {
+    const qp = new URLSearchParams();
+    if (options?.deleteFiles === true) qp.set('deleteFiles', '1');
+    const query = qp.toString();
+    const suffix = query ? `?${query}` : '';
+    return api<{ ok: boolean }>(`/api/admin/image-prank-subcategories/${id}${suffix}`, { method: 'DELETE' });
+  },
+  adminImagePranksList: (params?: { q?: string; categoryId?: string | null; subcategoryId?: string | null; page?: number; pageSize?: number }) => {
     const qp = new URLSearchParams();
     const q = params?.q?.trim() || '';
     if (q) qp.set('q', q);
     if (params?.categoryId) qp.set('categoryId', params.categoryId);
+    if (params?.subcategoryId) qp.set('subcategoryId', params.subcategoryId);
     if (typeof params?.page === 'number' && Number.isFinite(params.page)) qp.set('page', String(Math.max(1, Math.floor(params.page))));
     if (typeof params?.pageSize === 'number' && Number.isFinite(params.pageSize)) qp.set('pageSize', String(Math.max(1, Math.floor(params.pageSize))));
     const query = qp.toString() ? `?${qp.toString()}` : '';
@@ -289,6 +313,7 @@ export const Api = {
       items: Array<{
         id: string;
         categoryId: string;
+        subcategoryId: string | null;
         slug: string;
         titleEn: string;
         titleRu: string;
@@ -301,6 +326,7 @@ export const Api = {
         isPublic: boolean;
         priority: number;
         category: { id: string; slug: string; titleEn: string } | null;
+        subcategory: { id: string; slug: string; titleEn: string } | null;
         createdAt: string;
         updatedAt: string;
       }>;
@@ -312,6 +338,7 @@ export const Api = {
   },
   adminImagePrankCreate: async (payload: {
     categoryId: string;
+    subcategoryId?: string | null;
     slug: string;
     title: string;
     description?: string;
@@ -322,6 +349,7 @@ export const Api = {
   }) => {
     const form = new FormData();
     form.set('categoryId', payload.categoryId);
+    form.set('subcategoryId', payload.subcategoryId ?? '');
     form.set('slug', payload.slug);
     form.set('title', payload.title);
     form.set('description', payload.description ?? '');
@@ -337,6 +365,7 @@ export const Api = {
   },
   adminImagePrankUpdate: async (id: string, payload: {
     categoryId?: string;
+    subcategoryId?: string | null;
     slug?: string;
     title?: string;
     description?: string | null;
@@ -347,6 +376,7 @@ export const Api = {
   }) => {
     const form = new FormData();
     if (payload.categoryId !== undefined) form.set('categoryId', payload.categoryId);
+    if (payload.subcategoryId !== undefined) form.set('subcategoryId', payload.subcategoryId ?? '');
     if (payload.slug !== undefined) form.set('slug', payload.slug);
     if (payload.title !== undefined) form.set('title', payload.title);
     if (payload.description !== undefined) form.set('description', payload.description ?? '');

@@ -9,7 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button-1';
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
-import type { ImagePrankCatalogCategoryDTO, ImagePrankCatalogItemDTO, LocalizedCatalogTextDTO } from '@/shared/types';
+import type {
+  ImagePrankCatalogCategoryDTO,
+  ImagePrankCatalogItemDTO,
+  ImagePrankCatalogSubcategoryDTO,
+  LocalizedCatalogTextDTO,
+} from '@/shared/types';
 
 const PAGE_SIZE = 18;
 
@@ -79,7 +84,20 @@ function categoryMatches(category: ImagePrankCatalogCategoryDTO, query: string, 
     pickText(category.subtitle, language),
     pickText(category.description, language),
     pickText(category.hiddenSearchText, language),
-  ].some((value) => value.toLowerCase().includes(query)) || category.items.some((item) => itemMatches(item, query, language));
+  ].some((value) => value.toLowerCase().includes(query))
+    || (category.subcategories ?? []).some((subcategory) => subcategoryMatches(subcategory, query, language))
+    || category.items.some((item) => itemMatches(item, query, language));
+}
+
+function subcategoryMatches(subcategory: ImagePrankCatalogSubcategoryDTO, query: string, language: AppLanguageCode) {
+  if (!query) return true;
+  return [
+    subcategory.slug,
+    pickText(subcategory.title, language),
+    pickText(subcategory.subtitle, language),
+    pickText(subcategory.description, language),
+    pickText(subcategory.hiddenSearchText, language),
+  ].some((value) => value.toLowerCase().includes(query)) || subcategory.items.some((item) => itemMatches(item, query, language));
 }
 
 function PreviewGrid({ images, label }: { images: string[]; label: string }) {
@@ -159,6 +177,31 @@ function CategoryCard({
   );
 }
 
+function SubcategoryCard({
+  subcategory,
+  language,
+  onSelect,
+}: {
+  subcategory: ImagePrankCatalogSubcategoryDTO;
+  language: AppLanguageCode;
+  onSelect: () => void;
+}) {
+  const title = pickText(subcategory.title, language);
+  return (
+    <button type="button" onClick={onSelect} className="block w-full cursor-pointer text-left focus-visible:outline-none">
+      <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
+        <div className="relative aspect-[9/16] w-full">
+          <PreviewGrid images={subcategory.items.map((item) => item.previewImageUrl || item.imageUrl)} label={title} />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 to-transparent" />
+        </div>
+        <div className="bg-white px-3 py-3 dark:bg-gray-950">
+          <h3 className="truncate text-sm font-semibold leading-none text-gray-950 dark:text-white">{title}</h3>
+        </div>
+      </article>
+    </button>
+  );
+}
+
 function ItemCard({ item, language }: { item: ImagePrankCatalogItemDTO; language: AppLanguageCode }) {
   const title = pickText(item.title, language);
   const previewUrl = item.previewImageUrl || item.imageUrl;
@@ -183,9 +226,11 @@ export function ImagePrankCatalog({ categories }: Props) {
   const copy = COPY[language];
   const [query, setQuery] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const normalizedQuery = normalizeSearch(query);
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null;
+  const selectedSubcategory = (selectedCategory?.subcategories ?? []).find((subcategory) => subcategory.id === selectedSubcategoryId) ?? null;
   const hasMultipleCategories = categories.length > 1;
 
   const rootCategories = useMemo(() => (
@@ -197,7 +242,18 @@ export function ImagePrankCatalog({ categories }: Props) {
   const rootItems = useMemo(() => {
     if (hasMultipleCategories) return [];
     const onlyCategory = categories[0] ?? null;
-    return onlyCategory ? onlyCategory.items.filter((item) => itemMatches(item, normalizedQuery, language)) : [];
+    return onlyCategory
+      ? onlyCategory.items
+          .filter((item) => !item.subcategoryId)
+          .filter((item) => itemMatches(item, normalizedQuery, language))
+      : [];
+  }, [categories, hasMultipleCategories, language, normalizedQuery]);
+  const rootSubcategories = useMemo(() => {
+    if (hasMultipleCategories) return [];
+    const onlyCategory = categories[0] ?? null;
+    return onlyCategory
+      ? (onlyCategory.subcategories ?? []).filter((subcategory) => subcategoryMatches(subcategory, normalizedQuery, language))
+      : [];
   }, [categories, hasMultipleCategories, language, normalizedQuery]);
 
   const categoryItems = useMemo(() => (
@@ -205,14 +261,37 @@ export function ImagePrankCatalog({ categories }: Props) {
       ? selectedCategory.items.filter((item) => itemMatches(item, normalizedQuery, language))
       : []
   ), [language, normalizedQuery, selectedCategory]);
+  const categorySubcategories = useMemo(() => (
+    selectedCategory && !selectedSubcategory
+      ? (selectedCategory.subcategories ?? []).filter((subcategory) => subcategoryMatches(subcategory, normalizedQuery, language))
+      : []
+  ), [language, normalizedQuery, selectedCategory, selectedSubcategory]);
+  const directCategoryItems = useMemo(() => (
+    selectedCategory && !selectedSubcategory
+      ? categoryItems.filter((item) => !item.subcategoryId)
+      : []
+  ), [categoryItems, selectedCategory, selectedSubcategory]);
+  const subcategoryItems = useMemo(() => (
+    selectedSubcategory
+      ? selectedSubcategory.items.filter((item) => itemMatches(item, normalizedQuery, language))
+      : []
+  ), [language, normalizedQuery, selectedSubcategory]);
 
   const entries = selectedCategory
-    ? categoryItems.map((item) => ({ type: 'item' as const, item }))
+    ? selectedSubcategory
+      ? subcategoryItems.map((item) => ({ type: 'item' as const, item }))
+      : [
+          ...categorySubcategories.map((subcategory) => ({ type: 'subcategory' as const, subcategory })),
+          ...directCategoryItems.map((item) => ({ type: 'item' as const, item })),
+        ]
     : [
         { type: 'custom' as const },
         ...(hasMultipleCategories
           ? rootCategories.map((category) => ({ type: 'category' as const, category }))
-          : rootItems.map((item) => ({ type: 'item' as const, item }))),
+          : [
+              ...rootSubcategories.map((subcategory) => ({ type: 'subcategory' as const, subcategory })),
+              ...rootItems.map((item) => ({ type: 'item' as const, item })),
+            ]),
       ];
   const totalPages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -220,11 +299,27 @@ export function ImagePrankCatalog({ categories }: Props) {
 
   const selectCategory = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
+    setSelectedSubcategoryId(null);
+    setPage(1);
+  };
+
+  const selectSubcategory = (subcategoryId: string) => {
+    if (!selectedCategory) {
+      const parentCategory = categories.find((category) => (category.subcategories ?? []).some((subcategory) => subcategory.id === subcategoryId));
+      setSelectedCategoryId(parentCategory?.id ?? null);
+    }
+    setSelectedSubcategoryId(subcategoryId);
     setPage(1);
   };
 
   const resetCategory = () => {
+    if (selectedSubcategory) {
+      setSelectedSubcategoryId(null);
+      setPage(1);
+      return;
+    }
     setSelectedCategoryId(null);
+    setSelectedSubcategoryId(null);
     setPage(1);
   };
 
@@ -245,7 +340,7 @@ export function ImagePrankCatalog({ categories }: Props) {
             className="inline-flex h-9 w-36 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-full border border-blue-200/80 bg-white/80 px-3 text-sm font-medium text-blue-700 opacity-100 shadow-sm backdrop-blur-sm transition-[width,opacity,transform,margin,padding,border] duration-200 ease-out hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:text-blue-300"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>{copy.back}</span>
+            <span>{selectedSubcategory ? pickText(selectedCategory.title, language) : copy.back}</span>
           </button>
         ) : null}
         <div className="relative w-full">
@@ -265,7 +360,7 @@ export function ImagePrankCatalog({ categories }: Props) {
 
       <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
         <Sparkles className="h-4 w-4 text-blue-500" />
-        <span>{selectedCategory ? pickText(selectedCategory.title, language) : copy.title}</span>
+        <span>{selectedSubcategory ? pickText(selectedSubcategory.title, language) : selectedCategory ? pickText(selectedCategory.title, language) : copy.title}</span>
       </div>
 
       {pageEntries.length > 0 ? (
@@ -279,6 +374,16 @@ export function ImagePrankCatalog({ categories }: Props) {
                   category={entry.category}
                   language={language}
                   onSelect={() => selectCategory(entry.category.id)}
+                />
+              );
+            }
+            if (entry.type === 'subcategory') {
+              return (
+                <SubcategoryCard
+                  key={entry.subcategory.id}
+                  subcategory={entry.subcategory}
+                  language={language}
+                  onSelect={() => selectSubcategory(entry.subcategory.id)}
                 />
               );
             }
