@@ -14,6 +14,32 @@ const OMITTED_EXTRA_KEYS = new Set([
   'sourceImages',
 ]);
 
+function normalizeString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function getImagePrankSourceImages(extra: Record<string, unknown> | null | undefined): unknown[] {
+  const imagePrank = extra?.imagePrank;
+  if (!imagePrank || typeof imagePrank !== 'object' || Array.isArray(imagePrank)) return [];
+  const sourceImages = (imagePrank as Record<string, unknown>).sourceImages;
+  return Array.isArray(sourceImages) ? sourceImages : [];
+}
+
+function extractCommandFromLog(content: string | null | undefined): string | null {
+  const text = normalizeString(content);
+  if (!text) return null;
+  const match = text.match(/^Command:\s*([\s\S]*?)(?:\nCWD:|\nProject:|\nStarted:|\n--- STREAM BEGIN ---|$)/u);
+  return normalizeString(match?.[1]);
+}
+
+function removeCommandFromLog(content: string): string {
+  return content.replace(/^Command:\s*[\s\S]*?(?=\n(?:CWD:|Project:|Started:|--- STREAM BEGIN ---|$))/u, 'Command: [collapsed]');
+}
+
+function getCommand(extra: Record<string, unknown> | null | undefined, logFile: ProjectErrorLogFile | null | undefined): string | null {
+  return normalizeString(extra?.command) ?? extractCommandFromLog(logFile?.content);
+}
+
 function sanitizeExtraValue(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.slice(0, 20).map(sanitizeExtraValue);
@@ -47,8 +73,12 @@ function sanitizeExtraValue(value: unknown): unknown {
 }
 
 export function AdminProjectErrorDetails({ occurredAt, details = [], logFile, extra }: AdminProjectErrorDetailsProps) {
+  const command = getCommand(extra, logFile);
+  const sourceImages = getImagePrankSourceImages(extra);
   const sanitizedExtra = extra ? sanitizeExtraValue(extra) : null;
-  if (details.length === 0 && !logFile && !sanitizedExtra && !occurredAt) return null;
+  const fullExtra = extra ? JSON.stringify(extra, null, 2) : null;
+  const logContent = logFile?.content ? (command ? removeCommandFromLog(logFile.content) : logFile.content) : null;
+  if (details.length === 0 && !logFile && !sanitizedExtra && !occurredAt && !command && !fullExtra) return null;
 
   return (
     <Card>
@@ -73,15 +103,33 @@ export function AdminProjectErrorDetails({ occurredAt, details = [], logFile, ex
                 {logFile.path}
               </div>
             </div>
-            <pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap rounded-md border bg-gray-950 p-3 text-xs leading-5 text-gray-100">
-              {logFile.content}
-            </pre>
+            {logContent ? (
+              <details open className="rounded-md border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+                <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Log output
+                </summary>
+                <pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap border-t bg-gray-950 p-3 text-xs leading-5 text-gray-100">
+                  {logContent}
+                </pre>
+              </details>
+            ) : null}
             {logFile.truncated ? (
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 Showing a truncated log preview from {logFile.sizeBytes.toLocaleString()} bytes.
               </div>
             ) : null}
           </div>
+        ) : null}
+
+        {command ? (
+          <details className="rounded-md border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+            <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              Command
+            </summary>
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap border-t bg-gray-950 p-3 text-xs leading-5 text-gray-100">
+              {command}
+            </pre>
+          </details>
         ) : null}
 
         {details.length > 0 ? (
@@ -97,6 +145,17 @@ export function AdminProjectErrorDetails({ occurredAt, details = [], logFile, ex
           </div>
         ) : null}
 
+        {sourceImages.length > 0 ? (
+          <details className="rounded-md border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+            <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              Source images
+            </summary>
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap border-t bg-gray-950 p-3 text-xs leading-5 text-gray-100">
+              {JSON.stringify(sourceImages, null, 2)}
+            </pre>
+          </details>
+        ) : null}
+
         {sanitizedExtra ? (
           <div>
             <div className="mb-2 font-medium text-gray-500 dark:text-gray-400">Status extra preview</div>
@@ -104,6 +163,17 @@ export function AdminProjectErrorDetails({ occurredAt, details = [], logFile, ex
               {JSON.stringify(sanitizedExtra, null, 2)}
             </pre>
           </div>
+        ) : null}
+
+        {fullExtra ? (
+          <details className="rounded-md border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+            <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              Full status extra
+            </summary>
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap border-t bg-gray-950 p-3 text-xs leading-5 text-gray-100">
+              {fullExtra}
+            </pre>
+          </details>
         ) : null}
       </CardContent>
     </Card>
