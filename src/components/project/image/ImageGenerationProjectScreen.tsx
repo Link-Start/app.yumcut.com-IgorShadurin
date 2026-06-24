@@ -369,64 +369,66 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                   ? t.generationFailed
                   : t.generatingImage}
           </div>
-          {resultImageUrl ? (
-            <div className="inline-flex self-start rounded-lg shadow-sm sm:self-auto">
-              <Button
-                type="button"
-                size="sm"
-                className="cursor-pointer rounded-r-none"
-                onClick={() => void handleDownload('original')}
-                disabled={downloading !== null}
-              >
-                {downloading === 'original' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                {t.download}
-              </Button>
-              <Popover open={downloadMenuOpen} onOpenChange={setDownloadMenuOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="cursor-pointer rounded-l-none border-l border-white/25 px-2"
-                    aria-label={t.download}
-                    disabled={downloading !== null}
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-[min(180px,calc(100vw-1rem))] p-1">
-                  {([
-                    ['original', t.downloadOriginal],
-                    ['png', t.downloadPng],
-                    ['jpg', t.downloadJpg],
-                    ['webp', t.downloadWebp],
-                  ] as Array<[DownloadFormat, string]>).map(([format, label]) => (
-                    <button
-                      key={format}
-                      type="button"
-                      className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800"
-                      onClick={() => void handleDownload(format)}
-                      disabled={downloading !== null}
-                    >
-                      {downloading === format ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                </PopoverContent>
-              </Popover>
-            </div>
-          ) : null}
         </CardHeader>
         <CardContent className="pt-5">
           <div className="grid gap-5 lg:grid-cols-[minmax(240px,360px)_minmax(0,1fr)] lg:items-stretch">
             <div className="flex justify-center lg:justify-start">
-              <div className="flex aspect-[9/16] w-full max-w-[360px] items-center justify-center overflow-hidden border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
+              <div className="relative flex aspect-[9/16] w-full max-w-[360px] items-center justify-center overflow-hidden border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                 {resultImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={resultImageUrl}
-                    alt={t.generatedImage}
-                    className="h-full w-full object-contain"
-                  />
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={resultImageUrl}
+                      alt={t.generatedImage}
+                      className="h-full w-full object-contain"
+                    />
+                    <div className="absolute right-3 top-3 inline-flex rounded-lg shadow-sm">
+                      <Button
+                        type="button"
+                        size="icon"
+                        className="h-9 w-10 cursor-pointer rounded-r-none"
+                        onClick={() => void handleDownload('original')}
+                        disabled={downloading !== null}
+                        aria-label={t.download}
+                        title={t.download}
+                      >
+                        {downloading === 'original' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      </Button>
+                      <Popover open={downloadMenuOpen} onOpenChange={setDownloadMenuOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            className="h-9 w-9 cursor-pointer rounded-l-none border-l border-white/25"
+                            aria-label={t.download}
+                            title={t.download}
+                            disabled={downloading !== null}
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-[min(180px,calc(100vw-1rem))] p-1">
+                          {([
+                            ['original', t.downloadOriginal],
+                            ['png', t.downloadPng],
+                            ['jpg', t.downloadJpg],
+                            ['webp', t.downloadWebp],
+                          ] as Array<[DownloadFormat, string]>).map(([format, label]) => (
+                            <button
+                              key={format}
+                              type="button"
+                              className="flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800"
+                              onClick={() => void handleDownload(format)}
+                              disabled={downloading !== null}
+                            >
+                              {downloading === format ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                              <span>{label}</span>
+                            </button>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </>
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-5 text-center">
                     {isError ? (
