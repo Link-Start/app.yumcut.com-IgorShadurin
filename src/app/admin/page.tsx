@@ -18,7 +18,7 @@ import { AdminProjectCreationSettingsForm } from '@/components/admin/AdminProjec
 import { getProjectCreationSettings } from '@/server/admin/project-creation';
 import { AdminDashboardUserMetricsSection } from '@/components/admin/AdminDashboardUserMetricsSection';
 import { listTransactions } from '@/server/admin/transactions';
-import { AdminTransactionCard } from '@/components/admin/AdminTransactionCard';
+import { AdminRecentTransactionsCard } from '@/components/admin/AdminRecentTransactionsCard';
 
 export default async function AdminHomePage() {
   const [snapshotWithoutGuests, snapshotWithGuests, notificationSettings, publishQueue, voiceProviderSettings, imageEditorSettings, projectCreationSettings, recentTransactions] = await Promise.all([
@@ -54,25 +54,7 @@ export default async function AdminHomePage() {
         withoutGuests={snapshotWithoutGuests}
         withGuests={snapshotWithGuests}
         leftCard={(
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between min-w-0">
-              <CardTitle className="truncate">Recent transactions</CardTitle>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/admin/transactions">View all</Link>
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-3 overflow-hidden">
-              {recentTransactions.items.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-300">No token activity recorded.</p>
-              ) : (
-                <div className="w-full min-w-0 space-y-3">
-                  {recentTransactions.items.map((transaction) => (
-                    <AdminTransactionCard key={transaction.id} transaction={transaction} />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <AdminRecentTransactionsCard transactions={recentTransactions.items} />
         )}
       >
         <Card>
