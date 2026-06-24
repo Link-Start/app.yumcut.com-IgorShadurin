@@ -517,12 +517,12 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                         const isCatalogPrankCard = source.role === 'prank' && Boolean(catalogItemHref);
                         const cardContent = (
                           <>
-                            <div className="flex min-h-[240px] flex-1 items-center justify-center overflow-hidden rounded-md bg-white p-3 dark:bg-gray-950 md:min-h-[300px]">
+                            <div className="flex min-h-[240px] flex-1 items-center justify-center overflow-hidden md:min-h-[300px]">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={source.previewImageUrl || source.imageUrl || ''}
                                 alt={source.label || t.referenceImages}
-                                className="h-full max-h-[320px] w-full object-contain"
+                                className="h-full max-h-[360px] w-full object-contain"
                               />
                             </div>
                             <div className="min-w-0">
