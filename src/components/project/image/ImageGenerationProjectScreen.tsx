@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Download, FileText, ImageIcon, Loader2, MoreVertical, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Download, FileText, ImageIcon, Loader2, MoreVertical, Repeat2, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,7 @@ const COPY: Record<AppLanguageCode, {
   prompt: string;
   copy: string;
   copied: string;
+  reuse: string;
   sourceImage: string;
   referenceImages: string;
   catalogCharacter: string;
@@ -85,6 +86,7 @@ const COPY: Record<AppLanguageCode, {
     prompt: 'Prompt',
     copy: 'Copy',
     copied: 'Copied',
+    reuse: 'Reuse',
     sourceImage: 'Source image',
     referenceImages: 'Reference images',
     catalogCharacter: 'Catalog character',
@@ -119,6 +121,7 @@ const COPY: Record<AppLanguageCode, {
     prompt: 'Промпт',
     copy: 'Копировать',
     copied: 'Скопировано',
+    reuse: 'Повторить',
     sourceImage: 'Исходное изображение',
     referenceImages: 'Референсные изображения',
     catalogCharacter: 'Персонаж из каталога',
@@ -264,6 +267,9 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
   const originalFormat = (image?.resultFormat || 'jpg').toLowerCase();
   const baseFilename = sanitizeFilename(project.title || prompt);
   const catalogItemHref = image?.catalogItem?.slug ? `/image-prank/${encodeURIComponent(image.catalogItem.slug)}` : null;
+  const reuseHref = isImagePrank
+    ? `${catalogItemHref ?? '/image-prank/custom'}?reuseProjectId=${encodeURIComponent(projectId)}`
+    : null;
   const sourceLabel = image?.source === 'global'
     ? t.catalogCharacter
     : image?.source === 'user'
@@ -467,17 +473,31 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                     <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                     {t.prompt}
                   </h2>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="inline-flex cursor-pointer items-center gap-1.5"
-                    onClick={handleCopyPrompt}
-                    disabled={!prompt}
-                  >
-                    {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copied ? t.copied : t.copy}
-                  </Button>
+                  <div className="inline-flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="inline-flex cursor-pointer items-center gap-1.5"
+                      onClick={handleCopyPrompt}
+                      disabled={!prompt}
+                    >
+                      {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copied ? t.copied : t.copy}
+                    </Button>
+                    {reuseHref ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="inline-flex cursor-pointer items-center gap-1.5"
+                        onClick={() => router.push(reuseHref)}
+                      >
+                        <Repeat2 className="h-3.5 w-3.5" />
+                        {t.reuse}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="whitespace-pre-wrap text-sm leading-6 text-gray-800 dark:text-gray-200">
                   {prompt || t.unknown}

@@ -157,6 +157,19 @@ export interface ImagePrankCatalogDTO {
   categories: ImagePrankCatalogCategoryDTO[];
 }
 
+export interface ImagePrankReuseDTO {
+  projectId: string;
+  mode: ImagePrankMode;
+  prompt: string;
+  catalogItem: {
+    id: string;
+    slug: string;
+    title: string;
+    categoryTitle?: string | null;
+  } | null;
+  sourceImages: ImagePrankSourceImageDTO[];
+}
+
 export interface MobileCharacterProfileDTO extends CharacterCatalogMetricsDTO {
   id: string;
   characterId: string;

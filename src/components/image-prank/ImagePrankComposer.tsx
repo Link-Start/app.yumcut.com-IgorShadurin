@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, CreditCard, Crown, ImagePlus, Images, Loader2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
@@ -19,6 +19,7 @@ import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import type {
   ImagePrankCatalogItemDTO,
   ImagePrankMode,
+  ImagePrankSourceImageDTO,
   ImagePrankSourceImageRole,
 } from '@/shared/types';
 
@@ -27,6 +28,10 @@ type UploadedSource = {
   path: string;
   url: string;
   label: string;
+};
+
+type PrefilledSource = UploadedSource & {
+  previewUrl: string | null;
 };
 
 type ImageSlotState = {
@@ -77,6 +82,7 @@ const COPY: Record<AppLanguageCode, {
   loading: string;
   uploading: string;
   back: string;
+  reuseLoadFailed: string;
   missingPrompt: string;
   missingImages: string;
   tokenLoadFailed: string;
@@ -127,6 +133,7 @@ const COPY: Record<AppLanguageCode, {
     loading: 'Loading',
     uploading: 'Uploading',
     back: 'Back',
+    reuseLoadFailed: 'Could not load previous Image Prank',
     missingPrompt: 'Enter a prompt',
     missingImages: 'Upload the required images',
     tokenLoadFailed: 'Could not load token balance',
@@ -177,6 +184,7 @@ const COPY: Record<AppLanguageCode, {
     loading: 'Загрузка',
     uploading: 'Загрузка',
     back: 'Назад',
+    reuseLoadFailed: 'Не удалось загрузить прошлый Image Prank',
     missingPrompt: 'Введите промпт',
     missingImages: 'Загрузите нужные изображения',
     tokenLoadFailed: 'Не удалось загрузить баланс токенов',
@@ -201,6 +209,17 @@ function useObjectUrl(file: File | null) {
     return () => URL.revokeObjectURL(next);
   }, [file]);
   return url;
+}
+
+function toPrefilledSource(source: ImagePrankSourceImageDTO | null | undefined, fallbackLabel: string): PrefilledSource | null {
+  if (!source?.imagePath || !source.imageUrl) return null;
+  return {
+    role: source.role,
+    path: source.imagePath,
+    url: source.imageUrl,
+    label: source.label || fallbackLabel,
+    previewUrl: source.previewImageUrl || source.imageUrl,
+  };
 }
 
 function UploadSlot({
@@ -348,15 +367,20 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const { language } = useAppLanguage();
   const copy = COPY[language];
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { summary, setSummary, refresh } = useTokenSummary();
   const storageBaseUrl = useMemo(resolveStorageBaseUrl, []);
+  const reuseProjectId = searchParams.get('reuseProjectId')?.trim() || null;
   const [prompt, setPrompt] = useState(copy.twoImageDefaultPrompt);
   const [oneImageMode, setOneImageMode] = useState(false);
   const [prankFile, setPrankFile] = useState<File | null>(null);
   const [targetFile, setTargetFile] = useState<File | null>(null);
+  const [prankSource, setPrankSource] = useState<PrefilledSource | null>(null);
+  const [targetSource, setTargetSource] = useState<PrefilledSource | null>(null);
   const [tokenBalance, setTokenBalance] = useState(0);
   const [tokenCost, setTokenCost] = useState(TOKEN_COSTS.actions.imageGeneration);
   const [tokenInfoLoading, setTokenInfoLoading] = useState(false);
+  const [reuseLoading, setReuseLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlanKey | null>(null);
@@ -364,6 +388,8 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const [submitting, setSubmitting] = useState(false);
   const prankPreviewUrl = useObjectUrl(prankFile);
   const targetPreviewUrl = useObjectUrl(targetFile);
+  const prankSlotPreviewUrl = prankPreviewUrl || prankSource?.previewUrl || prankSource?.url || null;
+  const targetSlotPreviewUrl = targetPreviewUrl || targetSource?.previewUrl || targetSource?.url || null;
   const isCatalogMode = !!item;
   const mode: ImagePrankMode = isCatalogMode
     ? 'catalog'
@@ -389,6 +415,38 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
       return current.trim() === '' || defaults.includes(current) ? defaultPrompt : current;
     });
   }, [defaultPrompt]);
+
+  useEffect(() => {
+    if (!reuseProjectId) return;
+    let cancelled = false;
+    setReuseLoading(true);
+    Api.getImagePrankReuse(reuseProjectId)
+      .then((draft) => {
+        if (cancelled) return;
+        if (!item) {
+          setOneImageMode(draft.mode === 'custom-one-image');
+        }
+        const prank = draft.sourceImages.find((source) => source.role === 'prank') ?? null;
+        const target =
+          draft.sourceImages.find((source) => source.role === 'target')
+          ?? draft.sourceImages.find((source) => source.role === 'reference')
+          ?? null;
+        setPrompt(draft.prompt || defaultPrompt);
+        setPrankFile(null);
+        setTargetFile(null);
+        setPrankSource(toPrefilledSource(prank, copy.prankImage));
+        setTargetSource(toPrefilledSource(target, draft.mode === 'custom-one-image' ? copy.referenceImage : copy.targetImage));
+      })
+      .catch(() => {
+        if (!cancelled) toast.error(copy.reuseLoadFailed);
+      })
+      .finally(() => {
+        if (!cancelled) setReuseLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [copy.prankImage, copy.referenceImage, copy.reuseLoadFailed, copy.targetImage, defaultPrompt, item, reuseProjectId]);
 
   useEffect(() => {
     if (!summary) return;
@@ -424,15 +482,15 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
       toast.error(copy.missingPrompt);
       return false;
     }
-    if (isCatalogMode && !targetFile) {
+    if (isCatalogMode && !targetFile && !targetSource) {
       toast.error(copy.missingImages);
       return false;
     }
-    if (!isCatalogMode && !oneImageMode && (!prankFile || !targetFile)) {
+    if (!isCatalogMode && !oneImageMode && ((!prankFile && !prankSource) || (!targetFile && !targetSource))) {
       toast.error(copy.missingImages);
       return false;
     }
-    if (!isCatalogMode && oneImageMode && !targetFile) {
+    if (!isCatalogMode && oneImageMode && !targetFile && !targetSource) {
       toast.error(copy.missingImages);
       return false;
     }
@@ -475,13 +533,21 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
     try {
       const uploaded: UploadedSource[] = [];
       if (isCatalogMode) {
-        uploaded.push(await uploadSource(targetFile!, 'target', copy.targetImage, storageBaseUrl));
+        uploaded.push(targetFile
+          ? await uploadSource(targetFile, 'target', copy.targetImage, storageBaseUrl)
+          : { ...targetSource!, role: 'target', label: targetSource?.label || copy.targetImage });
       } else if (oneImageMode) {
-        uploaded.push(await uploadSource(targetFile!, 'target', copy.referenceImage, storageBaseUrl));
+        uploaded.push(targetFile
+          ? await uploadSource(targetFile, 'target', copy.referenceImage, storageBaseUrl)
+          : { ...targetSource!, role: 'target', label: targetSource?.label || copy.referenceImage });
       } else {
         const [prank, target] = await Promise.all([
-          uploadSource(prankFile!, 'prank', copy.prankImage, storageBaseUrl),
-          uploadSource(targetFile!, 'target', copy.targetImage, storageBaseUrl),
+          prankFile
+            ? uploadSource(prankFile, 'prank', copy.prankImage, storageBaseUrl)
+            : Promise.resolve({ ...prankSource!, role: 'prank' as const, label: prankSource?.label || copy.prankImage }),
+          targetFile
+            ? uploadSource(targetFile, 'target', copy.targetImage, storageBaseUrl)
+            : Promise.resolve({ ...targetSource!, role: 'target' as const, label: targetSource?.label || copy.targetImage }),
         ]);
         uploaded.push(prank, target);
       }
@@ -574,16 +640,22 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
             ) : oneImageMode ? null : (
               <UploadSlot
                 label={copy.prankImage}
-                state={{ file: prankFile, previewUrl: prankPreviewUrl }}
-                onChange={setPrankFile}
-                disabled={submitting}
+                state={{ file: prankFile, previewUrl: prankSlotPreviewUrl }}
+                onChange={(file) => {
+                  setPrankFile(file);
+                  setPrankSource(null);
+                }}
+                disabled={submitting || reuseLoading}
               />
             )}
             <UploadSlot
               label={oneImageMode && !item ? copy.referenceImage : copy.targetImage}
-              state={{ file: targetFile, previewUrl: targetPreviewUrl }}
-              onChange={setTargetFile}
-              disabled={submitting}
+              state={{ file: targetFile, previewUrl: targetSlotPreviewUrl }}
+              onChange={(file) => {
+                setTargetFile(file);
+                setTargetSource(null);
+              }}
+              disabled={submitting || reuseLoading}
             />
             <p className="col-span-2 text-sm leading-5 text-gray-600 dark:text-gray-400">
               {imageHint}
@@ -601,7 +673,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder={promptPlaceholder}
                 className="min-h-[320px] flex-1 resize-none"
-                disabled={submitting}
+                disabled={submitting || reuseLoading}
               />
             </div>
 
@@ -619,7 +691,10 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
                       type="button"
                       onClick={() => {
                         setOneImageMode(option.value);
-                        if (option.value) setPrankFile(null);
+                        if (option.value) {
+                          setPrankFile(null);
+                          setPrankSource(null);
+                        }
                       }}
                       className={cn(
                         'inline-flex h-8 cursor-pointer items-center gap-1 rounded-full px-3 text-sm font-medium leading-none transition-[background-color,color,box-shadow]',
@@ -628,7 +703,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
                           : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white',
                       )}
                       aria-pressed={active}
-                      disabled={submitting}
+                      disabled={submitting || reuseLoading}
                     >
                       <OptionIcon className="h-4 w-4" aria-hidden="true" />
                       <span className="inline-flex items-center whitespace-nowrap leading-none">{option.label}</span>
@@ -638,9 +713,9 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               </div>
             ) : null}
 
-            <Button type="button" className="w-full cursor-pointer" onClick={() => void handleContinue()} disabled={submitting}>
-              {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
-              {submitting ? copy.uploading : copy.create}
+            <Button type="button" className="w-full cursor-pointer" onClick={() => void handleContinue()} disabled={submitting || reuseLoading}>
+              {submitting || reuseLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
+              {submitting ? copy.uploading : reuseLoading ? copy.loading : copy.create}
             </Button>
           </div>
         </div>

@@ -70,6 +70,9 @@ export const Api = {
   getProjects: () => api('/api/projects'),
   getProject: (id: string) => api(`/api/projects/${id}`),
   getProjectStatus: (id: string) => api<import('@/shared/types').ProjectStatusDTO>(`/api/projects/${id}/status`),
+  getImagePrankReuse: (id: string) => api<import('@/shared/types').ImagePrankReuseDTO>(
+    `/api/projects/${encodeURIComponent(id)}/image-prank-reuse`,
+  ),
   getTelegramAccount: () => api<import('@/shared/types').TelegramAccountStatusDTO>('/api/telegram/account'),
   createTelegramLinkToken: () => api<import('@/shared/types').TelegramLinkTokenDTO>('/api/telegram/link-token', { method: 'POST' }),
   disconnectTelegramAccount: () => api<{ ok: boolean }>('/api/telegram/account', { method: 'DELETE' }),
