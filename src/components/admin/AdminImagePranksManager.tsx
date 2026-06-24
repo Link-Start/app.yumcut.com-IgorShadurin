@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Images, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { CheckCircle2, FolderOpen, Images, Loader2, Pencil, Plus, RefreshCw, Trash2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,27 @@ type Item = {
   category: { id: string; slug: string; titleEn: string } | null;
 };
 
+type BulkImportMetadata = {
+  categorySlug?: string;
+  categoryTitle?: string;
+  slug?: string;
+  title?: string;
+  description?: string;
+  searchText?: string;
+  priority?: number;
+  isPublic?: boolean;
+};
+
+type BulkImportItem = {
+  id: string;
+  folderName: string;
+  file: File;
+  previewUrl: string;
+  metadata: Required<BulkImportMetadata>;
+  status: 'pending' | 'uploading' | 'done' | 'error';
+  error: string | null;
+};
+
 const emptyCategoryForm = {
   slug: '',
   title: '',
@@ -52,9 +73,69 @@ const emptyItemForm = {
   isPublic: false,
 };
 
+const directoryInputProps = {
+  webkitdirectory: '',
+  directory: '',
+} as Record<string, string>;
+
 type DeleteTarget =
   | { kind: 'item'; id: string; title: string }
   | { kind: 'category'; id: string; title: string };
+
+function slugifyImportValue(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'image-prank';
+}
+
+function toBulkMetadata(raw: unknown, folderName: string): Required<BulkImportMetadata> {
+  const source = raw && typeof raw === 'object' ? raw as BulkImportMetadata : {};
+  const title = typeof source.title === 'string' && source.title.trim()
+    ? source.title.trim()
+    : folderName.replace(/[-_]+/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
+  const categoryTitle = typeof source.categoryTitle === 'string' && source.categoryTitle.trim()
+    ? source.categoryTitle.trim()
+    : 'Main';
+  return {
+    categorySlug: typeof source.categorySlug === 'string' && source.categorySlug.trim()
+      ? slugifyImportValue(source.categorySlug)
+      : slugifyImportValue(categoryTitle),
+    categoryTitle,
+    slug: typeof source.slug === 'string' && source.slug.trim()
+      ? slugifyImportValue(source.slug)
+      : slugifyImportValue(title),
+    title,
+    description: typeof source.description === 'string' ? source.description.trim() : '',
+    searchText: typeof source.searchText === 'string' ? source.searchText.trim() : '',
+    priority: typeof source.priority === 'number' && Number.isFinite(source.priority) ? Math.floor(source.priority) : 0,
+    isPublic: typeof source.isPublic === 'boolean' ? source.isPublic : true,
+  };
+}
+
+function itemFolderName(file: File) {
+  const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+  const parts = relativePath.split('/').filter(Boolean);
+  if (parts.length >= 3) return parts[1];
+  if (parts.length >= 2) return parts[0];
+  return '';
+}
+
+function isBulkImageFile(file: File) {
+  return /^image\/(png|jpeg|webp)$/.test(file.type) || /\.(png|jpe?g|webp)$/i.test(file.name);
+}
+
+function isMetadataFile(file: File) {
+  return /\.json$/i.test(file.name);
+}
+
+async function readJsonFile(file: File): Promise<unknown> {
+  const text = await file.text();
+  return JSON.parse(text);
+}
 
 export function AdminImagePranksManager() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -73,6 +154,10 @@ export function AdminImagePranksManager() {
   const [activeTab, setActiveTab] = useState('pranks');
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [bulkItems, setBulkItems] = useState<BulkImportItem[]>([]);
+  const [bulkParsing, setBulkParsing] = useState(false);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const bulkPreviewUrlsRef = useRef<string[]>([]);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === itemForm.categoryId) ?? null,
@@ -100,6 +185,10 @@ export function AdminImagePranksManager() {
   useEffect(() => {
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => () => {
+    bulkPreviewUrlsRef.current.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
   }, []);
 
   useEffect(() => {
@@ -216,6 +305,112 @@ export function AdminImagePranksManager() {
     setItemForm({ ...emptyItemForm, categoryId: categories[0]?.id ?? '' });
   };
 
+  const replaceBulkItems = (nextItems: BulkImportItem[]) => {
+    bulkPreviewUrlsRef.current.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
+    bulkPreviewUrlsRef.current = nextItems.map((item) => item.previewUrl);
+    setBulkItems(nextItems);
+  };
+
+  const parseBulkDirectory = async (files: FileList | null) => {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+    setBulkParsing(true);
+    try {
+      const grouped = new Map<string, { image?: File; metadata?: File }>();
+      for (const file of selectedFiles) {
+        const folderName = itemFolderName(file);
+        if (!folderName) continue;
+        const group = grouped.get(folderName) ?? {};
+        if (isBulkImageFile(file) && !group.image) {
+          group.image = file;
+        } else if (isMetadataFile(file) && !group.metadata) {
+          group.metadata = file;
+        }
+        grouped.set(folderName, group);
+      }
+
+      const nextItems: BulkImportItem[] = [];
+      for (const [folderName, group] of grouped.entries()) {
+        if (!group.image || !group.metadata) continue;
+        const parsedMetadata = await readJsonFile(group.metadata);
+        const metadata = toBulkMetadata(parsedMetadata, folderName);
+        nextItems.push({
+          id: `${folderName}-${group.image.name}`,
+          folderName,
+          file: group.image,
+          previewUrl: URL.createObjectURL(group.image),
+          metadata,
+          status: 'pending',
+          error: null,
+        });
+      }
+
+      nextItems.sort((a, b) => a.metadata.title.localeCompare(b.metadata.title));
+      replaceBulkItems(nextItems);
+      if (nextItems.length === 0) {
+        toast.error('No valid prank items found. Each item subfolder needs one image and one metadata JSON file.');
+      } else {
+        toast.success(`Loaded ${nextItems.length.toLocaleString()} prank items for preview`);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to parse import directory');
+    } finally {
+      setBulkParsing(false);
+    }
+  };
+
+  const uploadBulkItems = async () => {
+    if (bulkUploading || bulkItems.length === 0) return;
+    setBulkUploading(true);
+    try {
+      const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
+      for (const item of bulkItems) {
+        if (item.status === 'done') continue;
+        setBulkItems((current) => current.map((candidate) => (
+          candidate.id === item.id ? { ...candidate, status: 'uploading', error: null } : candidate
+        )));
+
+        try {
+          let category = categoryBySlug.get(item.metadata.categorySlug);
+          if (!category) {
+            category = await Api.adminImagePrankCategoriesCreate({
+              slug: item.metadata.categorySlug,
+              title: item.metadata.categoryTitle,
+              isActive: true,
+              priority: 0,
+            }) as Category;
+            categoryBySlug.set(category.slug, category);
+          }
+
+          await Api.adminImagePrankCreate({
+            categoryId: category.id,
+            slug: item.metadata.slug,
+            title: item.metadata.title,
+            description: item.metadata.description,
+            searchText: item.metadata.searchText,
+            priority: item.metadata.priority,
+            isPublic: item.metadata.isPublic,
+            image: item.file,
+          });
+          setBulkItems((current) => current.map((candidate) => (
+            candidate.id === item.id ? { ...candidate, status: 'done', error: null } : candidate
+          )));
+        } catch (error) {
+          const message = error && typeof error === 'object' && 'error' in error
+            ? String((error as { error?: { message?: string } }).error?.message ?? 'Upload failed')
+            : error instanceof Error ? error.message : 'Upload failed';
+          setBulkItems((current) => current.map((candidate) => (
+            candidate.id === item.id ? { ...candidate, status: 'error', error: message } : candidate
+          )));
+        }
+      }
+      await loadAll();
+      toast.success('Bulk upload finished');
+    } finally {
+      setBulkUploading(false);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -253,6 +448,78 @@ export function AdminImagePranksManager() {
         </TabsList>
 
         <TabsContent value="pranks" className="space-y-4">
+          <Card>
+            <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Bulk upload</CardTitle>
+                <CardDescription>Choose a folder where each item is a subfolder with one image and metadata.json.</CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 text-sm font-medium transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900">
+                  {bulkParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+                  Choose dir
+                  <input
+                    type="file"
+                    multiple
+                    className="hidden"
+                    {...directoryInputProps}
+                    onChange={(event) => {
+                      void parseBulkDirectory(event.target.files);
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  className="cursor-pointer"
+                  disabled={bulkUploading || bulkParsing || bulkItems.length === 0}
+                  onClick={() => void uploadBulkItems()}
+                >
+                  {bulkUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                  Upload selected
+                </Button>
+              </div>
+            </CardHeader>
+            {bulkItems.length > 0 ? (
+              <CardContent className="space-y-4">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Previewing {bulkItems.length.toLocaleString()} items. Upload uses each item metadata and creates missing categories.
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {bulkItems.map((item) => (
+                    <div key={item.id} className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                      <div className="flex aspect-[9/16] items-center justify-center overflow-hidden rounded-md bg-gray-50 dark:bg-gray-900">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.previewUrl} alt={item.metadata.title} className="h-full w-full object-contain" />
+                      </div>
+                      <div className="mt-2 min-w-0 space-y-1 text-sm">
+                        <div className="truncate font-semibold text-gray-900 dark:text-gray-100">{item.metadata.title}</div>
+                        <div className="truncate text-xs text-gray-500 dark:text-gray-400">{item.metadata.categoryTitle} / {item.metadata.slug}</div>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          {item.status === 'uploading' ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                              <span className="text-blue-700 dark:text-blue-300">Uploading</span>
+                            </>
+                          ) : item.status === 'done' ? (
+                            <>
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="text-emerald-700 dark:text-emerald-300">Uploaded</span>
+                            </>
+                          ) : item.status === 'error' ? (
+                            <span className="text-red-600 dark:text-red-300">{item.error ?? 'Upload failed'}</span>
+                          ) : (
+                            <span className="text-gray-500 dark:text-gray-400">Ready</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            ) : null}
+          </Card>
+
           <Card>
           <CardHeader>
             <CardTitle>{editingItemId ? 'Edit prank image' : 'New prank image'}</CardTitle>
