@@ -1,10 +1,10 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 import { ProjectStatus } from '@/shared/constants/status';
-import { QWEN_DEFAULT_NEGATIVE_PROMPT, requestRunwareImage, requestRunwareImageEdit } from '@/server/image-generation/runware';
-import { config } from '@/server/config';
+import { QWEN_DEFAULT_NEGATIVE_PROMPT } from '@/server/image-generation/runware';
 import type { DaemonConfig } from '../config';
 import { addImageAsset, setStatus } from '../db';
+import { runImageGenerationTool } from '../image-generation';
 import { log } from '../logger';
 import { buildStatusErrorExtra } from '../status-error-extra';
 import { createHandledError } from './error';
@@ -46,11 +46,6 @@ export async function handleImageGenerationProjectPhase({
     throw new Error('Image generation prompt is required');
   }
 
-  const apiKey = (config.RUNWARE_IMAGE_EDITOR_API_KEY || '').trim();
-  if (!apiKey) {
-    throw new Error('Runware API key is not configured');
-  }
-
   const provider = 'runware';
   const model = stringFromPayload(jobPayload.model, 'runware:108@1');
   const width = numberFromPayload(jobPayload.width, 1024);
@@ -64,28 +59,19 @@ export async function handleImageGenerationProjectPhase({
 
   try {
     await fs.mkdir(workspace, { recursive: true });
-    const result = imageKind === 'image-prank' && imagePrank
-      ? await requestRunwareImageEdit({
-          apiKey,
-          prompt,
-          width,
-          height,
-          model,
-          referenceImages: imagePrankSourceUrls(imagePrank),
-          negativePrompt: QWEN_DEFAULT_NEGATIVE_PROMPT,
-          outputFormat,
-        })
-      : await requestRunwareImage({
-          apiKey,
-          prompt,
-          width,
-          height,
-          model,
-          negativePrompt: QWEN_DEFAULT_NEGATIVE_PROMPT,
-        });
-    const outputPath = path.join(workspace, `result.${outputFormat}`);
-    await fs.writeFile(outputPath, Buffer.from(result.imageBytes));
-    const asset = await addImageAsset(projectId, outputPath);
+    const toolResult = await runImageGenerationTool({
+      projectId,
+      toolsWorkspace: daemonConfig.scriptWorkspaceV2,
+      projectWorkspace: workspace,
+      prompt,
+      width,
+      height,
+      model,
+      outputFormat,
+      negativePrompt: QWEN_DEFAULT_NEGATIVE_PROMPT,
+      referenceImages: imageKind === 'image-prank' && imagePrank ? imagePrankSourceUrls(imagePrank) : [],
+    });
+    const asset = await addImageAsset(projectId, toolResult.outputPath);
 
     await setStatus(projectId, ProjectStatus.Done, 'Image ready', {
       projectExperience: 'image-generation',
@@ -106,7 +92,7 @@ export async function handleImageGenerationProjectPhase({
           }
         : {}),
       imageGenerationWorkspace: workspace,
-      runwareResponse: result.responseJson,
+      runwareResponse: toolResult.responseJson,
     });
 
     log.info('Standalone image generation completed', {
@@ -116,6 +102,8 @@ export async function handleImageGenerationProjectPhase({
       width,
       height,
       model,
+      command: toolResult.command,
+      logPath: toolResult.logPath,
     });
   } catch (err: any) {
     log.error('Standalone image generation failed', {
@@ -127,6 +115,7 @@ export async function handleImageGenerationProjectPhase({
       model,
       width,
       height,
+      toolsWorkspace: daemonConfig.scriptWorkspaceV2,
       imageKind,
       ...(imagePrank ? { imagePrank } : {}),
     }));
