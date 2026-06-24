@@ -413,7 +413,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
         <CardContent className="pt-5">
           <div className="grid gap-5 lg:grid-cols-[minmax(240px,360px)_minmax(0,1fr)] lg:items-stretch">
             <div className="flex justify-center lg:justify-start">
-              <div className="flex aspect-[9/16] w-full max-w-[360px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
+              <div className="flex aspect-[9/16] w-full max-w-[360px] items-center justify-center overflow-hidden border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                 {resultImageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
