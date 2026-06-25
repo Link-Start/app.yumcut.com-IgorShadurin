@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ImagePlus, Search, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -101,7 +101,9 @@ function subcategoryMatches(subcategory: ImagePrankCatalogSubcategoryDTO, query:
 }
 
 function PreviewGrid({ images, label }: { images: string[]; label: string }) {
-  const preview = Array.from({ length: 4 }, (_, index) => images[index] ?? null);
+  const preview = Array.from({ length: 4 }, (_, index) => (
+    images.length > 0 ? images[index % images.length] : null
+  ));
   return (
     <div className="grid h-full w-full grid-cols-2 gap-0.5 bg-gray-200 dark:bg-gray-800">
       {preview.map((imageUrl, index) => (
@@ -297,13 +299,29 @@ export function ImagePrankCatalog({ categories }: Props) {
   const safePage = Math.min(page, totalPages);
   const pageEntries = entries.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      setSelectedCategoryId(null);
+      setSelectedSubcategoryId(null);
+      setPage(1);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const pushCatalogHistory = () => {
+    window.history.pushState({ imagePrankCatalog: true }, '', window.location.href);
+  };
+
   const selectCategory = (categoryId: string) => {
+    pushCatalogHistory();
     setSelectedCategoryId(categoryId);
     setSelectedSubcategoryId(null);
     setPage(1);
   };
 
   const selectSubcategory = (subcategoryId: string) => {
+    pushCatalogHistory();
     if (!selectedCategory) {
       const parentCategory = categories.find((category) => (category.subcategories ?? []).some((subcategory) => subcategory.id === subcategoryId));
       setSelectedCategoryId(parentCategory?.id ?? null);
@@ -312,37 +330,34 @@ export function ImagePrankCatalog({ categories }: Props) {
     setPage(1);
   };
 
-  const resetCategory = () => {
-    if (selectedSubcategory) {
-      setSelectedSubcategoryId(null);
-      setPage(1);
-      return;
-    }
+  const resetCatalog = () => {
     setSelectedCategoryId(null);
     setSelectedSubcategoryId(null);
     setPage(1);
+    window.history.replaceState({ imagePrankCatalog: true }, '', '/?openMode=image-prank');
   };
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 pb-14">
       <div className="flex min-h-10 items-center gap-2">
-        <Link
-          href="/"
-          className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-blue-200/80 bg-white/80 px-3 text-sm font-medium text-blue-700 shadow-sm backdrop-blur-sm transition hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:text-blue-300 dark:hover:border-blue-700 dark:hover:text-blue-200"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{copy.mainBack}</span>
-        </Link>
         {selectedCategory ? (
           <button
             type="button"
-            onClick={resetCategory}
-            className="inline-flex h-9 w-36 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-full border border-blue-200/80 bg-white/80 px-3 text-sm font-medium text-blue-700 opacity-100 shadow-sm backdrop-blur-sm transition-[width,opacity,transform,margin,padding,border] duration-200 ease-out hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:text-blue-300"
+            onClick={resetCatalog}
+            className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-blue-200/80 bg-white/80 px-3 text-sm font-medium text-blue-700 shadow-sm backdrop-blur-sm transition hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:text-blue-300 dark:hover:border-blue-700 dark:hover:text-blue-200"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>{selectedSubcategory ? pickText(selectedCategory.title, language) : copy.back}</span>
+            <span>{copy.mainBack}</span>
           </button>
-        ) : null}
+        ) : (
+          <Link
+            href="/"
+            className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-blue-200/80 bg-white/80 px-3 text-sm font-medium text-blue-700 shadow-sm backdrop-blur-sm transition hover:border-blue-300 hover:text-blue-800 dark:border-blue-800/80 dark:bg-gray-950/70 dark:text-blue-300 dark:hover:border-blue-700 dark:hover:text-blue-200"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>{copy.mainBack}</span>
+          </Link>
+        )}
         <div className="relative w-full">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <Input
