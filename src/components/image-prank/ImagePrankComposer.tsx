@@ -665,8 +665,8 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
             </p>
           </div>
 
-          <div className="flex h-full flex-col gap-4">
-            <div className="flex min-h-[360px] flex-1 flex-col space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col space-y-2">
               <Label htmlFor="image-prank-prompt" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {copy.promptLabel}
               </Label>
@@ -675,7 +675,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder={promptPlaceholder}
-                className="min-h-[320px] flex-1 resize-none"
+                className="h-[260px] resize-none lg:h-[320px]"
                 disabled={submitting || reuseLoading}
               />
             </div>
