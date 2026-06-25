@@ -564,6 +564,72 @@ export function ImagePrankCatalog({ categories }: Props) {
     }));
   };
 
+  const renderPagination = (position: 'top' | 'bottom') => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <Pagination className={cn(position === 'top' ? 'pb-1' : 'pt-2')}>
+        <PaginationContent className="w-full flex-wrap justify-center gap-1 sm:gap-1.5">
+          <PaginationItem>
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              className="h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed"
+              onClick={() => goToPage(safePage - 1)}
+              disabled={safePage <= 1}
+            >
+              <ChevronLeft className="rtl:rotate-180 h-4 w-4" />
+              {copy.previous}
+            </Button>
+          </PaginationItem>
+
+          {buildPageItems(totalPages, safePage).map((item) => {
+            if (item === 'ellipsis-left' || item === 'ellipsis-right') {
+              return (
+                <PaginationItem key={`${position}-${item}`}>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              );
+            }
+
+            const itemPage = item;
+            const isActive = itemPage === safePage;
+            return (
+              <PaginationItem key={`${position}-page-${itemPage}`}>
+                <Button
+                  type="button"
+                  variant={isActive ? 'outline' : 'ghost'}
+                  mode="icon"
+                  size="lg"
+                  className="h-10 w-10 cursor-pointer text-sm"
+                  onClick={() => goToPage(itemPage)}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  {itemPage}
+                </Button>
+              </PaginationItem>
+            );
+          })}
+
+          <PaginationItem>
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              className="h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed"
+              onClick={() => goToPage(safePage + 1)}
+              disabled={safePage >= totalPages}
+            >
+              {copy.next}
+              <ChevronRight className="rtl:rotate-180 h-4 w-4" />
+            </Button>
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    );
+  };
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 pb-14">
       <div className="flex min-h-10 items-center gap-2">
@@ -603,6 +669,8 @@ export function ImagePrankCatalog({ categories }: Props) {
       <div className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
         <span>{selectedSubcategory ? pickText(selectedSubcategory.title, language) : selectedCategory ? pickText(selectedCategory.title, language) : copy.title}</span>
       </div>
+
+      {renderPagination('top')}
 
       {pageEntries.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -651,67 +719,7 @@ export function ImagePrankCatalog({ categories }: Props) {
         </div>
       )}
 
-      {totalPages > 1 ? (
-        <Pagination className="pt-2">
-          <PaginationContent className="w-full flex-wrap justify-center gap-1 sm:gap-1.5">
-            <PaginationItem>
-              <Button
-                type="button"
-                variant="ghost"
-                size="lg"
-                className="h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed"
-                onClick={() => goToPage(safePage - 1)}
-                disabled={safePage <= 1}
-              >
-                <ChevronLeft className="rtl:rotate-180 h-4 w-4" />
-                {copy.previous}
-              </Button>
-            </PaginationItem>
-
-            {buildPageItems(totalPages, safePage).map((item) => {
-              if (item === 'ellipsis-left' || item === 'ellipsis-right') {
-                return (
-                  <PaginationItem key={item}>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                );
-              }
-
-              const itemPage = item;
-              const isActive = itemPage === safePage;
-              return (
-                <PaginationItem key={`page-${itemPage}`}>
-                  <Button
-                    type="button"
-                    variant={isActive ? 'outline' : 'ghost'}
-                    mode="icon"
-                    size="lg"
-                    className="h-10 w-10 cursor-pointer text-sm"
-                    onClick={() => goToPage(itemPage)}
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    {itemPage}
-                  </Button>
-                </PaginationItem>
-              );
-            })}
-
-            <PaginationItem>
-              <Button
-                type="button"
-                variant="ghost"
-                size="lg"
-                className="h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed"
-                onClick={() => goToPage(safePage + 1)}
-                disabled={safePage >= totalPages}
-              >
-                {copy.next}
-                <ChevronRight className="rtl:rotate-180 h-4 w-4" />
-              </Button>
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      ) : null}
+      {renderPagination('bottom')}
 
       <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
         <DialogContent
