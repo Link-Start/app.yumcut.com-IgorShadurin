@@ -18,7 +18,7 @@ import type {
 
 const PAGE_SIZE = 18;
 const SUBCATEGORY_HOVER_SECTIONS = 5;
-const CARD_LABEL_GRADIENT = 'bg-[linear-gradient(to_top,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.58)_42%,rgba(0,0,0,0.22)_74%,rgba(0,0,0,0)_100%)]';
+const CARD_LABEL_GRADIENT = 'h-36 bg-[linear-gradient(to_top,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.67)_18%,rgba(0,0,0,0.48)_38%,rgba(0,0,0,0.28)_58%,rgba(0,0,0,0.12)_76%,rgba(0,0,0,0.04)_90%,rgba(0,0,0,0)_100%)]';
 
 const COPY: Record<AppLanguageCode, {
   title: string;
@@ -205,7 +205,7 @@ function CategoryCard({
   const previewContent = (
     <div className="relative aspect-[9/16] w-full">
       <PreviewGrid images={category.items.map((item) => item.imageUrl)} label={title} />
-      <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 h-20', CARD_LABEL_GRADIENT)} />
+      <div className={cn('pointer-events-none absolute inset-x-0 bottom-0', CARD_LABEL_GRADIENT)} />
     </div>
   );
   return (
@@ -247,7 +247,7 @@ function SubcategoryCard({
       <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
         <div className="relative aspect-[9/16] w-full">
           <SubcategoryHoverPreview items={subcategory.items} label={title} />
-          <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 h-20', CARD_LABEL_GRADIENT)} />
+          <div className={cn('pointer-events-none absolute inset-x-0 bottom-0', CARD_LABEL_GRADIENT)} />
         </div>
         <div className="bg-white px-3 py-3 dark:bg-gray-950">
           <h3 className="truncate text-sm font-semibold leading-none text-gray-950 dark:text-white">{title}</h3>
@@ -266,7 +266,7 @@ function ItemCard({ item, language }: { item: ImagePrankCatalogItemDTO; language
         <div className="relative aspect-[9/16] w-full bg-gray-100 dark:bg-gray-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewUrl} alt={title} className="h-full w-full object-cover" loading="lazy" />
-          <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 h-20', CARD_LABEL_GRADIENT)} />
+          <div className={cn('pointer-events-none absolute inset-x-0 bottom-0', CARD_LABEL_GRADIENT)} />
           <div className="pointer-events-none absolute bottom-3 left-3 right-3 text-white">
             <h3 className="truncate text-sm font-semibold leading-none">{title}</h3>
           </div>
