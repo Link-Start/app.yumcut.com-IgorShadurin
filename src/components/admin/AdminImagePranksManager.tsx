@@ -51,13 +51,15 @@ type Item = {
 type BulkImportMetadata = {
   categorySlug?: string;
   categoryTitle?: string;
+  categoryPriority?: number | string;
   subcategorySlug?: string;
   subcategoryTitle?: string;
+  subcategoryPriority?: number | string;
   slug?: string;
   title?: string;
   description?: string;
   searchText?: string;
-  priority?: number;
+  priority?: number | string;
   isPublic?: boolean;
 };
 
@@ -125,6 +127,15 @@ function slugifyImportValue(value: string) {
     || 'image-prank';
 }
 
+function parseImportPriority(value: unknown, fallback = 0) {
+  const parsed = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim() !== ''
+      ? Number(value)
+      : fallback;
+  return Number.isFinite(parsed) ? Math.floor(parsed) : fallback;
+}
+
 function toBulkMetadata(raw: unknown, pathInfo: BulkPathInfo): Required<BulkImportMetadata> {
   const source = raw && typeof raw === 'object' ? raw as BulkImportMetadata : {};
   const folderName = pathInfo.folderName;
@@ -142,17 +153,19 @@ function toBulkMetadata(raw: unknown, pathInfo: BulkPathInfo): Required<BulkImpo
       ? slugifyImportValue(source.categorySlug)
       : slugifyImportValue(categoryTitle),
     categoryTitle,
+    categoryPriority: parseImportPriority(source.categoryPriority),
     subcategorySlug: typeof source.subcategorySlug === 'string' && source.subcategorySlug.trim()
       ? slugifyImportValue(source.subcategorySlug)
       : subcategoryTitle ? slugifyImportValue(subcategoryTitle) : '',
     subcategoryTitle,
+    subcategoryPriority: parseImportPriority(source.subcategoryPriority),
     slug: typeof source.slug === 'string' && source.slug.trim()
       ? slugifyImportValue(source.slug)
       : slugifyImportValue(title),
     title,
     description: typeof source.description === 'string' ? source.description.trim() : '',
     searchText: typeof source.searchText === 'string' ? source.searchText.trim() : '',
-    priority: typeof source.priority === 'number' && Number.isFinite(source.priority) ? Math.floor(source.priority) : 0,
+    priority: parseImportPriority(source.priority),
     isPublic: typeof source.isPublic === 'boolean' ? source.isPublic : true,
   };
 }
@@ -422,6 +435,14 @@ export function AdminImagePranksManager() {
     setBulkItems(nextItems);
   };
 
+  const updateBulkItemMetadata = (id: string, patch: Partial<BulkImportMetadata>) => {
+    setBulkItems((current) => current.map((item) => (
+      item.id === id
+        ? { ...item, metadata: { ...item.metadata, ...patch } }
+        : item
+    )));
+  };
+
   const parseBulkDirectory = async (files: FileList | null) => {
     const selectedFiles = Array.from(files ?? []);
     if (selectedFiles.length === 0) return;
@@ -461,7 +482,6 @@ export function AdminImagePranksManager() {
         });
       }
 
-      nextItems.sort((a, b) => a.metadata.title.localeCompare(b.metadata.title));
       replaceBulkItems(nextItems);
       if (nextItems.length === 0) {
         toast.error('No valid prank items found. Each item subfolder needs one image and one metadata JSON file.');
@@ -494,7 +514,7 @@ export function AdminImagePranksManager() {
               slug: item.metadata.categorySlug,
               title: item.metadata.categoryTitle,
               isActive: true,
-              priority: 0,
+              priority: Number(item.metadata.categoryPriority),
             }) as Category;
             categoryBySlug.set(category.slug, category);
           }
@@ -508,7 +528,7 @@ export function AdminImagePranksManager() {
                 slug: item.metadata.subcategorySlug,
                 title: item.metadata.subcategoryTitle || item.metadata.subcategorySlug,
                 isActive: true,
-                priority: 0,
+                priority: Number(item.metadata.subcategoryPriority),
               }) as Subcategory;
               subcategoryByKey.set(key, subcategory);
             }
@@ -522,7 +542,7 @@ export function AdminImagePranksManager() {
             title: item.metadata.title,
             description: item.metadata.description,
             searchText: item.metadata.searchText,
-            priority: item.metadata.priority,
+            priority: Number(item.metadata.priority),
             isPublic: item.metadata.isPublic,
             image: item.file,
           });
@@ -621,7 +641,7 @@ export function AdminImagePranksManager() {
             {bulkItems.length > 0 ? (
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  Previewing {bulkItems.length.toLocaleString()} items. Upload uses metadata and creates missing categories/subcategories.
+                  Previewing {bulkItems.length.toLocaleString()} items in directory order. Priority values are saved for the public catalog order, but they do not reorder this admin preview.
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {bulkItems.map((item) => (
@@ -637,6 +657,25 @@ export function AdminImagePranksManager() {
                           {item.metadata.subcategoryTitle ? ` / ${item.metadata.subcategoryTitle}` : ''}
                           {' / '}
                           {item.metadata.slug}
+                        </div>
+                        <div className="grid grid-cols-[76px_minmax(0,1fr)] items-center gap-2 pt-1 text-xs">
+                          <Label htmlFor={`bulk-priority-${item.id}`} className="text-xs text-gray-500 dark:text-gray-400">
+                            Priority
+                          </Label>
+                          <Input
+                            id={`bulk-priority-${item.id}`}
+                            type="number"
+                            value={String(item.metadata.priority)}
+                            disabled={bulkUploading || item.status === 'uploading' || item.status === 'done'}
+                            className="h-8"
+                            onChange={(event) => updateBulkItemMetadata(item.id, {
+                              priority: parseImportPriority(event.target.value),
+                            })}
+                          />
+                        </div>
+                        <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                          Category priority {item.metadata.categoryPriority}
+                          {item.metadata.subcategoryTitle ? ` / Subcategory priority ${item.metadata.subcategoryPriority}` : ''}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs">
                           {item.status === 'uploading' ? (

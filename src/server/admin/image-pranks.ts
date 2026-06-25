@@ -490,7 +490,7 @@ export async function listAdminImagePranks(input: {
           select: { id: true, slug: true, titleEn: true },
         },
       },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
