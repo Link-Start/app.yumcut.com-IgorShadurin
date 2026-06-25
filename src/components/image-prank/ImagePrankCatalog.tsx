@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ImagePlus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ import type {
 } from '@/shared/types';
 
 const PAGE_SIZE = 18;
+const SUBCATEGORY_HOVER_SECTIONS = 5;
 const CARD_LABEL_GRADIENT = 'bg-[linear-gradient(to_top,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.58)_42%,rgba(0,0,0,0.22)_74%,rgba(0,0,0,0)_100%)]';
 
 const COPY: Record<AppLanguageCode, {
@@ -126,6 +127,52 @@ function PreviewGrid({ images, label }: { images: string[]; label: string }) {
   );
 }
 
+function itemPreviewUrl(item: ImagePrankCatalogItemDTO) {
+  return item.previewImageUrl || item.imageUrl;
+}
+
+function SubcategoryHoverPreview({ items, label }: { items: ImagePrankCatalogItemDTO[]; label: string }) {
+  const [activeSection, setActiveSection] = useState<number | null>(null);
+  const previewImages = useMemo(() => (
+    items.slice(0, SUBCATEGORY_HOVER_SECTIONS).map(itemPreviewUrl)
+  ), [items]);
+  const activeIndex = activeSection ?? 0;
+  const activeImage = previewImages[activeIndex] ?? previewImages[0] ?? null;
+
+  const handleMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    if (previewImages.length <= 1) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const relativeX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+    const nextSection = Math.min(
+      previewImages.length - 1,
+      Math.floor((relativeX / rect.width) * previewImages.length),
+    );
+    setActiveSection((currentSection) => (currentSection === nextSection ? currentSection : nextSection));
+  };
+
+  return (
+    <div
+      className="relative h-full w-full overflow-hidden bg-gray-100 dark:bg-gray-900"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setActiveSection(null)}
+      onBlur={() => setActiveSection(null)}
+    >
+      {activeImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={activeImage}
+          alt={label}
+          className="h-full w-full origin-top scale-[1.3] object-cover object-top transition-opacity duration-200"
+          loading="lazy"
+        />
+      ) : (
+        <div className="h-full w-full bg-gray-100 dark:bg-gray-900" />
+      )}
+    </div>
+  );
+}
+
 function CustomCard({ copy }: { copy: (typeof COPY)[AppLanguageCode] }) {
   return (
     <Link href="/image-prank/custom" className="block h-full cursor-pointer focus-visible:outline-none">
@@ -199,7 +246,7 @@ function SubcategoryCard({
     <button type="button" onClick={onSelect} className="block w-full cursor-pointer text-left focus-visible:outline-none">
       <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
         <div className="relative aspect-[9/16] w-full">
-          <PreviewGrid images={subcategory.items.map((item) => item.previewImageUrl || item.imageUrl)} label={title} />
+          <SubcategoryHoverPreview items={subcategory.items} label={title} />
           <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 h-20', CARD_LABEL_GRADIENT)} />
         </div>
         <div className="bg-white px-3 py-3 dark:bg-gray-950">
