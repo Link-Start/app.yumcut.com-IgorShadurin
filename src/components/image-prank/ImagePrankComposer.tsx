@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, CreditCard, Crown, ImagePlus, Images, Loader2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, CreditCard, Crown, ImagePlus, Images, Loader2, Maximize2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { resolveStorageBaseUrl } from '@/components/main/character-modal/storage';
@@ -39,6 +39,11 @@ type ImageSlotState = {
   previewUrl: string | null;
 };
 
+type ZoomImage = {
+  url: string;
+  label: string;
+};
+
 const MAX_STORAGE_IMAGE_DIMENSION = 2000;
 
 const COPY: Record<AppLanguageCode, {
@@ -59,6 +64,7 @@ const COPY: Record<AppLanguageCode, {
   oneImageHint: string;
   twoImages: string;
   oneImage: string;
+  zoomImage: string;
   create: string;
   confirmTitle: string;
   confirmWithdrawIntro: string;
@@ -107,6 +113,7 @@ const COPY: Record<AppLanguageCode, {
     oneImageHint: 'Upload one image and describe the prank edit you want to make to it.',
     twoImages: '2 images',
     oneImage: '1 image',
+    zoomImage: 'Open image preview',
     create: 'Continue',
     confirmTitle: 'Confirm project creation',
     confirmWithdrawIntro: 'This action will withdraw',
@@ -159,6 +166,7 @@ const COPY: Record<AppLanguageCode, {
     oneImageHint: 'Загрузите одно изображение и опишите prank-правку, которую нужно сделать.',
     twoImages: '2 изображения',
     oneImage: '1 изображение',
+    zoomImage: 'Открыть предпросмотр изображения',
     create: 'Продолжить',
     confirmTitle: 'Подтвердите создание проекта',
     confirmWithdrawIntro: 'Будет списано',
@@ -228,15 +236,21 @@ function toPrefilledSource(source: ImagePrankSourceImageDTO | null | undefined, 
 function UploadSlot({
   label,
   state,
+  zoomUrl,
+  onZoom,
   onChange,
   disabled,
 }: {
   label: string;
   state: ImageSlotState;
+  zoomUrl?: string | null;
+  onZoom: (image: ZoomImage) => void;
   onChange: (file: File | null) => void;
   disabled: boolean;
 }) {
   const ref = useRef<HTMLInputElement | null>(null);
+  const previewUrl = state.previewUrl;
+  const fullUrl = zoomUrl || previewUrl;
   return (
     <div className="space-y-2">
       <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100">{label}</Label>
@@ -250,22 +264,34 @@ function UploadSlot({
           event.target.value = '';
         }}
       />
-      <button
-        type="button"
-        onClick={() => ref.current?.click()}
-        disabled={disabled}
-        className="group flex aspect-[9/16] w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/30"
-      >
-        {state.previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={state.previewUrl} alt={label} className="h-full w-full object-contain" />
+      <div className="relative aspect-[9/16] w-full">
+        <button
+          type="button"
+          onClick={() => ref.current?.click()}
+          disabled={disabled}
+          className="group flex h-full w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/30"
+        >
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={previewUrl} alt={label} className="h-full w-full object-contain" />
         ) : (
           <span className="flex flex-col items-center gap-2 p-4 text-sm text-gray-600 dark:text-gray-300">
             <UploadCloud className="h-6 w-6 text-blue-500" />
             {label}
           </span>
         )}
-      </button>
+        </button>
+        {fullUrl ? (
+          <button
+            type="button"
+            onClick={() => onZoom({ url: fullUrl, label })}
+            className="absolute right-2 top-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-black/55 text-white shadow-sm backdrop-blur transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label={label}
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -389,10 +415,13 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlanKey | null>(null);
   const [selectedPlanKey, setSelectedPlanKey] = useState<SubscriptionPlanKey>('monthly');
   const [submitting, setSubmitting] = useState(false);
+  const [zoomImage, setZoomImage] = useState<ZoomImage | null>(null);
   const prankPreviewUrl = useObjectUrl(prankFile);
   const targetPreviewUrl = useObjectUrl(targetFile);
   const prankSlotPreviewUrl = prankPreviewUrl || prankSource?.previewUrl || prankSource?.url || null;
   const targetSlotPreviewUrl = targetPreviewUrl || targetSource?.previewUrl || targetSource?.url || null;
+  const prankSlotZoomUrl = prankPreviewUrl || prankSource?.url || prankSlotPreviewUrl;
+  const targetSlotZoomUrl = targetPreviewUrl || targetSource?.url || targetSlotPreviewUrl;
   const isCatalogMode = !!item;
   const mode: ImagePrankMode = isCatalogMode
     ? 'catalog'
@@ -635,15 +664,25 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
             {item ? (
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100">{copy.catalogLabel}</Label>
-                <div className="flex aspect-[9/16] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+                <div className="relative flex aspect-[9/16] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={item.previewImageUrl || item.imageUrl} alt={itemTitle} className="h-full w-full object-contain" />
+                  <button
+                    type="button"
+                    onClick={() => setZoomImage({ url: item.imageUrl, label: itemTitle || copy.catalogLabel })}
+                    className="absolute right-2 top-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-black/55 text-white shadow-sm backdrop-blur transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    aria-label={`${copy.zoomImage}: ${itemTitle || copy.catalogLabel}`}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             ) : oneImageMode ? null : (
               <UploadSlot
                 label={copy.prankImage}
                 state={{ file: prankFile, previewUrl: prankSlotPreviewUrl }}
+                zoomUrl={prankSlotZoomUrl}
+                onZoom={setZoomImage}
                 onChange={(file) => {
                   setPrankFile(file);
                   setPrankSource(null);
@@ -654,6 +693,8 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
             <UploadSlot
               label={oneImageMode && !item ? copy.referenceImage : copy.targetImage}
               state={{ file: targetFile, previewUrl: targetSlotPreviewUrl }}
+              zoomUrl={targetSlotZoomUrl}
+              onZoom={setZoomImage}
               onChange={(file) => {
                 setTargetFile(file);
                 setTargetSource(null);
@@ -723,6 +764,23 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
           </div>
         </div>
       </div>
+
+      <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
+        <DialogContent
+          className="top-1/2 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] -translate-y-1/2 overflow-hidden p-3 sm:max-w-5xl"
+          ariaDescription={zoomImage?.label ?? copy.zoomImage}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{zoomImage?.label ?? copy.zoomImage}</DialogTitle>
+          </DialogHeader>
+          {zoomImage ? (
+            <div className="flex max-h-[calc(100vh-4rem)] w-full items-center justify-center bg-gray-50 dark:bg-gray-950">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={zoomImage.url} alt={zoomImage.label} className="max-h-[calc(100vh-4rem)] max-w-full object-contain" />
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="sm:max-w-[440px]">
