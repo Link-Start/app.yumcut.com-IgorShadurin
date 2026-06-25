@@ -222,6 +222,10 @@ function buildPageItems(totalPages: number, currentPage: number): Array<number |
   return items;
 }
 
+function isPlainLeftClick(event: MouseEvent<HTMLElement>) {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && !event.defaultPrevented;
+}
+
 function PreviewGrid({ images, label }: { images: string[]; label: string }) {
   const preview = Array.from({ length: 4 }, (_, index) => (
     images.length > 0 ? images[index % images.length] : null
@@ -314,56 +318,56 @@ function CustomCard({ copy }: { copy: (typeof COPY)[AppLanguageCode] }) {
 function CategoryCard({
   category,
   language,
+  href,
   onSelect,
 }: {
   category: ImagePrankCatalogCategoryDTO;
   language: AppLanguageCode;
+  href: string;
   onSelect: () => void;
 }) {
   const title = pickText(category.title, language);
-  const firstItem = category.items[0] ?? null;
-  const previewContent = (
-    <div className="relative aspect-[9/16] w-full">
-      <PreviewGrid images={category.items.map((item) => item.imageUrl)} label={title} />
-      <div className={cn('pointer-events-none absolute inset-x-0 bottom-0', CARD_LABEL_GRADIENT)} />
-    </div>
-  );
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
-      {firstItem ? (
-        <Link href={`/image-prank/${encodeURIComponent(firstItem.slug)}`} className="block cursor-pointer focus-visible:outline-none">
-          {previewContent}
-        </Link>
-      ) : (
-        <button type="button" onClick={onSelect} className="block w-full cursor-pointer focus-visible:outline-none">
-          {previewContent}
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onSelect}
-        className="block w-full cursor-pointer bg-white px-3 py-3 text-left transition hover:bg-gray-50 focus-visible:outline-none dark:bg-gray-950 dark:hover:bg-gray-900"
-      >
-        <div className="min-w-0">
+    <Link
+      href={href}
+      onClick={(event) => {
+        if (isPlainLeftClick(event)) onSelect();
+      }}
+      className="group block cursor-pointer overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 focus-visible:outline-none dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700"
+    >
+      <article>
+        <div className="relative aspect-[9/16] w-full">
+          <PreviewGrid images={category.items.map((item) => item.imageUrl)} label={title} />
+          <div className={cn('pointer-events-none absolute inset-x-0 bottom-0', CARD_LABEL_GRADIENT)} />
+        </div>
+        <div className="bg-white px-3 py-3 transition group-hover:bg-gray-50 dark:bg-gray-950 dark:group-hover:bg-gray-900">
           <h3 className="truncate text-sm font-semibold leading-none text-gray-950 dark:text-white">{title}</h3>
         </div>
-      </button>
-    </article>
+      </article>
+    </Link>
   );
 }
 
 function SubcategoryCard({
   subcategory,
   language,
+  href,
   onSelect,
 }: {
   subcategory: ImagePrankCatalogSubcategoryDTO;
   language: AppLanguageCode;
+  href: string;
   onSelect: () => void;
-}) {
+  }) {
   const title = pickText(subcategory.title, language);
   return (
-    <button type="button" onClick={onSelect} className="block w-full cursor-pointer text-left focus-visible:outline-none">
+    <Link
+      href={href}
+      onClick={(event) => {
+        if (isPlainLeftClick(event)) onSelect();
+      }}
+      className="block cursor-pointer focus-visible:outline-none"
+    >
       <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
         <div className="relative aspect-[9/16] w-full">
           <SubcategoryHoverPreview items={subcategory.items} label={title} />
@@ -373,7 +377,7 @@ function SubcategoryCard({
           <h3 className="truncate text-sm font-semibold leading-none text-gray-950 dark:text-white">{title}</h3>
         </div>
       </article>
-    </button>
+    </Link>
   );
 }
 
@@ -610,6 +614,7 @@ export function ImagePrankCatalog({ categories }: Props) {
                   key={entry.category.id}
                   category={entry.category}
                   language={language}
+                  href={buildImagePrankCatalogUrl({ category: entry.category, page: 1 })}
                   onSelect={() => selectCategory(entry.category.id)}
                 />
               );
@@ -620,6 +625,11 @@ export function ImagePrankCatalog({ categories }: Props) {
                   key={entry.subcategory.id}
                   subcategory={entry.subcategory}
                   language={language}
+                  href={buildImagePrankCatalogUrl({
+                    category: categories.find((category) => category.id === entry.subcategory.categoryId) ?? selectedCategory,
+                    subcategory: entry.subcategory,
+                    page: 1,
+                  })}
                   onSelect={() => selectSubcategory(entry.subcategory.id)}
                 />
               );
