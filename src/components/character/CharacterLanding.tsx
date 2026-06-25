@@ -29,7 +29,6 @@ import {
 } from './main-page-groups';
 import type { ImagePrankCatalogCategoryDTO } from '@/shared/types';
 const CATEGORY_PREVIEW_CELLS = 4;
-const CATEGORY_PREVIEW_SECTIONS = 6;
 const MAX_CHARACTERS_PER_CATEGORY_PAGE = 18;
 const STORIES_PREVIEW_IMAGES = [
   '/template/basic/preview.jpg',
@@ -128,15 +127,59 @@ type LandingCopy = {
   go: string;
 };
 
-function buildPreviewSections(images: string[]): string[][] {
+function getPreviewSectionCount(imageCount: number) {
+  return Math.max(1, Math.ceil(Math.max(imageCount, CATEGORY_PREVIEW_CELLS) / CATEGORY_PREVIEW_CELLS));
+}
+
+function buildPreviewSections(images: string[], sectionCount = getPreviewSectionCount(images.length)): string[][] {
   const source = images;
-  return Array.from({ length: CATEGORY_PREVIEW_SECTIONS }, (_, sectionIndex) => (
-    Array.from({ length: CATEGORY_PREVIEW_CELLS }, (_, cellIndex) => (
-      source.length > 0
-        ? source[(sectionIndex * CATEGORY_PREVIEW_CELLS + cellIndex) % source.length] ?? source[0]!
-        : ''
-    ))
-  ));
+  return Array.from({ length: sectionCount }, (_, sectionIndex) => {
+    const sectionImages = source.slice(
+      sectionIndex * CATEGORY_PREVIEW_CELLS,
+      sectionIndex * CATEGORY_PREVIEW_CELLS + CATEGORY_PREVIEW_CELLS,
+    );
+    const fallback = sectionImages.at(-1) ?? source.at(-1) ?? '';
+    return Array.from({ length: CATEGORY_PREVIEW_CELLS }, (_, cellIndex) => sectionImages[cellIndex] ?? fallback);
+  });
+}
+
+function imagePrankItemPreviewUrl(item: { previewImageUrl?: string | null; imageUrl: string }) {
+  return item.previewImageUrl || item.imageUrl;
+}
+
+function buildImagePrankPreviewImages(categories: ImagePrankCatalogCategoryDTO[]) {
+  const representativeImages: string[] = [];
+  const remainingImages: string[] = [];
+  const seen = new Set<string>();
+  const pushUnique = (target: string[], imageUrl: string | null | undefined) => {
+    if (!imageUrl || seen.has(imageUrl)) return;
+    seen.add(imageUrl);
+    target.push(imageUrl);
+  };
+
+  for (const category of categories) {
+    const subcategories = category.subcategories ?? [];
+    if (subcategories.length > 0) {
+      for (const subcategory of subcategories) {
+        pushUnique(representativeImages, subcategory.items[0] ? imagePrankItemPreviewUrl(subcategory.items[0]) : null);
+      }
+      for (const subcategory of subcategories) {
+        for (const item of subcategory.items.slice(1)) {
+          pushUnique(remainingImages, imagePrankItemPreviewUrl(item));
+        }
+      }
+    } else {
+      for (const item of category.items.slice(0, CATEGORY_PREVIEW_CELLS)) {
+        pushUnique(representativeImages, imagePrankItemPreviewUrl(item));
+      }
+    }
+
+    for (const item of category.items) {
+      pushUnique(remainingImages, imagePrankItemPreviewUrl(item));
+    }
+  }
+
+  return [...representativeImages, ...remainingImages];
 }
 
 function GroupGridPreview({
@@ -307,6 +350,7 @@ function GroupCategoryCard({
   const [activeSection, setActiveSection] = useState<number | null>(null);
   const title = pickLocalizedText(group.title, language);
   const slideshowImages = useMemo(() => group.characters.map((character) => character.imageUrl), [group.characters]);
+  const previewSectionCount = useMemo(() => getPreviewSectionCount(slideshowImages.length), [slideshowImages.length]);
   const generationKind = group.id === 'image-prank'
     ? 'image'
     : (group.id === 'stories' || group.id === 'brainrot' ? 'video' : null);
@@ -350,8 +394,8 @@ function GroupCategoryCard({
       if (rect.width <= 0) return;
       const relativeX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
       const nextSection = Math.min(
-        CATEGORY_PREVIEW_SECTIONS - 1,
-        Math.floor((relativeX / rect.width) * CATEGORY_PREVIEW_SECTIONS),
+        previewSectionCount - 1,
+        Math.floor((relativeX / rect.width) * previewSectionCount),
       );
       setActiveSection((currentSection) => (currentSection === nextSection ? currentSection : nextSection));
     },
@@ -423,9 +467,7 @@ export function CharacterLanding({
 
   const topLevelGroups = useMemo(() => {
     const brainrotImages = groups.flatMap((group) => group.characters.map((character) => character.imageUrl));
-    const imagePrankImages = imagePrankCategories.flatMap((category) => (
-      category.items.map((item) => item.previewImageUrl || item.imageUrl)
-    ));
+    const imagePrankImages = buildImagePrankPreviewImages(imagePrankCategories);
     return [
       makeTopLevelGroup({
         id: 'image-prank',
