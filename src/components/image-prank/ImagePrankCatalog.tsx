@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ImagePlus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ImagePlus, Search, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button-1';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from '@/components/ui/pagination';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
 import type {
@@ -33,6 +34,7 @@ const COPY: Record<AppLanguageCode, {
   empty: string;
   previous: string;
   next: string;
+  zoomImage: string;
 }> = {
   en: {
     title: 'Image Prank',
@@ -44,6 +46,7 @@ const COPY: Record<AppLanguageCode, {
     empty: 'No prank images yet.',
     previous: 'Previous',
     next: 'Next',
+    zoomImage: 'Open image preview',
   },
   ru: {
     title: 'Image Prank',
@@ -55,6 +58,7 @@ const COPY: Record<AppLanguageCode, {
     empty: 'Prank-картинок пока нет.',
     previous: 'Назад',
     next: 'Вперёд',
+    zoomImage: 'Открыть предпросмотр изображения',
   },
 };
 
@@ -66,6 +70,11 @@ type CatalogSelection = {
   categoryId: string | null;
   subcategoryId: string | null;
   page: number;
+};
+
+type ZoomImage = {
+  url: string;
+  label: string;
 };
 
 function pickText(value: LocalizedCatalogTextDTO, language: AppLanguageCode) {
@@ -368,12 +377,22 @@ function SubcategoryCard({
   );
 }
 
-function ItemCard({ item, language }: { item: ImagePrankCatalogItemDTO; language: AppLanguageCode }) {
+function ItemCard({
+  item,
+  language,
+  onZoom,
+  zoomLabel,
+}: {
+  item: ImagePrankCatalogItemDTO;
+  language: AppLanguageCode;
+  onZoom: (image: ZoomImage) => void;
+  zoomLabel: string;
+}) {
   const title = pickText(item.title, language);
   const previewUrl = item.previewImageUrl || item.imageUrl;
   return (
-    <Link href={`/image-prank/${encodeURIComponent(item.slug)}`} className="block cursor-pointer focus-visible:outline-none">
-      <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
+    <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700">
+      <Link href={`/image-prank/${encodeURIComponent(item.slug)}`} className="block cursor-pointer focus-visible:outline-none">
         <div className="relative aspect-[9/16] w-full bg-gray-100 dark:bg-gray-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewUrl} alt={title} className="h-full w-full object-cover" loading="lazy" />
@@ -382,8 +401,16 @@ function ItemCard({ item, language }: { item: ImagePrankCatalogItemDTO; language
             <h3 className="truncate text-sm font-semibold leading-none">{title}</h3>
           </div>
         </div>
-      </article>
-    </Link>
+      </Link>
+      <button
+        type="button"
+        onClick={() => onZoom({ url: item.imageUrl, label: title })}
+        className="absolute right-2 top-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-black/55 text-white opacity-100 shadow-sm backdrop-blur transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+        aria-label={`${zoomLabel}: ${title}`}
+      >
+        <Maximize2 className="h-4 w-4" />
+      </button>
+    </article>
   );
 }
 
@@ -391,6 +418,7 @@ export function ImagePrankCatalog({ categories }: Props) {
   const { language } = useAppLanguage();
   const copy = COPY[language];
   const [query, setQuery] = useState('');
+  const [zoomImage, setZoomImage] = useState<ZoomImage | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     return resolveCatalogSelectionFromSearchParams(categories, new URL(window.location.href).searchParams).categoryId;
@@ -596,7 +624,15 @@ export function ImagePrankCatalog({ categories }: Props) {
                 />
               );
             }
-            return <ItemCard key={entry.item.id} item={entry.item} language={language} />;
+            return (
+              <ItemCard
+                key={entry.item.id}
+                item={entry.item}
+                language={language}
+                onZoom={setZoomImage}
+                zoomLabel={copy.zoomImage}
+              />
+            );
           })}
         </div>
       ) : (
@@ -666,6 +702,23 @@ export function ImagePrankCatalog({ categories }: Props) {
           </PaginationContent>
         </Pagination>
       ) : null}
+
+      <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
+        <DialogContent
+          className="top-1/2 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] -translate-y-1/2 overflow-hidden p-3 sm:max-w-5xl"
+          ariaDescription={zoomImage?.label ?? copy.zoomImage}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{zoomImage?.label ?? copy.zoomImage}</DialogTitle>
+          </DialogHeader>
+          {zoomImage ? (
+            <div className="flex max-h-[calc(100vh-4rem)] w-full items-center justify-center bg-gray-50 dark:bg-gray-950">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={zoomImage.url} alt={zoomImage.label} className="max-h-[calc(100vh-4rem)] max-w-full object-contain" />
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
