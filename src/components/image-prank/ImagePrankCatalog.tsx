@@ -19,6 +19,9 @@ import type {
 const PAGE_SIZE = 18;
 const SUBCATEGORY_HOVER_SECTIONS = 5;
 const CARD_LABEL_GRADIENT = 'h-36 bg-[linear-gradient(to_top,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.67)_18%,rgba(0,0,0,0.48)_38%,rgba(0,0,0,0.28)_58%,rgba(0,0,0,0.12)_76%,rgba(0,0,0,0.04)_90%,rgba(0,0,0,0)_100%)]';
+const IMAGE_PRANK_MODE_PARAM = 'image-prank';
+const IMAGE_PRANK_CATEGORY_PARAM = 'category';
+const IMAGE_PRANK_SUBCATEGORY_PARAM = 'subcategory';
 
 const COPY: Record<AppLanguageCode, {
   title: string;
@@ -57,6 +60,11 @@ const COPY: Record<AppLanguageCode, {
 
 type Props = {
   categories: ImagePrankCatalogCategoryDTO[];
+};
+
+type CatalogSelection = {
+  categoryId: string | null;
+  subcategoryId: string | null;
 };
 
 function pickText(value: LocalizedCatalogTextDTO, language: AppLanguageCode) {
@@ -100,6 +108,65 @@ function subcategoryMatches(subcategory: ImagePrankCatalogSubcategoryDTO, query:
     pickText(subcategory.description, language),
     pickText(subcategory.hiddenSearchText, language),
   ].some((value) => value.toLowerCase().includes(query)) || subcategory.items.some((item) => itemMatches(item, query, language));
+}
+
+function findCategoryBySlugOrId(categories: ImagePrankCatalogCategoryDTO[], value: string | null) {
+  if (!value) return null;
+  return categories.find((category) => category.slug === value || category.id === value) ?? null;
+}
+
+function findSubcategoryBySlugOrId(categories: ImagePrankCatalogCategoryDTO[], value: string | null) {
+  if (!value) return null;
+  for (const category of categories) {
+    const subcategory = (category.subcategories ?? []).find((item) => item.slug === value || item.id === value);
+    if (subcategory) return { category, subcategory };
+  }
+  return null;
+}
+
+function resolveCatalogSelectionFromSearchParams(
+  categories: ImagePrankCatalogCategoryDTO[],
+  searchParams: URLSearchParams,
+): CatalogSelection {
+  const subcategoryMatch = findSubcategoryBySlugOrId(categories, searchParams.get(IMAGE_PRANK_SUBCATEGORY_PARAM));
+  if (subcategoryMatch) {
+    return {
+      categoryId: subcategoryMatch.category.id,
+      subcategoryId: subcategoryMatch.subcategory.id,
+    };
+  }
+
+  const category = findCategoryBySlugOrId(categories, searchParams.get(IMAGE_PRANK_CATEGORY_PARAM));
+  return {
+    categoryId: category?.id ?? null,
+    subcategoryId: null,
+  };
+}
+
+function buildImagePrankCatalogUrl(input: {
+  category?: ImagePrankCatalogCategoryDTO | null;
+  subcategory?: ImagePrankCatalogSubcategoryDTO | null;
+}) {
+  const url = new URL(typeof window === 'undefined' ? 'http://localhost/' : window.location.href);
+  url.pathname = '/';
+  url.searchParams.set('openMode', IMAGE_PRANK_MODE_PARAM);
+  url.searchParams.delete('openCategory');
+  url.searchParams.delete('page');
+
+  if (input.category) {
+    url.searchParams.set(IMAGE_PRANK_CATEGORY_PARAM, input.category.slug);
+  } else {
+    url.searchParams.delete(IMAGE_PRANK_CATEGORY_PARAM);
+  }
+
+  if (input.subcategory) {
+    url.searchParams.set(IMAGE_PRANK_SUBCATEGORY_PARAM, input.subcategory.slug);
+  } else {
+    url.searchParams.delete(IMAGE_PRANK_SUBCATEGORY_PARAM);
+  }
+
+  url.hash = '';
+  return `${url.pathname}${url.search}`;
 }
 
 function PreviewGrid({ images, label }: { images: string[]; label: string }) {
@@ -280,8 +347,14 @@ export function ImagePrankCatalog({ categories }: Props) {
   const { language } = useAppLanguage();
   const copy = COPY[language];
   const [query, setQuery] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return resolveCatalogSelectionFromSearchParams(categories, new URL(window.location.href).searchParams).categoryId;
+  });
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return resolveCatalogSelectionFromSearchParams(categories, new URL(window.location.href).searchParams).subcategoryId;
+  });
   const [page, setPage] = useState(1);
   const normalizedQuery = normalizeSearch(query);
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null;
@@ -352,34 +425,45 @@ export function ImagePrankCatalog({ categories }: Props) {
   const safePage = Math.min(page, totalPages);
   const pageEntries = entries.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const applySelectionFromUrl = () => {
+    if (typeof window === 'undefined') return;
+    const nextSelection = resolveCatalogSelectionFromSearchParams(categories, new URL(window.location.href).searchParams);
+    setSelectedCategoryId(nextSelection.categoryId);
+    setSelectedSubcategoryId(nextSelection.subcategoryId);
+    setPage(1);
+  };
+
   useEffect(() => {
-    const handlePopState = () => {
-      setSelectedCategoryId(null);
-      setSelectedSubcategoryId(null);
-      setPage(1);
-    };
+    applySelectionFromUrl();
+    const handlePopState = () => applySelectionFromUrl();
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories]);
 
-  const pushCatalogHistory = () => {
-    window.history.pushState({ imagePrankCatalog: true }, '', window.location.href);
+  const pushCatalogUrl = (url: string) => {
+    if (typeof window === 'undefined') return;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (url === currentUrl) return;
+    window.history.pushState({ imagePrankCatalog: true }, '', url);
   };
 
   const selectCategory = (categoryId: string) => {
-    pushCatalogHistory();
-    setSelectedCategoryId(categoryId);
+    const category = categories.find((item) => item.id === categoryId) ?? null;
+    if (!category) return;
+    pushCatalogUrl(buildImagePrankCatalogUrl({ category }));
+    setSelectedCategoryId(category.id);
     setSelectedSubcategoryId(null);
     setPage(1);
   };
 
   const selectSubcategory = (subcategoryId: string) => {
-    pushCatalogHistory();
-    if (!selectedCategory) {
-      const parentCategory = categories.find((category) => (category.subcategories ?? []).some((subcategory) => subcategory.id === subcategoryId));
-      setSelectedCategoryId(parentCategory?.id ?? null);
-    }
-    setSelectedSubcategoryId(subcategoryId);
+    const parentCategory = categories.find((category) => (category.subcategories ?? []).some((subcategory) => subcategory.id === subcategoryId)) ?? null;
+    const subcategory = (parentCategory?.subcategories ?? []).find((item) => item.id === subcategoryId) ?? null;
+    if (!parentCategory || !subcategory) return;
+    pushCatalogUrl(buildImagePrankCatalogUrl({ category: parentCategory, subcategory }));
+    setSelectedCategoryId(parentCategory.id);
+    setSelectedSubcategoryId(subcategory.id);
     setPage(1);
   };
 
@@ -387,7 +471,7 @@ export function ImagePrankCatalog({ categories }: Props) {
     setSelectedCategoryId(null);
     setSelectedSubcategoryId(null);
     setPage(1);
-    window.history.replaceState({ imagePrankCatalog: true }, '', '/?openMode=image-prank');
+    pushCatalogUrl(buildImagePrankCatalogUrl({}));
   };
 
   return (
