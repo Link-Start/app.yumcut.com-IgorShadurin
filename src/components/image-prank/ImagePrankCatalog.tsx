@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ImagePlus, Search, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ImagePlus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import { Input } from '@/components/ui/input';
@@ -373,8 +373,7 @@ export function ImagePrankCatalog({ categories }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
-        <Sparkles className="h-4 w-4 text-blue-500" />
+      <div className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
         <span>{selectedSubcategory ? pickText(selectedSubcategory.title, language) : selectedCategory ? pickText(selectedCategory.title, language) : copy.title}</span>
       </div>
 
