@@ -185,9 +185,11 @@ function buildImagePrankPreviewImages(categories: ImagePrankCatalogCategoryDTO[]
 function GroupGridPreview({
   images,
   alt,
+  zoomTop = false,
 }: {
   images: string[];
   alt: string;
+  zoomTop?: boolean;
 }) {
   const previewImages = useMemo(() => (
     Array.from({ length: CATEGORY_PREVIEW_CELLS }, (_, index) => images[index] ?? null)
@@ -203,7 +205,10 @@ function GroupGridPreview({
               src={imageUrl}
               alt={`${alt} preview ${index + 1}`}
               loading="lazy"
-              className="h-full w-full object-cover"
+              className={cn(
+                'h-full w-full object-cover',
+                zoomTop ? 'origin-top scale-[1.3] object-top' : null,
+              )}
             />
           ) : (
             <div
@@ -223,10 +228,12 @@ function GroupHoverGridPreview({
   images,
   alt,
   activeSection,
+  zoomTop = false,
 }: {
   images: string[];
   alt: string;
   activeSection: number | null;
+  zoomTop?: boolean;
 }) {
   const previewSections = useMemo(() => buildPreviewSections(images), [images]);
   const activeIndex = activeSection ?? 0;
@@ -242,7 +249,7 @@ function GroupHoverGridPreview({
           )}
           aria-hidden={index !== activeIndex}
         >
-          <GroupGridPreview images={sectionImages} alt={`${alt} preview ${index + 1}`} />
+          <GroupGridPreview images={sectionImages} alt={`${alt} preview ${index + 1}`} zoomTop={zoomTop} />
         </div>
       ))}
     </div>
@@ -351,6 +358,7 @@ function GroupCategoryCard({
   const title = pickLocalizedText(group.title, language);
   const slideshowImages = useMemo(() => group.characters.map((character) => character.imageUrl), [group.characters]);
   const previewSectionCount = useMemo(() => getPreviewSectionCount(slideshowImages.length), [slideshowImages.length]);
+  const zoomTopPreview = group.id === 'image-prank';
   const generationKind = group.id === 'image-prank'
     ? 'image'
     : (group.id === 'stories' || group.id === 'brainrot' ? 'video' : null);
@@ -369,7 +377,7 @@ function GroupCategoryCard({
       )}
     >
       <div className="relative aspect-[9/16] w-full">
-        <GroupHoverGridPreview images={slideshowImages} alt={title} activeSection={activeSection} />
+        <GroupHoverGridPreview images={slideshowImages} alt={title} activeSection={activeSection} zoomTop={zoomTopPreview} />
         {generationKind ? (
           <Tooltip content={generationTooltip} side="top">
             <span

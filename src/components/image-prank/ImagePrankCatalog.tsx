@@ -111,7 +111,12 @@ function PreviewGrid({ images, label }: { images: string[]; label: string }) {
         <div key={`${imageUrl ?? 'empty'}-${index}`} className="overflow-hidden bg-gray-100 dark:bg-gray-900">
           {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt={`${label} ${index + 1}`} className="h-full w-full object-cover" loading="lazy" />
+            <img
+              src={imageUrl}
+              alt={`${label} ${index + 1}`}
+              className="h-full w-full origin-top scale-[1.3] object-cover object-top"
+              loading="lazy"
+            />
           ) : (
             <div className={cn('h-full w-full', index % 2 === 0 ? 'bg-gray-100 dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-950')} />
           )}
