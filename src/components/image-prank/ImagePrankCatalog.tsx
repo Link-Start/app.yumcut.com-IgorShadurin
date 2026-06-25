@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button-1';
-import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from '@/components/ui/pagination';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
 import type {
   ImagePrankCatalogCategoryDTO,
@@ -65,6 +65,7 @@ type Props = {
 type CatalogSelection = {
   categoryId: string | null;
   subcategoryId: string | null;
+  page: number;
 };
 
 function pickText(value: LocalizedCatalogTextDTO, language: AppLanguageCode) {
@@ -128,11 +129,14 @@ function resolveCatalogSelectionFromSearchParams(
   categories: ImagePrankCatalogCategoryDTO[],
   searchParams: URLSearchParams,
 ): CatalogSelection {
+  const rawPage = Number.parseInt(searchParams.get('page') || '1', 10);
+  const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1;
   const subcategoryMatch = findSubcategoryBySlugOrId(categories, searchParams.get(IMAGE_PRANK_SUBCATEGORY_PARAM));
   if (subcategoryMatch) {
     return {
       categoryId: subcategoryMatch.category.id,
       subcategoryId: subcategoryMatch.subcategory.id,
+      page,
     };
   }
 
@@ -140,18 +144,25 @@ function resolveCatalogSelectionFromSearchParams(
   return {
     categoryId: category?.id ?? null,
     subcategoryId: null,
+    page,
   };
 }
 
 function buildImagePrankCatalogUrl(input: {
   category?: ImagePrankCatalogCategoryDTO | null;
   subcategory?: ImagePrankCatalogSubcategoryDTO | null;
+  page?: number;
 }) {
   const url = new URL(typeof window === 'undefined' ? 'http://localhost/' : window.location.href);
   url.pathname = '/';
   url.searchParams.set('openMode', IMAGE_PRANK_MODE_PARAM);
   url.searchParams.delete('openCategory');
-  url.searchParams.delete('page');
+  const page = Math.max(1, Math.floor(input.page ?? 1));
+  if (page > 1) {
+    url.searchParams.set('page', String(page));
+  } else {
+    url.searchParams.delete('page');
+  }
 
   if (input.category) {
     url.searchParams.set(IMAGE_PRANK_CATEGORY_PARAM, input.category.slug);
@@ -167,6 +178,39 @@ function buildImagePrankCatalogUrl(input: {
 
   url.hash = '';
   return `${url.pathname}${url.search}`;
+}
+
+function buildPageItems(totalPages: number, currentPage: number): Array<number | 'ellipsis-left' | 'ellipsis-right'> {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const items: Array<number | 'ellipsis-left' | 'ellipsis-right'> = [1];
+  let start = Math.max(2, currentPage - 1);
+  let end = Math.min(totalPages - 1, currentPage + 1);
+
+  if (currentPage <= 3) {
+    start = 2;
+    end = 4;
+  } else if (currentPage >= totalPages - 2) {
+    start = totalPages - 3;
+    end = totalPages - 1;
+  }
+
+  if (start > 2) {
+    items.push('ellipsis-left');
+  }
+
+  for (let page = start; page <= end; page += 1) {
+    items.push(page);
+  }
+
+  if (end < totalPages - 1) {
+    items.push('ellipsis-right');
+  }
+
+  items.push(totalPages);
+  return items;
 }
 
 function PreviewGrid({ images, label }: { images: string[]; label: string }) {
@@ -355,7 +399,10 @@ export function ImagePrankCatalog({ categories }: Props) {
     if (typeof window === 'undefined') return null;
     return resolveCatalogSelectionFromSearchParams(categories, new URL(window.location.href).searchParams).subcategoryId;
   });
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    if (typeof window === 'undefined') return 1;
+    return resolveCatalogSelectionFromSearchParams(categories, new URL(window.location.href).searchParams).page;
+  });
   const normalizedQuery = normalizeSearch(query);
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null;
   const selectedSubcategory = (selectedCategory?.subcategories ?? []).find((subcategory) => subcategory.id === selectedSubcategoryId) ?? null;
@@ -430,7 +477,7 @@ export function ImagePrankCatalog({ categories }: Props) {
     const nextSelection = resolveCatalogSelectionFromSearchParams(categories, new URL(window.location.href).searchParams);
     setSelectedCategoryId(nextSelection.categoryId);
     setSelectedSubcategoryId(nextSelection.subcategoryId);
-    setPage(1);
+    setPage(nextSelection.page);
   };
 
   useEffect(() => {
@@ -451,7 +498,7 @@ export function ImagePrankCatalog({ categories }: Props) {
   const selectCategory = (categoryId: string) => {
     const category = categories.find((item) => item.id === categoryId) ?? null;
     if (!category) return;
-    pushCatalogUrl(buildImagePrankCatalogUrl({ category }));
+    pushCatalogUrl(buildImagePrankCatalogUrl({ category, page: 1 }));
     setSelectedCategoryId(category.id);
     setSelectedSubcategoryId(null);
     setPage(1);
@@ -461,7 +508,7 @@ export function ImagePrankCatalog({ categories }: Props) {
     const parentCategory = categories.find((category) => (category.subcategories ?? []).some((subcategory) => subcategory.id === subcategoryId)) ?? null;
     const subcategory = (parentCategory?.subcategories ?? []).find((item) => item.id === subcategoryId) ?? null;
     if (!parentCategory || !subcategory) return;
-    pushCatalogUrl(buildImagePrankCatalogUrl({ category: parentCategory, subcategory }));
+    pushCatalogUrl(buildImagePrankCatalogUrl({ category: parentCategory, subcategory, page: 1 }));
     setSelectedCategoryId(parentCategory.id);
     setSelectedSubcategoryId(subcategory.id);
     setPage(1);
@@ -471,7 +518,18 @@ export function ImagePrankCatalog({ categories }: Props) {
     setSelectedCategoryId(null);
     setSelectedSubcategoryId(null);
     setPage(1);
-    pushCatalogUrl(buildImagePrankCatalogUrl({}));
+    pushCatalogUrl(buildImagePrankCatalogUrl({ page: 1 }));
+  };
+
+  const goToPage = (nextPage: number) => {
+    const clampedPage = Math.min(Math.max(1, Math.floor(nextPage)), totalPages);
+    if (clampedPage === safePage) return;
+    setPage(clampedPage);
+    pushCatalogUrl(buildImagePrankCatalogUrl({
+      category: selectedCategory,
+      subcategory: selectedSubcategory,
+      page: clampedPage,
+    }));
   };
 
   return (
@@ -549,36 +607,60 @@ export function ImagePrankCatalog({ categories }: Props) {
 
       {totalPages > 1 ? (
         <Pagination className="pt-2">
-          <PaginationContent className="w-full justify-center gap-2">
+          <PaginationContent className="w-full flex-wrap justify-center gap-1 sm:gap-1.5">
             <PaginationItem>
               <Button
                 type="button"
                 variant="ghost"
                 size="lg"
                 className="h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed"
-                onClick={() => setPage(Math.max(1, safePage - 1))}
+                onClick={() => goToPage(safePage - 1)}
                 disabled={safePage <= 1}
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="rtl:rotate-180 h-4 w-4" />
                 {copy.previous}
               </Button>
             </PaginationItem>
-            <PaginationItem>
-              <div className="h-10 rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-700 dark:border-gray-800 dark:text-gray-300">
-                {safePage} / {totalPages}
-              </div>
-            </PaginationItem>
+
+            {buildPageItems(totalPages, safePage).map((item) => {
+              if (item === 'ellipsis-left' || item === 'ellipsis-right') {
+                return (
+                  <PaginationItem key={item}>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                );
+              }
+
+              const itemPage = item;
+              const isActive = itemPage === safePage;
+              return (
+                <PaginationItem key={`page-${itemPage}`}>
+                  <Button
+                    type="button"
+                    variant={isActive ? 'outline' : 'ghost'}
+                    mode="icon"
+                    size="lg"
+                    className="h-10 w-10 cursor-pointer text-sm"
+                    onClick={() => goToPage(itemPage)}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    {itemPage}
+                  </Button>
+                </PaginationItem>
+              );
+            })}
+
             <PaginationItem>
               <Button
                 type="button"
                 variant="ghost"
                 size="lg"
                 className="h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed"
-                onClick={() => setPage(Math.min(totalPages, safePage + 1))}
+                onClick={() => goToPage(safePage + 1)}
                 disabled={safePage >= totalPages}
               >
                 {copy.next}
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="rtl:rotate-180 h-4 w-4" />
               </Button>
             </PaginationItem>
           </PaginationContent>
