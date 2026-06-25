@@ -122,9 +122,9 @@ function PreviewGrid({ images, label }: { images: string[]; label: string }) {
 
 function CustomCard({ copy }: { copy: (typeof COPY)[AppLanguageCode] }) {
   return (
-    <Link href="/image-prank/custom" className="block cursor-pointer focus-visible:outline-none">
-      <article className="group relative overflow-hidden rounded-2xl border border-blue-200 bg-blue-50 transition hover:border-blue-300 hover:bg-blue-100 dark:border-blue-900/70 dark:bg-blue-950/30 dark:hover:border-blue-800">
-        <div className="flex aspect-[9/16] flex-col items-center justify-center gap-3 p-4 text-center">
+    <Link href="/image-prank/custom" className="block h-full cursor-pointer focus-visible:outline-none">
+      <article className="group relative h-full overflow-hidden rounded-2xl border border-blue-200 bg-blue-50 transition hover:border-blue-300 hover:bg-blue-100 dark:border-blue-900/70 dark:bg-blue-950/30 dark:hover:border-blue-800">
+        <div className="flex h-full min-h-full flex-col items-center justify-center gap-3 p-4 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.3)]">
             <ImagePlus className="h-7 w-7" />
           </div>
