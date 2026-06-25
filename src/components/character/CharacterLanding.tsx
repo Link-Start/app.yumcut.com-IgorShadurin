@@ -29,6 +29,7 @@ import {
 } from './main-page-groups';
 import type { ImagePrankCatalogCategoryDTO } from '@/shared/types';
 const CATEGORY_PREVIEW_CELLS = 4;
+const MAX_CATEGORY_HOVER_PREVIEW_SECTIONS = 5;
 const MAX_CHARACTERS_PER_CATEGORY_PAGE = 18;
 const STORIES_PREVIEW_IMAGES = [
   '/template/basic/preview.jpg',
@@ -127,17 +128,18 @@ type LandingCopy = {
   go: string;
 };
 
-function getPreviewSectionCount(imageCount: number) {
-  return Math.max(1, Math.ceil(Math.max(imageCount, CATEGORY_PREVIEW_CELLS) / CATEGORY_PREVIEW_CELLS));
+function getPreviewSectionCount(imageCount: number, maxSections = MAX_CATEGORY_HOVER_PREVIEW_SECTIONS) {
+  const sectionCount = Math.max(1, Math.ceil(Math.max(imageCount, CATEGORY_PREVIEW_CELLS) / CATEGORY_PREVIEW_CELLS));
+  const normalizedMaxSections = Math.max(1, Math.floor(maxSections));
+  return Math.min(sectionCount, normalizedMaxSections);
 }
 
 function buildPreviewSections(images: string[], sectionCount = getPreviewSectionCount(images.length)): string[][] {
   const source = images;
   return Array.from({ length: sectionCount }, (_, sectionIndex) => {
-    const sectionImages = source.slice(
-      sectionIndex * CATEGORY_PREVIEW_CELLS,
-      sectionIndex * CATEGORY_PREVIEW_CELLS + CATEGORY_PREVIEW_CELLS,
-    );
+    const maxStartIndex = Math.max(0, source.length - CATEGORY_PREVIEW_CELLS);
+    const startIndex = sectionCount <= 1 ? 0 : Math.round((maxStartIndex * sectionIndex) / (sectionCount - 1));
+    const sectionImages = source.slice(startIndex, startIndex + CATEGORY_PREVIEW_CELLS);
     const fallback = sectionImages.at(-1) ?? source.at(-1) ?? '';
     return Array.from({ length: CATEGORY_PREVIEW_CELLS }, (_, cellIndex) => sectionImages[cellIndex] ?? fallback);
   });
@@ -228,14 +230,16 @@ function GroupHoverGridPreview({
   images,
   alt,
   activeSection,
+  sectionCount,
   zoomTop = false,
 }: {
   images: string[];
   alt: string;
   activeSection: number | null;
+  sectionCount: number;
   zoomTop?: boolean;
 }) {
-  const previewSections = useMemo(() => buildPreviewSections(images), [images]);
+  const previewSections = useMemo(() => buildPreviewSections(images, sectionCount), [images, sectionCount]);
   const activeIndex = activeSection ?? 0;
 
   return (
@@ -377,7 +381,13 @@ function GroupCategoryCard({
       )}
     >
       <div className="relative aspect-[9/16] w-full">
-        <GroupHoverGridPreview images={slideshowImages} alt={title} activeSection={activeSection} zoomTop={zoomTopPreview} />
+        <GroupHoverGridPreview
+          images={slideshowImages}
+          alt={title}
+          activeSection={activeSection}
+          sectionCount={previewSectionCount}
+          zoomTop={zoomTopPreview}
+        />
         {generationKind ? (
           <Tooltip content={generationTooltip} side="top">
             <span
