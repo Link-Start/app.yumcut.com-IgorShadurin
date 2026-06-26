@@ -17,3 +17,7 @@ Email-writing instructions live in [email/AGENTS.md](email/AGENTS.md).
 ## Debug Auth Notes
 
 - Local debug instructions for signing into web admin in Chrome MCP without OAuth are documented in [docs/debug-web-admin-login.md](docs/debug-web-admin-login.md).
+
+## Image Prank Catalog Notes
+
+- Instructions for generating and importing Image Prank catalog characters are documented in [docs/image-prank-character-generation.md](docs/image-prank-character-generation.md).
