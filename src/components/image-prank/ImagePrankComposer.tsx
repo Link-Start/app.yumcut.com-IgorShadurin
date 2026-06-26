@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, CreditCard, Crown, ImagePlus, Images, Loader2, Maximize2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, CreditCard, Crown, ImagePlus, Images, Loader2, Trash2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { resolveStorageBaseUrl } from '@/components/main/character-modal/storage';
@@ -44,6 +44,11 @@ type ZoomImage = {
   label: string;
 };
 
+type DeleteImageTarget = {
+  slot: 'prank' | 'target';
+  label: string;
+};
+
 const MAX_STORAGE_IMAGE_DIMENSION = 2000;
 
 const COPY: Record<AppLanguageCode, {
@@ -55,6 +60,9 @@ const COPY: Record<AppLanguageCode, {
   referenceImage: string;
   upload: string;
   replace: string;
+  deleteImage: string;
+  confirmDeleteImageTitle: string;
+  confirmDeleteImageDescription: (label: string) => string;
   promptLabel: string;
   twoImagePromptPlaceholder: string;
   oneImagePromptPlaceholder: string;
@@ -104,6 +112,9 @@ const COPY: Record<AppLanguageCode, {
     referenceImage: 'Reference image',
     upload: 'Upload',
     replace: 'Replace',
+    deleteImage: 'Delete image',
+    confirmDeleteImageTitle: 'Delete uploaded image?',
+    confirmDeleteImageDescription: (label) => `Remove "${label}" from this Image Prank draft?`,
     promptLabel: 'Prompt',
     twoImagePromptPlaceholder: 'Example: place the prank image naturally inside the target photo. You can also say first image and second image.',
     oneImagePromptPlaceholder: 'Example: turn this image into a funny prank scene.',
@@ -157,6 +168,9 @@ const COPY: Record<AppLanguageCode, {
     referenceImage: 'Референс',
     upload: 'Загрузить',
     replace: 'Заменить',
+    deleteImage: 'Удалить изображение',
+    confirmDeleteImageTitle: 'Удалить загруженное изображение?',
+    confirmDeleteImageDescription: (label) => `Убрать "${label}" из этого Image Prank черновика?`,
     promptLabel: 'Промпт',
     twoImagePromptPlaceholder: 'Например: естественно поместить prank-картинку на целевое фото. Можно писать первое и второе изображение.',
     oneImagePromptPlaceholder: 'Например: превратить это изображение в смешную prank-сцену.',
@@ -238,6 +252,8 @@ function UploadSlot({
   state,
   zoomUrl,
   onZoom,
+  onDelete,
+  deleteLabel,
   onChange,
   disabled,
 }: {
@@ -245,6 +261,8 @@ function UploadSlot({
   state: ImageSlotState;
   zoomUrl?: string | null;
   onZoom: (image: ZoomImage) => void;
+  onDelete: (() => void) | null;
+  deleteLabel: string;
   onChange: (file: File | null) => void;
   disabled: boolean;
 }) {
@@ -265,30 +283,42 @@ function UploadSlot({
         }}
       />
       <div className="relative aspect-[9/16] w-full">
-        <button
-          type="button"
-          onClick={() => ref.current?.click()}
-          disabled={disabled}
-          className="group flex h-full w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/30"
-        >
-          {previewUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewUrl} alt={label} className="h-full w-full object-contain" />
-        ) : (
-          <span className="flex flex-col items-center gap-2 p-4 text-sm text-gray-600 dark:text-gray-300">
-            <UploadCloud className="h-6 w-6 text-blue-500" />
-            {label}
-          </span>
-        )}
-        </button>
-        {fullUrl ? (
+        {previewUrl ? (
           <button
             type="button"
-            onClick={() => onZoom({ url: fullUrl, label })}
-            className="absolute right-2 top-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-black/55 text-white shadow-sm backdrop-blur transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            onClick={() => fullUrl && onZoom({ url: fullUrl, label })}
+            disabled={disabled || !fullUrl}
+            className="group flex h-full w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 text-center transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/30"
             aria-label={label}
           >
-            <Maximize2 className="h-4 w-4" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewUrl} alt={label} className="h-full w-full object-contain" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => ref.current?.click()}
+            disabled={disabled}
+            className="group flex h-full w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/30"
+          >
+            <span className="flex flex-col items-center gap-2 p-4 text-sm text-gray-600 dark:text-gray-300">
+              <UploadCloud className="h-6 w-6 text-blue-500" />
+              {label}
+            </span>
+          </button>
+        )}
+        {previewUrl && onDelete ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+            disabled={disabled}
+            className="absolute right-2 top-2 z-10 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/60 bg-black/45 text-white opacity-80 shadow-sm backdrop-blur transition hover:bg-red-600/90 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:bg-red-600/90 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            aria-label={`${deleteLabel}: ${label}`}
+          >
+            <Trash2 className="h-4 w-4" />
           </button>
         ) : null}
       </div>
@@ -412,6 +442,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const [reuseLoading, setReuseLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [deleteImageTarget, setDeleteImageTarget] = useState<DeleteImageTarget | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<SubscriptionPlanKey | null>(null);
   const [selectedPlanKey, setSelectedPlanKey] = useState<SubscriptionPlanKey>('monthly');
   const [submitting, setSubmitting] = useState(false);
@@ -624,6 +655,22 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
     setSubmitting(false);
   };
 
+  const requestDeleteSlot = (slot: DeleteImageTarget['slot'], label: string) => {
+    setDeleteImageTarget({ slot, label });
+  };
+
+  const confirmDeleteSlot = () => {
+    if (!deleteImageTarget) return;
+    if (deleteImageTarget.slot === 'prank') {
+      setPrankFile(null);
+      setPrankSource(null);
+    } else {
+      setTargetFile(null);
+      setTargetSource(null);
+    }
+    setDeleteImageTarget(null);
+  };
+
   async function openSubscriptionCheckout(plan: SubscriptionPlanKey) {
     if (checkoutPlan) return;
     setCheckoutPlan(plan);
@@ -664,18 +711,15 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
             {item ? (
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-gray-900 dark:text-gray-100">{copy.catalogLabel}</Label>
-                <div className="relative flex aspect-[9/16] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+                <button
+                  type="button"
+                  onClick={() => setZoomImage({ url: item.imageUrl, label: itemTitle || copy.catalogLabel })}
+                  className="relative flex aspect-[9/16] w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-800 dark:hover:bg-blue-950/30"
+                  aria-label={`${copy.zoomImage}: ${itemTitle || copy.catalogLabel}`}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={item.previewImageUrl || item.imageUrl} alt={itemTitle} className="h-full w-full object-contain" />
-                  <button
-                    type="button"
-                    onClick={() => setZoomImage({ url: item.imageUrl, label: itemTitle || copy.catalogLabel })}
-                    className="absolute right-2 top-2 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-black/55 text-white shadow-sm backdrop-blur transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    aria-label={`${copy.zoomImage}: ${itemTitle || copy.catalogLabel}`}
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                  </button>
-                </div>
+                </button>
               </div>
             ) : oneImageMode ? null : (
               <UploadSlot
@@ -683,6 +727,8 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
                 state={{ file: prankFile, previewUrl: prankSlotPreviewUrl }}
                 zoomUrl={prankSlotZoomUrl}
                 onZoom={setZoomImage}
+                onDelete={prankSlotPreviewUrl ? () => requestDeleteSlot('prank', copy.prankImage) : null}
+                deleteLabel={copy.deleteImage}
                 onChange={(file) => {
                   setPrankFile(file);
                   setPrankSource(null);
@@ -695,6 +741,8 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               state={{ file: targetFile, previewUrl: targetSlotPreviewUrl }}
               zoomUrl={targetSlotZoomUrl}
               onZoom={setZoomImage}
+              onDelete={targetSlotPreviewUrl ? () => requestDeleteSlot('target', oneImageMode && !item ? copy.referenceImage : copy.targetImage) : null}
+              deleteLabel={copy.deleteImage}
               onChange={(file) => {
                 setTargetFile(file);
                 setTargetSource(null);
@@ -779,6 +827,26 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               <img src={zoomImage.url} alt={zoomImage.label} className="max-h-[calc(100vh-4rem)] max-w-full object-contain" />
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteImageTarget} onOpenChange={(open) => !open && setDeleteImageTarget(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>{copy.confirmDeleteImageTitle}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {copy.confirmDeleteImageDescription(deleteImageTarget?.label ?? '')}
+          </p>
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <Button type="button" variant="outline" className="cursor-pointer" onClick={() => setDeleteImageTarget(null)}>
+              {copy.cancel}
+            </Button>
+            <Button type="button" variant="destructive" className="cursor-pointer" onClick={confirmDeleteSlot}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              {copy.deleteImage}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
