@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { InsufficientTokensError } from '@/server/tokens';
+import { AccountDeletionBlockedByStripeError } from '@/server/account/errors';
 
 type Normalized = {
   status: number;
@@ -82,6 +83,14 @@ export function normalizeError(e: unknown, human: string): Normalized {
   }
   if (e instanceof InsufficientTokensError) {
     return { status: e.status, code: e.code, message: `${human}: ${e.message}`, details: e.details };
+  }
+  if (e instanceof AccountDeletionBlockedByStripeError) {
+    return {
+      status: e.status,
+      code: e.code,
+      message: e.message,
+      details: e.details,
+    };
   }
   if (e instanceof Error) {
     return fromGenericError(e, human);

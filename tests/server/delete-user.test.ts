@@ -18,11 +18,13 @@ const prismaMock = {
 const deleteStoredMedia = vi.fn();
 const notifyAdminsOfAccountDeletion = vi.fn().mockResolvedValue(undefined);
 const revokeAppleTokens = vi.fn();
+const cancelStripeSubscriptionForAccountDeletion = vi.fn();
 
 vi.mock('@/server/db', () => ({ prisma: prismaMock }));
 vi.mock('@/server/storage', () => ({ deleteStoredMedia }));
 vi.mock('@/server/telegram', () => ({ notifyAdminsOfAccountDeletion }));
 vi.mock('@/server/apple/revoke-tokens', () => ({ revokeAppleTokens }));
+vi.mock('@/server/stripe/subscriptions', () => ({ cancelStripeSubscriptionForAccountDeletion }));
 
 const { deleteUserAccount } = await import('@/server/account/delete-user');
 
@@ -42,6 +44,10 @@ beforeEach(() => {
   prismaMock.videoAsset.findMany.mockResolvedValue([]);
   prismaMock.userCharacterVariation.findMany.mockResolvedValue([]);
   prismaMock.userCharacterImageTask.findMany.mockResolvedValue([]);
+  cancelStripeSubscriptionForAccountDeletion.mockResolvedValue({
+    ok: true,
+    action: 'no_stripe_subscription',
+  });
 });
 
 describe('deleteUserAccount', () => {
@@ -139,5 +145,26 @@ describe('deleteUserAccount', () => {
       expect.arrayContaining(['image/2024/01/uploaded.jpg', 'https://cdn.test/image/2024/01/uploaded.jpg']),
       { userId: 'user-1' },
     );
+  });
+
+  it('does not delete account data when Stripe subscription cancellation is required manually', async () => {
+    cancelStripeSubscriptionForAccountDeletion.mockResolvedValue({
+      ok: false,
+      action: 'manual_cancellation_required',
+      message: 'Cancel subscription manually before deleting account.',
+      subscriptionId: 'sub_123',
+      portalUrl: 'https://billing.stripe.test/session',
+    });
+
+    await expect(deleteUserAccount({ userId: 'user-1', source: 'web' })).rejects.toMatchObject({
+      code: 'STRIPE_SUBSCRIPTION_CANCEL_REQUIRED',
+      details: {
+        subscriptionId: 'sub_123',
+        portalUrl: 'https://billing.stripe.test/session',
+      },
+    });
+
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(deleteStoredMedia).not.toHaveBeenCalled();
   });
 });

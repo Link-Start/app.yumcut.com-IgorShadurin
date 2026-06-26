@@ -5,6 +5,11 @@ import { revokeAppleTokens } from '@/server/apple/revoke-tokens';
 import { notifyAdminsOfAccountDeletion } from '@/server/telegram';
 import { deleteStoredMedia } from '@/server/storage';
 import { cancelPlannedEmailsForUser } from '@/server/emails/planned';
+import {
+  cancelStripeSubscriptionForAccountDeletion,
+  type StripeAccountDeletionCancellationResult,
+} from '@/server/stripe/subscriptions';
+import { AccountDeletionBlockedByStripeError } from '@/server/account/errors';
 
 export type DeleteUserAccountSource = 'mobile' | 'web' | 'support' | 'admin' | 'unknown';
 
@@ -16,6 +21,7 @@ export type DeleteUserAccountOptions = {
 
 export type DeleteUserAccountResult = {
   alreadyDeleted: boolean;
+  stripeCancellation?: Extract<StripeAccountDeletionCancellationResult, { ok: true }>;
 };
 
 export async function deleteUserAccount(options: DeleteUserAccountOptions): Promise<DeleteUserAccountResult> {
@@ -29,6 +35,11 @@ export async function deleteUserAccount(options: DeleteUserAccountOptions): Prom
   }
   if (existingUser.deleted) {
     return { alreadyDeleted: true };
+  }
+
+  const stripeCancellation = await cancelStripeSubscriptionForAccountDeletion(userId);
+  if (!stripeCancellation.ok) {
+    throw new AccountDeletionBlockedByStripeError(stripeCancellation);
   }
 
   const appleAccounts = await prisma.account.findMany({
@@ -152,7 +163,7 @@ export async function deleteUserAccount(options: DeleteUserAccountOptions): Prom
     console.error('Failed to notify admins about account deletion', { userId, err });
   });
 
-  return { alreadyDeleted: false };
+  return { alreadyDeleted: false, stripeCancellation };
 }
 
 async function collectUserMediaPaths(userId: string): Promise<string[]> {

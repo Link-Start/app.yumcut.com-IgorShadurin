@@ -33,7 +33,14 @@ export async function api<T>(url: string, init?: ApiRequestInit): Promise<T> {
         if (msgs.length > 0) message = msgs[0];
       } catch {}
     }
-    const err = { status: res.status, error: { code: data?.error?.code || 'REQUEST_FAILED', message } } as import('@/shared/types').ApiErrorShape & { status: number };
+    const err = {
+      status: res.status,
+      error: {
+        code: data?.error?.code || 'REQUEST_FAILED',
+        message,
+        details: data?.error?.details,
+      },
+    } as import('@/shared/types').ApiErrorShape & { status: number };
     // Default behavior: show error toast unless explicitly disabled.
     // Exception: do NOT show toasts for 401 (unauthorized) since it can be expected on public pages.
     const defaultShowToast = res.status !== 401;
@@ -625,11 +632,21 @@ export const Api = {
       errorToastTitle: 'Failed to revoke channel tokens',
     }),
 
-  deleteAccount: (payload?: { reason?: string }) =>
-    api<{ status: 'deleted' | 'already_deleted'; message: string }>('/api/account/delete', {
+  deleteAccount: (payload?: { reason?: string }, init?: ApiRequestInit) =>
+    api<{
+      status: 'deleted' | 'already_deleted';
+      message: string;
+      stripeCancellation?: {
+        ok: true;
+        action: 'no_stripe_subscription' | 'already_cancelled' | 'cancelled_at_period_end';
+        subscriptionId?: string | null;
+        cancellationEffectiveAt?: string | null;
+      } | null;
+    }>('/api/account/delete', {
       method: 'POST',
       body: JSON.stringify(payload ?? {}),
       errorToastTitle: 'Failed to delete account',
+      ...(init ?? {}),
     }),
 
 };

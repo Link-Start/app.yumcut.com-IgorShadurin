@@ -101,6 +101,28 @@ function buildStripePortalReturnUrl() {
   return resolveAbsoluteAppUrl(config.STRIPE_BILLING_PORTAL_RETURN_PATH);
 }
 
+async function createBillingPortalSessionForCustomer(input: {
+  userId: string;
+  customerId: string;
+  reason: string;
+}) {
+  const stripe = getStripeClient();
+  const portal = await stripe.billingPortal.sessions.create({
+    customer: input.customerId,
+    return_url: buildStripePortalReturnUrl(),
+  });
+
+  logStripeSubscriptionEvent('portal_created', {
+    userId: input.userId,
+    customerId: input.customerId,
+    reason: input.reason,
+  });
+
+  return {
+    url: portal.url,
+  };
+}
+
 function getPlanConfigByKey(planKey: StripePlanKey) {
   return getSubscriptionPlanByKey(planKey);
 }
@@ -118,10 +140,17 @@ function requirePriceIdForPlan(planKey: StripePlanKey) {
 }
 
 async function findUserById(userId: string): Promise<AppUserProfile | null> {
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, preferredLanguage: true },
+    select: { id: true, email: true, name: true, preferredLanguage: true, deleted: true },
   });
+  if (!user || user.deleted) return null;
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    preferredLanguage: user.preferredLanguage,
+  };
 }
 
 function extractCustomerIdFromPayload(payload: unknown) {
@@ -711,6 +740,141 @@ async function findStripeSubscriptionForUser(userId: string) {
   return candidate ?? null;
 }
 
+export type StripeAccountDeletionCancellationResult =
+  | {
+      ok: true;
+      action: 'no_stripe_subscription' | 'already_cancelled' | 'cancelled_at_period_end';
+      subscriptionId?: string | null;
+      cancellationEffectiveAt?: string | null;
+    }
+  | {
+      ok: false;
+      action: 'manual_cancellation_required';
+      message: string;
+      subscriptionId?: string | null;
+      portalUrl?: string | null;
+    };
+
+export async function cancelStripeSubscriptionForAccountDeletion(
+  userId: string,
+): Promise<StripeAccountDeletionCancellationResult> {
+  const expectedSubscriptionId = await findLatestStripeSubscriptionId(userId);
+  const knownCustomerId = await findCustomerIdFromPurchaseHistory(userId);
+  if (!expectedSubscriptionId && !knownCustomerId) {
+    return { ok: true, action: 'no_stripe_subscription' };
+  }
+
+  if (!hasConfigValue(config.STRIPE_SECRET_KEY)) {
+    return {
+      ok: false,
+      action: 'manual_cancellation_required',
+      message: 'Stripe is not configured, so the web subscription could not be cancelled automatically.',
+      subscriptionId: expectedSubscriptionId,
+      portalUrl: null,
+    };
+  }
+
+  const stripe = getStripeClient();
+  let subscription: Stripe.Subscription | null = null;
+  try {
+    subscription = await findStripeSubscriptionForUser(userId);
+  } catch (error) {
+    logStripeSubscriptionEvent('account_deletion_subscription_lookup_failed', {
+      userId,
+      subscriptionId: expectedSubscriptionId,
+      customerId: knownCustomerId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  if (!subscription) {
+    return { ok: true, action: 'no_stripe_subscription' };
+  }
+
+  if (
+    !isStripeSubscriptionActiveLike(subscription.status) ||
+    subscription.cancel_at_period_end === true ||
+    subscription.cancel_at !== null
+  ) {
+    const cancellationState = mapStripeCancellationState(subscription);
+    return {
+      ok: true,
+      action: 'already_cancelled',
+      subscriptionId: subscription.id,
+      cancellationEffectiveAt: cancellationState.cancellationEffectiveAt,
+    };
+  }
+
+  try {
+    const updated = await stripe.subscriptions.update(subscription.id, {
+      cancel_at_period_end: true,
+      metadata: {
+        ...subscription.metadata,
+        userId,
+        accountDeletionRequestedAt: new Date().toISOString(),
+      },
+    });
+    const cancellationState = mapStripeCancellationState(updated);
+    if (updated.cancel_at_period_end === true || updated.cancel_at !== null) {
+      logStripeSubscriptionEvent('account_deletion_subscription_cancelled', {
+        userId,
+        subscriptionId: updated.id,
+        status: updated.status,
+        cancellationEffectiveAt: cancellationState.cancellationEffectiveAt,
+      });
+      return {
+        ok: true,
+        action: 'cancelled_at_period_end',
+        subscriptionId: updated.id,
+        cancellationEffectiveAt: cancellationState.cancellationEffectiveAt,
+      };
+    }
+
+    logStripeSubscriptionEvent('account_deletion_subscription_not_cancelled', {
+      userId,
+      subscriptionId: updated.id,
+      status: updated.status,
+      cancelAtPeriodEnd: updated.cancel_at_period_end,
+      cancelAt: updated.cancel_at,
+    });
+  } catch (error) {
+    logStripeSubscriptionEvent('account_deletion_subscription_cancel_failed', {
+      userId,
+      subscriptionId: subscription.id,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  const customerId = extractCustomerId(subscription.customer) ?? knownCustomerId;
+  let portalUrl: string | null = null;
+  if (customerId) {
+    try {
+      const portal = await createBillingPortalSessionForCustomer({
+        userId,
+        customerId,
+        reason: 'account_deletion_cancel_failed',
+      });
+      portalUrl = portal.url;
+    } catch (error) {
+      logStripeSubscriptionEvent('account_deletion_portal_failed', {
+        userId,
+        subscriptionId: subscription.id,
+        customerId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return {
+    ok: false,
+    action: 'manual_cancellation_required',
+    message:
+      'Your Stripe subscription could not be cancelled automatically. Cancel it in Stripe Billing Portal before deleting the account.',
+    subscriptionId: subscription.id,
+    portalUrl,
+  };
+}
+
 export async function switchStripeSubscriptionPlan(input: {
   userId: string;
   targetPlanKey: StripePlanKey;
@@ -834,7 +998,6 @@ export async function createStripeCheckoutSession(input: {
 }
 
 export async function createStripeBillingPortalSession(userId: string) {
-  const stripe = getStripeClient();
   const customerId =
     (await findCustomerIdFromPurchaseHistory(userId)) ??
     (await findCustomerIdFromLatestStripeSubscription(userId));
@@ -843,14 +1006,10 @@ export async function createStripeBillingPortalSession(userId: string) {
     throw new Error('No Stripe customer found for this account.');
   }
 
-  const portal = await stripe.billingPortal.sessions.create({
-    customer: customerId,
-    return_url: buildStripePortalReturnUrl(),
-  });
-
-  logStripeSubscriptionEvent('portal_created', {
+  const portal = await createBillingPortalSessionForCustomer({
     userId,
     customerId,
+    reason: 'manage_billing',
   });
 
   return {

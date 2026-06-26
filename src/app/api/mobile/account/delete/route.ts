@@ -33,5 +33,6 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     message: result.alreadyDeleted
       ? 'This YumCut account was already deleted. Create a new account to continue.'
       : 'Your YumCut account has been deleted. Create a new account if you return.',
+    stripeCancellation: result.stripeCancellation ?? null,
   });
 }, 'Failed to delete mobile account');
