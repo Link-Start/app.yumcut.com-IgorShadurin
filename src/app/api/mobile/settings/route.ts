@@ -26,6 +26,7 @@ import { getAdminVoiceProviderSettings } from '@/server/admin/voice-providers';
 import { buildVoiceProviderSet } from '@/shared/constants/voice-providers';
 import { normalizeCharacterCreationSettings } from '@/shared/constants/character-creation-settings';
 import { normalizeContentTone } from '@/shared/constants/content-tone';
+import { IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS } from '@/shared/constants/image-generation';
 
 export const GET = withApiError(async function GET(req: NextRequest) {
   const auth = await authenticateApiRequest(req);
@@ -84,6 +85,7 @@ export const GET = withApiError(async function GET(req: NextRequest) {
     scriptAvoidanceGuidance: (settings as any).scriptAvoidanceGuidance ?? '',
     audioStyleGuidanceEnabled: (settings as any).audioStyleGuidanceEnabled ?? false,
     audioStyleGuidance: (settings as any).audioStyleGuidance ?? '',
+    imagePrankModels: IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS,
     characterSelection,
     preferredVoiceId: sanitizedPreferredVoiceId,
     preferredTemplateId: (settings as any)?.preferredTemplateId ?? null,

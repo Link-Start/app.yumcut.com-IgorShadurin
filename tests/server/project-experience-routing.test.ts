@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { ProjectStatus } from '@/shared/constants/status';
 import { createProjectSchema } from '@/server/validators/projects';
+import { IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS } from '@/shared/constants/image-generation';
 
 const prismaMock = {
   project: { findFirst: vi.fn() },
@@ -185,5 +186,31 @@ describe('createProjectSchema projectExperience', () => {
     });
     expect(valid.success).toBe(true);
     expect(invalid.success).toBe(false);
+  });
+
+  it('accepts only selectable image prank models', () => {
+    const basePayload = {
+      prompt: 'Place first image into second image',
+      projectExperience: 'image-generation',
+      imagePrank: {
+        mode: 'custom-two-image',
+        sourceImages: [
+          { role: 'prank', path: 'characters/a.png', url: 'https://cdn.test/a.png' },
+          { role: 'target', path: 'characters/b.png', url: 'https://cdn.test/b.png' },
+        ],
+      },
+    };
+
+    for (const model of IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS) {
+      expect(createProjectSchema.safeParse({
+        ...basePayload,
+        imagePrank: { ...basePayload.imagePrank, model: model.id },
+      }).success).toBe(true);
+    }
+
+    expect(createProjectSchema.safeParse({
+      ...basePayload,
+      imagePrank: { ...basePayload.imagePrank, model: 'bfl:5@1' },
+    }).success).toBe(false);
   });
 });

@@ -537,6 +537,12 @@ export interface MobilePaywallConfigDTO {
   }>;
 }
 
+export interface MobileImagePrankModelOptionDTO {
+  id: string;
+  label: string;
+  isDefault: boolean;
+}
+
 export interface ProjectDraftSettingsSnapshot {
   includeDefaultMusic: boolean;
   addOverlay: boolean;

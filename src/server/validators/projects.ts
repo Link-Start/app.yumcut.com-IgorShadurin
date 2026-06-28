@@ -4,7 +4,7 @@ import { LANGUAGE_CODES, LANGUAGE_ENUM } from '@/shared/constants/languages';
 import { PROJECT_EXPERIENCES } from '@/shared/constants/project-experience';
 import { CONTENT_TONES } from '@/shared/constants/content-tone';
 import { CHARACTER_PROJECT_TARGET_DURATION_SECONDS } from '@/shared/constants/character-project';
-import { IMAGE_PRANK_TWO_REFERENCE_MODELS } from '@/shared/constants/image-generation';
+import { IMAGE_PRANK_UI_MODEL_OPTIONS } from '@/shared/constants/image-generation';
 import {
   CHARACTER_VIDEO_GENERATION_MODES,
   CHARACTER_VIDEO_QUALITIES,
@@ -46,7 +46,7 @@ const imagePrankSourceImageSchema = z.object({
 const imagePrankSchema = z.object({
   mode: z.enum(['catalog', 'custom-two-image', 'custom-one-image']),
   catalogItemId: z.string().uuid().optional(),
-  model: z.enum(IMAGE_PRANK_TWO_REFERENCE_MODELS).optional(),
+  model: z.enum(IMAGE_PRANK_UI_MODEL_OPTIONS).optional(),
   sourceImages: z.array(imagePrankSourceImageSchema).min(1).max(2),
 }).strict();
 

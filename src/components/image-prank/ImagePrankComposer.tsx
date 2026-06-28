@@ -15,9 +15,9 @@ import { cn } from '@/lib/utils';
 import { TOKEN_COSTS } from '@/shared/constants/token-costs';
 import {
   DEFAULT_IMAGE_PRANK_GENERATION_MODEL,
-  IMAGE_PRANK_UI_MODEL_OPTIONS,
-  normalizeImagePrankGenerationModel,
-  type ImagePrankGenerationModel,
+  IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS,
+  normalizeSelectableImagePrankGenerationModel,
+  type ImagePrankSelectableModel,
 } from '@/shared/constants/image-generation';
 import { requestTokenRefresh, useTokenSummary } from '@/hooks/useTokenSummary';
 import { formatSubscriptionVideoCountForPaywall, getSubscriptionPlansForUi, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
@@ -59,18 +59,11 @@ type DeleteImageTarget = {
 const MAX_STORAGE_IMAGE_DIMENSION = 2000;
 const DEFAULT_MODEL_SELECT_VALUE = '__default__';
 
-const MODEL_LABELS: Record<ImagePrankGenerationModel, string> = {
-  'bytedance:seedream@4.5': 'Seedream 4.5',
-  'klingai:kling-image@o3': 'Kling O3',
-  'bytedance:5@0': 'Bytedance 5',
-  'alibaba:wan@2.7-image': 'Alibaba Wan 2.7',
-  'bfl:5@1': 'BFL 5.1',
-  'krea:krea@2-medium': 'Krea 2 Medium',
-  'prunaai:2@1': 'Pruna 2.1',
-  'krea:krea@2-turbo': 'Krea 2 Turbo',
-};
+const MODEL_LABELS: Record<ImagePrankSelectableModel, string> = Object.fromEntries(
+  IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS.map((model) => [model.id, model.label]),
+) as Record<ImagePrankSelectableModel, string>;
 
-function toSelectableModelOverride(model: ImagePrankGenerationModel | null): ImagePrankGenerationModel | null {
+function toSelectableModelOverride(model: ImagePrankSelectableModel | null): ImagePrankSelectableModel | null {
   return model && model !== DEFAULT_IMAGE_PRANK_GENERATION_MODEL ? model : null;
 }
 
@@ -459,8 +452,8 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const { summary, setSummary, refresh } = useTokenSummary();
   const storageBaseUrl = useMemo(resolveStorageBaseUrl, []);
   const reuseProjectId = searchParams.get('reuseProjectId')?.trim() || null;
-  const requestedModel = toSelectableModelOverride(normalizeImagePrankGenerationModel(searchParams.get('model')));
-  const [selectedModel, setSelectedModel] = useState<ImagePrankGenerationModel | null>(requestedModel);
+  const requestedModel = toSelectableModelOverride(normalizeSelectableImagePrankGenerationModel(searchParams.get('model')));
+  const [selectedModel, setSelectedModel] = useState<ImagePrankSelectableModel | null>(requestedModel);
   const [prompt, setPrompt] = useState(copy.twoImageDefaultPrompt);
   const [oneImageMode, setOneImageMode] = useState(false);
   const [prankFile, setPrankFile] = useState<File | null>(null);
@@ -527,7 +520,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
           ?? null;
         setPrompt(draft.prompt || defaultPrompt);
         if (!requestedModel) {
-          setSelectedModel(toSelectableModelOverride(normalizeImagePrankGenerationModel(draft.model)));
+          setSelectedModel(toSelectableModelOverride(normalizeSelectableImagePrankGenerationModel(draft.model)));
         }
         setPrankFile(null);
         setTargetFile(null);
@@ -813,7 +806,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
               <Select
                 value={selectedModel ?? DEFAULT_MODEL_SELECT_VALUE}
                 onValueChange={(value) => {
-                  setSelectedModel(value === DEFAULT_MODEL_SELECT_VALUE ? null : normalizeImagePrankGenerationModel(value));
+                  setSelectedModel(value === DEFAULT_MODEL_SELECT_VALUE ? null : normalizeSelectableImagePrankGenerationModel(value));
                 }}
                 disabled={submitting || reuseLoading}
               >
@@ -824,16 +817,11 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
                   <SelectItem value={DEFAULT_MODEL_SELECT_VALUE} className="cursor-pointer">
                     {copy.defaultModelLabel}
                   </SelectItem>
-                  {IMAGE_PRANK_UI_MODEL_OPTIONS.filter((model) => model !== 'bytedance:seedream@4.5').map((model) => (
-                    <SelectItem key={model} value={model} className="cursor-pointer">
-                      {MODEL_LABELS[model]}
+                  {IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS.filter((model) => !model.isDefault).map((model) => (
+                    <SelectItem key={model.id} value={model.id} className="cursor-pointer">
+                      {model.label}
                     </SelectItem>
                   ))}
-                  {selectedModel && !IMAGE_PRANK_UI_MODEL_OPTIONS.some((model) => model === selectedModel) ? (
-                    <SelectItem value={selectedModel} className="cursor-pointer">
-                      {MODEL_LABELS[selectedModel] ?? selectedModel}
-                    </SelectItem>
-                  ) : null}
                 </SelectContent>
               </Select>
             </div>

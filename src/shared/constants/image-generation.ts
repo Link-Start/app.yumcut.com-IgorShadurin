@@ -32,6 +32,28 @@ export const IMAGE_PRANK_UI_MODEL_OPTIONS = [
   'prunaai:2@1',
 ] as const satisfies readonly ImagePrankGenerationModel[];
 
+export type ImagePrankSelectableModel = typeof IMAGE_PRANK_UI_MODEL_OPTIONS[number];
+
+export type ImagePrankSelectableModelOption = {
+  id: ImagePrankSelectableModel;
+  label: string;
+  isDefault: boolean;
+};
+
+export const IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS = [
+  { id: DEFAULT_IMAGE_PRANK_GENERATION_MODEL, label: 'Default (Seedream)', isDefault: true },
+  { id: 'klingai:kling-image@o3', label: 'Kling O3', isDefault: false },
+  { id: 'bytedance:5@0', label: 'Bytedance 5', isDefault: false },
+  { id: 'alibaba:wan@2.7-image', label: 'Alibaba Wan 2.7', isDefault: false },
+  { id: 'prunaai:2@1', label: 'Pruna 2.1', isDefault: false },
+] as const satisfies readonly ImagePrankSelectableModelOption[];
+
+export function normalizeSelectableImagePrankGenerationModel(value: string | null | undefined): ImagePrankSelectableModel | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+  return IMAGE_PRANK_UI_MODEL_OPTIONS.find((model) => model === normalized) ?? null;
+}
+
 const IMAGE_PRANK_MODEL_DIMENSIONS: Record<ImagePrankGenerationModel, { width: number; height: number }> = {
   [DEFAULT_IMAGE_PRANK_GENERATION_MODEL]: {
     width: DEFAULT_IMAGE_PRANK_GENERATION_WIDTH,

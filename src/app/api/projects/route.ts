@@ -13,7 +13,7 @@ import {
   DEFAULT_IMAGE_GENERATION_WIDTH,
   type ImagePrankGenerationModel,
   imagePrankGenerationDimensions,
-  normalizeImagePrankGenerationModel,
+  normalizeSelectableImagePrankGenerationModel,
 } from '@/shared/constants/image-generation';
 import { spendTokens, makeUserInitiator, TOKEN_TRANSACTION_TYPES } from '@/server/tokens';
 import { calculateCharacterProjectTokenCost, calculateProjectTokenCost, TOKEN_COSTS } from '@/shared/constants/token-costs';
@@ -667,7 +667,9 @@ async function resolveImagePrankPayload(input: {
     mode: imagePrank.mode,
     prompt: buildImagePrankPrompt(userPrompt),
     userPrompt,
-    model: normalizeImagePrankGenerationModel(imagePrank.model) ?? DEFAULT_IMAGE_PRANK_GENERATION_MODEL,
+    model: imagePrank.model
+      ? normalizeSelectableImagePrankGenerationModel(imagePrank.model) ?? DEFAULT_IMAGE_PRANK_GENERATION_MODEL
+      : DEFAULT_IMAGE_PRANK_GENERATION_MODEL,
     sourceImages,
     catalogItem: catalogItem
       ? {
