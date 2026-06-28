@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { TOKEN_COSTS } from '@/shared/constants/token-costs';
+import { normalizeImagePrankGenerationModel } from '@/shared/constants/image-generation';
 import { requestTokenRefresh, useTokenSummary } from '@/hooks/useTokenSummary';
 import { formatSubscriptionVideoCountForPaywall, getSubscriptionPlansForUi, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
@@ -430,12 +431,14 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const { summary, setSummary, refresh } = useTokenSummary();
   const storageBaseUrl = useMemo(resolveStorageBaseUrl, []);
   const reuseProjectId = searchParams.get('reuseProjectId')?.trim() || null;
+  const requestedModel = normalizeImagePrankGenerationModel(searchParams.get('model'));
   const [prompt, setPrompt] = useState(copy.twoImageDefaultPrompt);
   const [oneImageMode, setOneImageMode] = useState(false);
   const [prankFile, setPrankFile] = useState<File | null>(null);
   const [targetFile, setTargetFile] = useState<File | null>(null);
   const [prankSource, setPrankSource] = useState<PrefilledSource | null>(null);
   const [targetSource, setTargetSource] = useState<PrefilledSource | null>(null);
+  const [reuseModel, setReuseModel] = useState<string | null>(null);
   const [tokenBalance, setTokenBalance] = useState(0);
   const [tokenCost, setTokenCost] = useState(TOKEN_COSTS.actions.imageGeneration);
   const [tokenInfoLoading, setTokenInfoLoading] = useState(false);
@@ -495,13 +498,17 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
           ?? draft.sourceImages.find((source) => source.role === 'reference')
           ?? null;
         setPrompt(draft.prompt || defaultPrompt);
+        setReuseModel(draft.model || null);
         setPrankFile(null);
         setTargetFile(null);
         setPrankSource(toPrefilledSource(prank, copy.prankImage));
         setTargetSource(toPrefilledSource(target, draft.mode === 'custom-one-image' ? copy.referenceImage : copy.targetImage));
       })
       .catch(() => {
-        if (!cancelled) toast.error(copy.reuseLoadFailed);
+        if (!cancelled) {
+          setReuseModel(null);
+          toast.error(copy.reuseLoadFailed);
+        }
       })
       .finally(() => {
         if (!cancelled) setReuseLoading(false);
@@ -621,6 +628,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
         imagePrank: {
           mode,
           ...(item ? { catalogItemId: item.id } : {}),
+          ...(requestedModel || reuseModel ? { model: requestedModel ?? reuseModel ?? undefined } : {}),
           sourceImages: uploaded.map((source) => ({
             role: source.role,
             path: source.path,

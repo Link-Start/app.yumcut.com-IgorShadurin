@@ -8,8 +8,12 @@ import { LIMITS } from '@/server/limits';
 import { deriveTitleFromText } from '@/server/title';
 import { ProjectStatus } from '@/shared/constants/status';
 import {
+  DEFAULT_IMAGE_PRANK_GENERATION_MODEL,
   DEFAULT_IMAGE_GENERATION_HEIGHT,
   DEFAULT_IMAGE_GENERATION_WIDTH,
+  type ImagePrankGenerationModel,
+  imagePrankGenerationDimensions,
+  normalizeImagePrankGenerationModel,
 } from '@/shared/constants/image-generation';
 import { spendTokens, makeUserInitiator, TOKEN_TRANSACTION_TYPES } from '@/server/tokens';
 import { calculateCharacterProjectTokenCost, calculateProjectTokenCost, TOKEN_COSTS } from '@/shared/constants/token-costs';
@@ -553,6 +557,7 @@ type ImagePrankRequestSource = {
 type ImagePrankRequest = {
   mode: ImagePrankMode;
   catalogItemId?: string;
+  model?: string;
   sourceImages: ImagePrankRequestSource[];
 };
 
@@ -560,6 +565,7 @@ type ResolvedImagePrankPayload = {
   mode: ImagePrankMode;
   prompt: string;
   userPrompt: string;
+  model: ImagePrankGenerationModel;
   sourceImages: ImagePrankSourceImageDTO[];
   catalogItem: {
     id: string;
@@ -661,6 +667,7 @@ async function resolveImagePrankPayload(input: {
     mode: imagePrank.mode,
     prompt: buildImagePrankPrompt(userPrompt),
     userPrompt,
+    model: normalizeImagePrankGenerationModel(imagePrank.model) ?? DEFAULT_IMAGE_PRANK_GENERATION_MODEL,
     sourceImages,
     catalogItem: catalogItem
       ? {
@@ -707,11 +714,14 @@ async function createImageGenerationProject(params: {
     }
   }
 
+  const imagePrankDimensions = resolvedImagePrank
+    ? imagePrankGenerationDimensions(resolvedImagePrank.model)
+    : null;
   const imageSpec = {
     provider: 'runware',
-    model: resolvedImagePrank ? 'runware:108@22' : 'runware:108@1',
-    width: DEFAULT_IMAGE_GENERATION_WIDTH,
-    height: DEFAULT_IMAGE_GENERATION_HEIGHT,
+    model: resolvedImagePrank ? resolvedImagePrank.model : 'runware:108@1',
+    width: imagePrankDimensions?.width ?? DEFAULT_IMAGE_GENERATION_WIDTH,
+    height: imagePrankDimensions?.height ?? DEFAULT_IMAGE_GENERATION_HEIGHT,
     estimatedDurationSeconds: 300,
   };
   const tokenCost = TOKEN_COSTS.actions.imageGeneration;
@@ -792,6 +802,7 @@ async function createImageGenerationProject(params: {
                 imageKind: 'image-prank',
                 imagePrank: {
                   mode: resolvedImagePrank.mode,
+                  model: resolvedImagePrank.model,
                   sourceImages: resolvedImagePrank.sourceImages,
                   catalogItem: resolvedImagePrank.catalogItem,
                   userPrompt: resolvedImagePrank.userPrompt,
@@ -819,6 +830,7 @@ async function createImageGenerationProject(params: {
                 imageKind: 'image-prank',
                 imagePrank: {
                   mode: resolvedImagePrank.mode,
+                  model: resolvedImagePrank.model,
                   sourceImages: resolvedImagePrank.sourceImages,
                   catalogItem: resolvedImagePrank.catalogItem,
                 },

@@ -1,4 +1,5 @@
 import * as crypto from 'node:crypto';
+import { DEFAULT_IMAGE_PRANK_GENERATION_MODEL } from '@/shared/constants/image-generation';
 
 export const QWEN_DEFAULT_NEGATIVE_PROMPT =
   'text, letters, numbers, captions, logos, watermarks, typography';
@@ -183,7 +184,7 @@ export async function requestRunwareImageEdit(params: RunwareImageEditParams): P
     {
       taskType: 'imageInference',
       taskUUID: crypto.randomUUID(),
-      model: params.model ?? 'runware:108@22',
+      model: params.model ?? DEFAULT_IMAGE_PRANK_GENERATION_MODEL,
       numberResults: 1,
       width: params.width,
       height: params.height,

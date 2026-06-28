@@ -4,6 +4,7 @@ import { withApiError } from '@/server/errors';
 import { ok, notFound, unauthorized } from '@/server/http';
 import { authenticateApiRequest } from '@/server/api-user';
 import { normalizeMediaUrl } from '@/server/storage';
+import { normalizeImagePrankGenerationModel } from '@/shared/constants/image-generation';
 import type { ImagePrankMode, ImagePrankReuseDTO, ImagePrankSourceImageDTO, ImagePrankSourceImageRole } from '@/shared/types';
 
 type Params = { projectId: string };
@@ -123,6 +124,9 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
   return ok<ImagePrankReuseDTO>({
     projectId: project.id,
     mode,
+    model: normalizeImagePrankGenerationModel(
+      typeof picked.imagePrank.model === 'string' ? picked.imagePrank.model : null,
+    ),
     prompt,
     catalogItem: normalizeCatalogItem(picked.imagePrank.catalogItem),
     sourceImages,

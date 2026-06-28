@@ -175,6 +175,7 @@ export interface ImagePrankCatalogDTO {
 export interface ImagePrankReuseDTO {
   projectId: string;
   mode: ImagePrankMode;
+  model?: string | null;
   prompt: string;
   catalogItem: {
     id: string;
@@ -611,6 +612,7 @@ export interface PendingProjectDraft {
     imagePrank?: {
       mode: ImagePrankMode;
       catalogItemId?: string;
+      model?: string;
       sourceImages: Array<{
         role: ImagePrankSourceImageRole;
         path: string;
