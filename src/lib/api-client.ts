@@ -404,6 +404,54 @@ export const Api = {
     const suffix = query ? `?${query}` : '';
     return api<{ ok: boolean }>(`/api/admin/image-pranks/${id}${suffix}`, { method: 'DELETE' });
   },
+  adminPaywallAttemptsList: (params?: { q?: string; userId?: string; from?: string; to?: string; page?: number; pageSize?: number }) => {
+    const qp = new URLSearchParams();
+    const q = params?.q?.trim() || '';
+    if (q) qp.set('q', q);
+    if (params?.userId?.trim()) qp.set('userId', params.userId.trim());
+    if (params?.from) qp.set('from', params.from);
+    if (params?.to) qp.set('to', params.to);
+    if (typeof params?.page === 'number' && Number.isFinite(params.page)) qp.set('page', String(Math.max(1, Math.floor(params.page))));
+    if (typeof params?.pageSize === 'number' && Number.isFinite(params.pageSize)) qp.set('pageSize', String(Math.max(1, Math.floor(params.pageSize))));
+    const query = qp.toString() ? `?${qp.toString()}` : '';
+    return api<{
+      items: Array<{
+        id: string;
+        userId: string;
+        projectId: string | null;
+        clientAttemptId: string;
+        promptText: string | null;
+        promptMode: string | null;
+        projectExperience: string | null;
+        durationSeconds: number | null;
+        tokenCost: number | null;
+        tokenBalance: number | null;
+        mainPageMode: string | null;
+        mainPageCategoryId: string | null;
+        characterSlug: string | null;
+        templateId: string | null;
+        utmSource: string | null;
+        utmMedium: string | null;
+        utmCampaign: string | null;
+        intent: string | null;
+        sourceToolSlug: string | null;
+        referrerOrigin: string | null;
+        referrerPath: string | null;
+        landingPath: string | null;
+        query: unknown;
+        languageCodes: unknown;
+        settingsSnapshot: unknown;
+        rawContext: unknown;
+        createdAt: string;
+        updatedAt: string;
+        user: { id: string; email: string | null; name: string | null; isAdmin: boolean; createdAt: string } | null;
+      }>;
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
+    }>(`/api/admin/project-attempts/paywall${query}`);
+  },
   adminCharactersList: (params?: { q?: string; categoryId?: string | null; page?: number; pageSize?: number }) => {
     const qp = new URLSearchParams();
     const q = params?.q?.trim() || '';

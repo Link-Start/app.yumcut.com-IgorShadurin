@@ -902,8 +902,9 @@ export function notifyAdminsOfNewProject(payload: AdminNotificationPayloads['new
   return notifyAdminsInternal('new_project', payload);
 }
 
-export function notifyAdminsOfProjectAttemptPaywall(payload: AdminNotificationPayloads['project_attempt_paywall']) {
-  return notifyAdminsInternal('project_attempt_paywall', payload);
+export async function notifyAdminsOfProjectAttemptPaywall(_payload: AdminNotificationPayloads['project_attempt_paywall']) {
+  // Paywall attempts are intentionally stored in admin DB logs instead of being sent to Telegram.
+  return;
 }
 
 export function notifyAdminsOfNewGroup(payload: AdminNotificationPayloads['new_group']) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { CheckCircle2, FolderOpen, Images, Loader2, Pencil, Plus, RefreshCw, Trash2, UploadCloud } from 'lucide-react';
+import { CheckCircle2, Download, FolderOpen, Images, Loader2, Pencil, Plus, RefreshCw, Trash2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,33 @@ type Item = {
   priority: number;
   category: { id: string; slug: string; titleEn: string } | null;
   subcategory: { id: string; slug: string; titleEn: string } | null;
+};
+
+type PaywallAttempt = {
+  id: string;
+  userId: string;
+  projectId: string | null;
+  clientAttemptId: string;
+  promptText: string | null;
+  promptMode: string | null;
+  projectExperience: string | null;
+  durationSeconds: number | null;
+  tokenCost: number | null;
+  tokenBalance: number | null;
+  mainPageMode: string | null;
+  mainPageCategoryId: string | null;
+  characterSlug: string | null;
+  templateId: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  intent: string | null;
+  sourceToolSlug: string | null;
+  referrerOrigin: string | null;
+  referrerPath: string | null;
+  landingPath: string | null;
+  createdAt: string;
+  user: { id: string; email: string | null; name: string | null; isAdmin: boolean; createdAt: string } | null;
 };
 
 type BulkImportMetadata = {
@@ -191,6 +218,23 @@ function isMetadataFile(file: File) {
   return /\.json$/i.test(file.name);
 }
 
+function formatAdminDate(value: string | null) {
+  if (!value) return '—';
+  try {
+    return new Intl.DateTimeFormat('en', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function filenameFromContentDisposition(header: string | null) {
+  const match = header?.match(/filename="([^"]+)"/i) ?? header?.match(/filename=([^;]+)/i);
+  return match?.[1]?.trim() || null;
+}
+
 async function readJsonFile(file: File): Promise<unknown> {
   const text = await file.text();
   return JSON.parse(text);
@@ -220,6 +264,14 @@ export function AdminImagePranksManager() {
   const [bulkItems, setBulkItems] = useState<BulkImportItem[]>([]);
   const [bulkParsing, setBulkParsing] = useState(false);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [paywallAttempts, setPaywallAttempts] = useState<PaywallAttempt[]>([]);
+  const [paywallLoading, setPaywallLoading] = useState(false);
+  const [paywallExporting, setPaywallExporting] = useState(false);
+  const [paywallPage, setPaywallPage] = useState(1);
+  const [paywallPageSize, setPaywallPageSize] = useState(50);
+  const [paywallTotalPages, setPaywallTotalPages] = useState(1);
+  const [paywallTotal, setPaywallTotal] = useState(0);
+  const [paywallFilters, setPaywallFilters] = useState({ q: '', userId: '', from: '', to: '' });
   const bulkPreviewUrlsRef = useRef<string[]>([]);
 
   const selectedCategory = useMemo(
@@ -261,6 +313,27 @@ export function AdminImagePranksManager() {
     }
   };
 
+  const loadPaywallAttempts = async (page = paywallPage) => {
+    setPaywallLoading(true);
+    try {
+      const result = await Api.adminPaywallAttemptsList({
+        q: paywallFilters.q,
+        userId: paywallFilters.userId,
+        from: paywallFilters.from,
+        to: paywallFilters.to,
+        page,
+        pageSize: paywallPageSize,
+      });
+      setPaywallAttempts(result.items as PaywallAttempt[]);
+      setPaywallPage(result.page);
+      setPaywallPageSize(result.pageSize);
+      setPaywallTotal(result.total);
+      setPaywallTotalPages(result.totalPages);
+    } finally {
+      setPaywallLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -269,6 +342,13 @@ export function AdminImagePranksManager() {
   useEffect(() => () => {
     bulkPreviewUrlsRef.current.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'paywall') {
+      void loadPaywallAttempts(paywallPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, paywallPage, paywallPageSize]);
 
   useEffect(() => {
     if (!itemImage) {
@@ -586,6 +666,39 @@ export function AdminImagePranksManager() {
     }
   };
 
+  const applyPaywallFilters = () => {
+    setPaywallPage(1);
+    void loadPaywallAttempts(1);
+  };
+
+  const exportPaywallAttempts = async () => {
+    setPaywallExporting(true);
+    try {
+      const qp = new URLSearchParams();
+      qp.set('export', '1');
+      if (paywallFilters.q.trim()) qp.set('q', paywallFilters.q.trim());
+      if (paywallFilters.userId.trim()) qp.set('userId', paywallFilters.userId.trim());
+      if (paywallFilters.from) qp.set('from', paywallFilters.from);
+      if (paywallFilters.to) qp.set('to', paywallFilters.to);
+      const response = await fetch(`/api/admin/project-attempts/paywall?${qp.toString()}`);
+      if (!response.ok) throw new Error(`Export failed (${response.status})`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filenameFromContentDisposition(response.headers.get('content-disposition')) || 'paywall-attempts.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success('Paywall log exported');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to export paywall log');
+    } finally {
+      setPaywallExporting(false);
+    }
+  };
+
   const displayedItemImagePreviewUrl = itemImagePreviewUrl ?? editingItemPreviewUrl;
 
   return (
@@ -603,6 +716,7 @@ export function AdminImagePranksManager() {
           <TabsTrigger value="pranks" className="cursor-pointer">Prank images</TabsTrigger>
           <TabsTrigger value="categories" className="cursor-pointer">Categories</TabsTrigger>
           <TabsTrigger value="subcategories" className="cursor-pointer">Subcategories</TabsTrigger>
+          <TabsTrigger value="paywall" className="cursor-pointer">Paywall logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pranks" className="space-y-4">
@@ -1120,6 +1234,144 @@ export function AdminImagePranksManager() {
                           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                           Delete
                         </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="paywall" className="space-y-4">
+          <Card>
+            <CardHeader className="gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle>Paywall before project creation</CardTitle>
+                <CardDescription>
+                  Stored paywall events with prompt text and user info. Telegram sending for these events is disabled.
+                </CardDescription>
+              </div>
+              <Button type="button" className="cursor-pointer" variant="outline" onClick={() => void exportPaywallAttempts()} disabled={paywallExporting}>
+                {paywallExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Export JSON
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_160px_160px_120px_auto]">
+                <Input
+                  value={paywallFilters.q}
+                  onChange={(event) => setPaywallFilters((prev) => ({ ...prev, q: event.target.value }))}
+                  placeholder="Search prompt, email, name, user id"
+                />
+                <Input
+                  value={paywallFilters.userId}
+                  onChange={(event) => setPaywallFilters((prev) => ({ ...prev, userId: event.target.value }))}
+                  placeholder="User ID"
+                />
+                <Input
+                  type="date"
+                  value={paywallFilters.from}
+                  onChange={(event) => setPaywallFilters((prev) => ({ ...prev, from: event.target.value }))}
+                />
+                <Input
+                  type="date"
+                  value={paywallFilters.to}
+                  onChange={(event) => setPaywallFilters((prev) => ({ ...prev, to: event.target.value }))}
+                />
+                <select
+                  className="h-10 cursor-pointer rounded-md border border-gray-200 bg-background px-3 text-sm dark:border-gray-800"
+                  value={paywallPageSize}
+                  onChange={(event) => {
+                    setPaywallPageSize(Number(event.target.value));
+                    setPaywallPage(1);
+                  }}
+                >
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                </select>
+                <Button type="button" className="cursor-pointer" onClick={applyPaywallFilters} disabled={paywallLoading}>
+                  {paywallLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                  Apply
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <div>
+                  {paywallTotal.toLocaleString()} events, page {paywallPage.toLocaleString()} of {paywallTotalPages.toLocaleString()}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="cursor-pointer"
+                    disabled={paywallLoading || paywallPage <= 1}
+                    onClick={() => setPaywallPage((page) => Math.max(1, page - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="cursor-pointer"
+                    disabled={paywallLoading || paywallPage >= paywallTotalPages}
+                    onClick={() => setPaywallPage((page) => Math.min(paywallTotalPages, page + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+
+              {paywallLoading ? (
+                <div className="flex h-32 items-center justify-center text-gray-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : paywallAttempts.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-500 dark:border-gray-700">
+                  No paywall events found.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {paywallAttempts.map((attempt) => (
+                    <div key={attempt.id} className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                            <span>{formatAdminDate(attempt.createdAt)}</span>
+                            <span>{attempt.projectExperience ?? 'unknown'}</span>
+                            <span>{attempt.promptMode ?? 'no mode'}</span>
+                            {attempt.durationSeconds !== null ? <span>{attempt.durationSeconds}s</span> : null}
+                            {attempt.tokenCost !== null || attempt.tokenBalance !== null ? (
+                              <span>Need {attempt.tokenCost ?? '—'} / balance {attempt.tokenBalance ?? '—'}</span>
+                            ) : null}
+                          </div>
+                          <div className="whitespace-pre-wrap break-words rounded-md bg-gray-50 p-3 text-sm text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+                            {attempt.promptText || 'No prompt text'}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                            {attempt.mainPageMode ? <span>Mode: {attempt.mainPageMode}</span> : null}
+                            {attempt.mainPageCategoryId ? <span>Category: {attempt.mainPageCategoryId}</span> : null}
+                            {attempt.characterSlug ? <span>Character: {attempt.characterSlug}</span> : null}
+                            {attempt.utmSource || attempt.utmMedium || attempt.utmCampaign ? (
+                              <span>UTM: {attempt.utmSource || '—'} / {attempt.utmMedium || '—'} / {attempt.utmCampaign || '—'}</span>
+                            ) : null}
+                            {attempt.landingPath ? <span>Landing: {attempt.landingPath}</span> : null}
+                            {attempt.referrerOrigin ? <span>Referrer: {attempt.referrerOrigin}{attempt.referrerPath ?? ''}</span> : null}
+                          </div>
+                        </div>
+                        <div className="space-y-1 rounded-md bg-gray-50 p-3 text-xs dark:bg-gray-900">
+                          <div className="font-semibold text-gray-900 dark:text-gray-100">
+                            {attempt.user?.name || attempt.user?.email || 'Unknown user'}
+                          </div>
+                          <div className="break-all text-gray-500 dark:text-gray-400">User: {attempt.userId}</div>
+                          {attempt.user?.email ? <div className="break-all text-gray-500 dark:text-gray-400">Email: {attempt.user.email}</div> : null}
+                          {attempt.user?.createdAt ? <div className="text-gray-500 dark:text-gray-400">User since: {formatAdminDate(attempt.user.createdAt)}</div> : null}
+                          <div className="break-all text-gray-500 dark:text-gray-400">Attempt: {attempt.id}</div>
+                          {attempt.projectId ? <div className="break-all text-gray-500 dark:text-gray-400">Project: {attempt.projectId}</div> : null}
+                        </div>
                       </div>
                     </div>
                   ))}
