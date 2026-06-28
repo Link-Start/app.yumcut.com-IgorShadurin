@@ -9,10 +9,16 @@ import { resolveStorageBaseUrl } from '@/components/main/character-modal/storage
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { TOKEN_COSTS } from '@/shared/constants/token-costs';
-import { normalizeImagePrankGenerationModel } from '@/shared/constants/image-generation';
+import {
+  DEFAULT_IMAGE_PRANK_GENERATION_MODEL,
+  IMAGE_PRANK_UI_MODEL_OPTIONS,
+  normalizeImagePrankGenerationModel,
+  type ImagePrankGenerationModel,
+} from '@/shared/constants/image-generation';
 import { requestTokenRefresh, useTokenSummary } from '@/hooks/useTokenSummary';
 import { formatSubscriptionVideoCountForPaywall, getSubscriptionPlansForUi, type SubscriptionPlanKey } from '@/shared/constants/subscriptions';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
@@ -51,6 +57,22 @@ type DeleteImageTarget = {
 };
 
 const MAX_STORAGE_IMAGE_DIMENSION = 2000;
+const DEFAULT_MODEL_SELECT_VALUE = '__default__';
+
+const MODEL_LABELS: Record<ImagePrankGenerationModel, string> = {
+  'bytedance:seedream@4.5': 'Seedream 4.5',
+  'klingai:kling-image@o3': 'Kling O3',
+  'bytedance:5@0': 'Bytedance 5',
+  'alibaba:wan@2.7-image': 'Alibaba Wan 2.7',
+  'bfl:5@1': 'BFL 5.1',
+  'krea:krea@2-medium': 'Krea 2 Medium',
+  'prunaai:2@1': 'Pruna 2.1',
+  'krea:krea@2-turbo': 'Krea 2 Turbo',
+};
+
+function toSelectableModelOverride(model: ImagePrankGenerationModel | null): ImagePrankGenerationModel | null {
+  return model && model !== DEFAULT_IMAGE_PRANK_GENERATION_MODEL ? model : null;
+}
 
 const COPY: Record<AppLanguageCode, {
   title: string;
@@ -65,6 +87,8 @@ const COPY: Record<AppLanguageCode, {
   confirmDeleteImageTitle: string;
   confirmDeleteImageDescription: (label: string) => string;
   promptLabel: string;
+  modelLabel: string;
+  defaultModelLabel: string;
   twoImagePromptPlaceholder: string;
   oneImagePromptPlaceholder: string;
   twoImageDefaultPrompt: string;
@@ -117,6 +141,8 @@ const COPY: Record<AppLanguageCode, {
     confirmDeleteImageTitle: 'Delete uploaded image?',
     confirmDeleteImageDescription: (label) => `Remove "${label}" from this Image Prank draft?`,
     promptLabel: 'Prompt',
+    modelLabel: 'Model',
+    defaultModelLabel: 'Default (Seedream)',
     twoImagePromptPlaceholder: 'Example: place the prank image naturally inside the target photo. You can also say first image and second image.',
     oneImagePromptPlaceholder: 'Example: turn this image into a funny prank scene.',
     twoImageDefaultPrompt: 'Place the prank image on the target image so it fits the lighting, perspective, scale, and natural position.',
@@ -173,6 +199,8 @@ const COPY: Record<AppLanguageCode, {
     confirmDeleteImageTitle: 'Удалить загруженное изображение?',
     confirmDeleteImageDescription: (label) => `Убрать "${label}" из этого Image Prank черновика?`,
     promptLabel: 'Промпт',
+    modelLabel: 'Модель',
+    defaultModelLabel: 'По умолчанию (Seedream)',
     twoImagePromptPlaceholder: 'Например: естественно поместить prank-картинку на целевое фото. Можно писать первое и второе изображение.',
     oneImagePromptPlaceholder: 'Например: превратить это изображение в смешную prank-сцену.',
     twoImageDefaultPrompt: 'Помести prank-картинку на целевое изображение так, чтобы она подходила по освещению, перспективе, масштабу и естественной позиции.',
@@ -431,14 +459,14 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const { summary, setSummary, refresh } = useTokenSummary();
   const storageBaseUrl = useMemo(resolveStorageBaseUrl, []);
   const reuseProjectId = searchParams.get('reuseProjectId')?.trim() || null;
-  const requestedModel = normalizeImagePrankGenerationModel(searchParams.get('model'));
+  const requestedModel = toSelectableModelOverride(normalizeImagePrankGenerationModel(searchParams.get('model')));
+  const [selectedModel, setSelectedModel] = useState<ImagePrankGenerationModel | null>(requestedModel);
   const [prompt, setPrompt] = useState(copy.twoImageDefaultPrompt);
   const [oneImageMode, setOneImageMode] = useState(false);
   const [prankFile, setPrankFile] = useState<File | null>(null);
   const [targetFile, setTargetFile] = useState<File | null>(null);
   const [prankSource, setPrankSource] = useState<PrefilledSource | null>(null);
   const [targetSource, setTargetSource] = useState<PrefilledSource | null>(null);
-  const [reuseModel, setReuseModel] = useState<string | null>(null);
   const [tokenBalance, setTokenBalance] = useState(0);
   const [tokenCost, setTokenCost] = useState(TOKEN_COSTS.actions.imageGeneration);
   const [tokenInfoLoading, setTokenInfoLoading] = useState(false);
@@ -498,7 +526,9 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
           ?? draft.sourceImages.find((source) => source.role === 'reference')
           ?? null;
         setPrompt(draft.prompt || defaultPrompt);
-        setReuseModel(draft.model || null);
+        if (!requestedModel) {
+          setSelectedModel(toSelectableModelOverride(normalizeImagePrankGenerationModel(draft.model)));
+        }
         setPrankFile(null);
         setTargetFile(null);
         setPrankSource(toPrefilledSource(prank, copy.prankImage));
@@ -506,7 +536,6 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
       })
       .catch(() => {
         if (!cancelled) {
-          setReuseModel(null);
           toast.error(copy.reuseLoadFailed);
         }
       })
@@ -516,7 +545,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
     return () => {
       cancelled = true;
     };
-  }, [copy.prankImage, copy.referenceImage, copy.reuseLoadFailed, copy.targetImage, defaultPrompt, item, reuseProjectId]);
+  }, [copy.prankImage, copy.referenceImage, copy.reuseLoadFailed, copy.targetImage, defaultPrompt, item, requestedModel, reuseProjectId]);
 
   useEffect(() => {
     if (!summary) return;
@@ -628,7 +657,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
         imagePrank: {
           mode,
           ...(item ? { catalogItemId: item.id } : {}),
-          ...(requestedModel || reuseModel ? { model: requestedModel ?? reuseModel ?? undefined } : {}),
+          ...(selectedModel ? { model: selectedModel } : {}),
           sourceImages: uploaded.map((source) => ({
             role: source.role,
             path: source.path,
@@ -775,6 +804,38 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
                 className="h-[260px] resize-none lg:h-[320px]"
                 disabled={submitting || reuseLoading}
               />
+            </div>
+
+            <div className="grid gap-2 sm:max-w-[360px]">
+              <Label htmlFor="image-prank-model" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {copy.modelLabel}
+              </Label>
+              <Select
+                value={selectedModel ?? DEFAULT_MODEL_SELECT_VALUE}
+                onValueChange={(value) => {
+                  setSelectedModel(value === DEFAULT_MODEL_SELECT_VALUE ? null : normalizeImagePrankGenerationModel(value));
+                }}
+                disabled={submitting || reuseLoading}
+              >
+                <SelectTrigger id="image-prank-model" className="cursor-pointer">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={DEFAULT_MODEL_SELECT_VALUE} className="cursor-pointer">
+                    {copy.defaultModelLabel}
+                  </SelectItem>
+                  {IMAGE_PRANK_UI_MODEL_OPTIONS.filter((model) => model !== 'bytedance:seedream@4.5').map((model) => (
+                    <SelectItem key={model} value={model} className="cursor-pointer">
+                      {MODEL_LABELS[model]}
+                    </SelectItem>
+                  ))}
+                  {selectedModel && !IMAGE_PRANK_UI_MODEL_OPTIONS.some((model) => model === selectedModel) ? (
+                    <SelectItem value={selectedModel} className="cursor-pointer">
+                      {MODEL_LABELS[selectedModel] ?? selectedModel}
+                    </SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
             </div>
 
             {!item ? (

@@ -24,6 +24,14 @@ export const IMAGE_PRANK_TWO_REFERENCE_MODELS = [
 
 export type ImagePrankGenerationModel = typeof IMAGE_PRANK_TWO_REFERENCE_MODELS[number];
 
+export const IMAGE_PRANK_UI_MODEL_OPTIONS = [
+  DEFAULT_IMAGE_PRANK_GENERATION_MODEL,
+  'klingai:kling-image@o3',
+  'bytedance:5@0',
+  'alibaba:wan@2.7-image',
+  'prunaai:2@1',
+] as const satisfies readonly ImagePrankGenerationModel[];
+
 const IMAGE_PRANK_MODEL_DIMENSIONS: Record<ImagePrankGenerationModel, { width: number; height: number }> = {
   [DEFAULT_IMAGE_PRANK_GENERATION_MODEL]: {
     width: DEFAULT_IMAGE_PRANK_GENERATION_WIDTH,
