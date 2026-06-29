@@ -455,12 +455,19 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
               <div className="relative flex aspect-[9/16] w-full max-w-[360px] items-center justify-center overflow-hidden border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                 {resultImageUrl ? (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={resultImageUrl}
-                      alt={t.generatedImage}
-                      className="h-full w-full object-contain"
-                    />
+                    <button
+                      type="button"
+                      className="flex h-full w-full cursor-pointer items-center justify-center"
+                      aria-label={`${t.zoomImage}: ${t.generatedImage}`}
+                      onClick={() => openZoomImage(resultImageUrl, t.generatedImage)}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={resultImageUrl}
+                        alt={t.generatedImage}
+                        className="h-full w-full object-contain"
+                      />
+                    </button>
                     <div className="absolute right-3 top-3 inline-flex rounded-lg shadow-sm">
                       <Button
                         type="button"
