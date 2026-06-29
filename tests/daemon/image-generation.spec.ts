@@ -57,6 +57,7 @@ describe('runImageGenerationTool', () => {
       model: 'runware:108@22',
       outputFormat: 'jpg',
       negativePrompt: 'text, watermark',
+      checkNSFW: true,
       referenceImages: ['https://example.com/prank.png', 'https://example.com/target.jpg'],
     });
 
@@ -83,6 +84,7 @@ describe('runImageGenerationTool', () => {
       path.join(projectWorkspace, 'response.json'),
       '--negative-prompt',
       'text, watermark',
+      '--check-nsfw',
       '--reference-image',
       'https://example.com/prank.png',
       '--reference-image',

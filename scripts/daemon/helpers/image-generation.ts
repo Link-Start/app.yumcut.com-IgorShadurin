@@ -14,6 +14,7 @@ type RunImageGenerationToolOptions = {
   outputFormat: 'jpg' | 'png' | 'webp';
   negativePrompt?: string;
   referenceImages?: string[];
+  checkNSFW?: boolean;
 };
 
 type RunImageGenerationToolResult = {
@@ -68,6 +69,10 @@ export async function runImageGenerationTool(options: RunImageGenerationToolOpti
   const negativePrompt = options.negativePrompt ? sanitizeValue(options.negativePrompt) : '';
   if (negativePrompt) {
     args.push('--negative-prompt', negativePrompt);
+  }
+
+  if (options.checkNSFW) {
+    args.push('--check-nsfw');
   }
 
   for (const referenceImage of options.referenceImages ?? []) {

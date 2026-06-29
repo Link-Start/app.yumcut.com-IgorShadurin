@@ -37,7 +37,7 @@ vi.mock('@/server/voices', () => ({
 vi.mock('@/server/tokens', () => ({
   spendTokens: spendTokensMock,
   makeUserInitiator: vi.fn((userId: string) => `user:${userId}`),
-  TOKEN_TRANSACTION_TYPES: { projectCreation: 'projectCreation' },
+  TOKEN_TRANSACTION_TYPES: { projectCreation: 'projectCreation', imageGeneration: 'imageGeneration' },
 }));
 vi.mock('@/shared/projects', () => ({ validateProjectState: validateProjectStateMock }));
 vi.mock('@/server/telegram', () => ({ notifyAdminsOfNewProject: notifyAdminsOfNewProjectMock }));
@@ -171,6 +171,49 @@ describe('project creation from character slug', () => {
             mode: 'lipsync_runware',
             lipsyncPrompt: expect.any(String),
           }),
+        }),
+      }),
+    }));
+  });
+
+  it('enables NSFW blocking for mobile image generation projects', async () => {
+    authenticateApiRequestMock.mockResolvedValue({
+      userId: 'user-1',
+      source: 'mobile',
+    });
+    prismaMock.project.create.mockResolvedValue({
+      id: 'project-image-1',
+      title: 'Image project',
+      status: ProjectStatus.ProcessImagesGeneration,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    });
+
+    const route = await import('@/app/api/projects/route');
+    const req = new NextRequest('http://localhost/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({
+        prompt: 'Create an image',
+        projectExperience: 'image-generation',
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const res = await route.POST(req);
+    expect(res.status).toBe(200);
+    expect(spendTokensMock).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({
+        checkNSFW: true,
+        safetyNegativePrompt: expect.stringContaining('nudity'),
+      }),
+    }), expect.anything());
+    expect(prismaMock.job.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        payload: expect.objectContaining({
+          projectExperience: 'image-generation',
+          checkNSFW: true,
+          safetyNegativePrompt: expect.stringContaining('nudity'),
+          prompt: expect.stringContaining('Mobile safety instruction:'),
+          userPrompt: 'Create an image',
         }),
       }),
     }));

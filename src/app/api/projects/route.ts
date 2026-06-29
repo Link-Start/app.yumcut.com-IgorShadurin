@@ -597,8 +597,41 @@ const IMAGE_PRANK_SYSTEM_PROMPT = [
   'Do not add captions, text, UI, logos, watermarks, or random artifacts.',
 ].join('\n');
 
-function buildImagePrankPrompt(userPrompt: string) {
-  return `${IMAGE_PRANK_SYSTEM_PROMPT}\n\nUser prompt:\n${userPrompt.trim()}`;
+const IOS_IMAGE_GENERATION_SAFETY_PROMPT = [
+  'Mobile safety instruction:',
+  'This request came from the iOS app. Generate only age-appropriate, non-explicit, non-NSFW imagery.',
+  'Do not create nudity, explicit sexual content, pornographic or erotic framing, fetish content, lingerie or underwear focus, or sexualized minors.',
+  'Keep clothing, pose, camera framing, and context safe for a general mobile audience.',
+].join('\n');
+
+const IOS_IMAGE_GENERATION_NEGATIVE_PROMPT = [
+  'nudity',
+  'nude',
+  'naked',
+  'explicit sexual content',
+  'porn',
+  'pornography',
+  'erotic',
+  'fetish',
+  'lingerie',
+  'underwear focus',
+  'sexualized minors',
+].join(', ');
+
+function shouldBlockNsfwForAuth(auth: NonNullable<Awaited<ReturnType<typeof authenticateApiRequest>>>) {
+  return auth.source === 'mobile';
+}
+
+function buildImageGenerationPrompt(userPrompt: string, blockNsfw: boolean) {
+  const trimmed = userPrompt.trim();
+  return blockNsfw ? `${IOS_IMAGE_GENERATION_SAFETY_PROMPT}\n\nUser prompt:\n${trimmed}` : trimmed;
+}
+
+function buildImagePrankPrompt(userPrompt: string, blockNsfw: boolean) {
+  const systemPrompt = blockNsfw
+    ? `${IMAGE_PRANK_SYSTEM_PROMPT}\n${IOS_IMAGE_GENERATION_SAFETY_PROMPT}`
+    : IMAGE_PRANK_SYSTEM_PROMPT;
+  return `${systemPrompt}\n\nUser prompt:\n${userPrompt.trim()}`;
 }
 
 function localizedTitle(item: ImagePrankCatalogItemDTO): string {
@@ -673,8 +706,9 @@ function imagePrankReferenceAspectRatio(payload: ResolvedImagePrankPayload): num
 async function resolveImagePrankPayload(input: {
   userPrompt: string;
   imagePrank: ImagePrankRequest;
+  blockNsfw: boolean;
 }): Promise<ResolvedImagePrankPayload> {
-  const { imagePrank, userPrompt } = input;
+  const { imagePrank, userPrompt, blockNsfw } = input;
   const uploaded = imagePrank.sourceImages.map(normalizeUploadedImageSource);
   const findRole = (role: ImagePrankSourceImageRole) => uploaded.find((source) => source.role === role) ?? null;
   let catalogItem: ImagePrankCatalogItemDTO | null = null;
@@ -728,7 +762,7 @@ async function resolveImagePrankPayload(input: {
 
   return {
     mode: imagePrank.mode,
-    prompt: buildImagePrankPrompt(userPrompt),
+    prompt: buildImagePrankPrompt(userPrompt, blockNsfw),
     userPrompt,
     model: imagePrank.model
       ? normalizeSelectableImagePrankGenerationModel(imagePrank.model) ?? DEFAULT_IMAGE_PRANK_GENERATION_MODEL
@@ -761,6 +795,8 @@ async function createImageGenerationProject(params: {
   if (!prompt) {
     return error('VALIDATION_ERROR', 'Prompt cannot be empty', 400);
   }
+  const blockNsfw = shouldBlockNsfwForAuth(params.auth);
+  const generationPrompt = buildImageGenerationPrompt(prompt, blockNsfw);
 
   const normalizedCharacterSlug =
     typeof params.characterSlug === 'string' && params.characterSlug.trim().length > 0
@@ -776,6 +812,7 @@ async function createImageGenerationProject(params: {
       resolvedImagePrank = await resolveImagePrankPayload({
         userPrompt: prompt,
         imagePrank: params.imagePrank,
+        blockNsfw,
       });
     } catch (err) {
       return error('VALIDATION_ERROR', err instanceof Error ? err.message : 'Image prank payload is invalid', 400);
@@ -794,6 +831,8 @@ async function createImageGenerationProject(params: {
     width: imagePrankDimensions?.width ?? DEFAULT_IMAGE_GENERATION_WIDTH,
     height: imagePrankDimensions?.height ?? DEFAULT_IMAGE_GENERATION_HEIGHT,
     estimatedDurationSeconds: 300,
+    checkNSFW: blockNsfw,
+    ...(blockNsfw ? { safetyNegativePrompt: IOS_IMAGE_GENERATION_NEGATIVE_PROMPT } : {}),
   };
   const tokenCost = TOKEN_COSTS.actions.imageGeneration;
   const now = new Date();
@@ -839,6 +878,8 @@ async function createImageGenerationProject(params: {
         model: imageSpec.model,
         width: imageSpec.width,
         height: imageSpec.height,
+        checkNSFW: imageSpec.checkNSFW,
+        ...(imageSpec.safetyNegativePrompt ? { safetyNegativePrompt: imageSpec.safetyNegativePrompt } : {}),
         ...(resolvedImagePrank
           ? {
               imageKind: 'image-prank',
@@ -894,7 +935,7 @@ async function createImageGenerationProject(params: {
         status: 'queued',
         payload: {
           projectExperience: 'image-generation',
-          prompt: resolvedImagePrank?.prompt ?? prompt,
+          prompt: resolvedImagePrank?.prompt ?? generationPrompt,
           userPrompt: resolvedImagePrank?.userPrompt ?? prompt,
           ...(resolvedImagePrank
             ? {

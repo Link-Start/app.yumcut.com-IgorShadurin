@@ -55,6 +55,11 @@ export async function handleImageGenerationProjectPhase({
   const width = numberFromPayload(jobPayload.width, DEFAULT_IMAGE_GENERATION_WIDTH);
   const height = numberFromPayload(jobPayload.height, DEFAULT_IMAGE_GENERATION_HEIGHT);
   const imageKind = stringFromPayload(jobPayload.imageKind, 'standalone');
+  const checkNSFW = jobPayload.checkNSFW === true;
+  const safetyNegativePrompt = stringFromPayload(jobPayload.safetyNegativePrompt, '');
+  const negativePrompt = safetyNegativePrompt
+    ? `${QWEN_DEFAULT_NEGATIVE_PROMPT}, ${safetyNegativePrompt}`
+    : QWEN_DEFAULT_NEGATIVE_PROMPT;
   const imagePrank = (jobPayload.imagePrank && typeof jobPayload.imagePrank === 'object')
     ? jobPayload.imagePrank as Record<string, unknown>
     : null;
@@ -72,7 +77,8 @@ export async function handleImageGenerationProjectPhase({
       height,
       model,
       outputFormat,
-      negativePrompt: QWEN_DEFAULT_NEGATIVE_PROMPT,
+      negativePrompt,
+      checkNSFW,
       referenceImages: imageKind === 'image-prank' && imagePrank ? imagePrankSourceUrls(imagePrank) : [],
     });
     const asset = await addImageAsset(projectId, toolResult.outputPath);
@@ -87,6 +93,7 @@ export async function handleImageGenerationProjectPhase({
       model,
       width,
       height,
+      checkNSFW,
       prompt,
       userPrompt: stringFromPayload(jobPayload.userPrompt, prompt),
       ...(imageKind === 'image-prank' && imagePrank
@@ -119,6 +126,7 @@ export async function handleImageGenerationProjectPhase({
       model,
       width,
       height,
+      checkNSFW,
       toolsWorkspace: daemonConfig.scriptWorkspaceV2,
       imageKind,
       ...(imagePrank ? { imagePrank } : {}),
