@@ -571,7 +571,10 @@ type ResolvedImagePrankPayload = {
     id: string;
     slug: string;
     title: string;
+    categorySlug: string;
     categoryTitle: string;
+    subcategorySlug: string | null;
+    subcategoryTitle: string | null;
   } | null;
 };
 
@@ -597,6 +600,11 @@ function localizedTitle(item: ImagePrankCatalogItemDTO): string {
 
 function localizedCategoryTitle(item: ImagePrankCatalogItemDTO): string {
   return item.categoryTitle.en || item.categoryTitle.ru || 'Catalog';
+}
+
+function localizedSubcategoryTitle(item: ImagePrankCatalogItemDTO): string | null {
+  if (!item.subcategoryTitle) return null;
+  return item.subcategoryTitle.en || item.subcategoryTitle.ru || null;
 }
 
 function normalizeUploadedImageSource(source: ImagePrankRequestSource): ImagePrankSourceImageDTO {
@@ -676,7 +684,10 @@ async function resolveImagePrankPayload(input: {
           id: catalogItem.id,
           slug: catalogItem.slug,
           title: localizedTitle(catalogItem),
+          categorySlug: catalogItem.categorySlug,
           categoryTitle: localizedCategoryTitle(catalogItem),
+          subcategorySlug: catalogItem.subcategorySlug ?? null,
+          subcategoryTitle: localizedSubcategoryTitle(catalogItem),
         }
       : null,
   };

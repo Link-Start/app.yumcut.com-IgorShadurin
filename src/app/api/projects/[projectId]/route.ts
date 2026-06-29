@@ -442,14 +442,39 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
             previewImagePath: typeof entry?.previewImagePath === 'string' ? entry.previewImagePath : null,
           }))
       : [];
-    const catalogItem = resolvedImagePrank?.catalogItem && typeof resolvedImagePrank.catalogItem === 'object'
+    let catalogItem = resolvedImagePrank?.catalogItem && typeof resolvedImagePrank.catalogItem === 'object'
       ? {
           id: typeof resolvedImagePrank.catalogItem.id === 'string' ? resolvedImagePrank.catalogItem.id : '',
           slug: typeof resolvedImagePrank.catalogItem.slug === 'string' ? resolvedImagePrank.catalogItem.slug : '',
           title: typeof resolvedImagePrank.catalogItem.title === 'string' ? resolvedImagePrank.catalogItem.title : 'Image Prank',
+          categorySlug: typeof resolvedImagePrank.catalogItem.categorySlug === 'string' ? resolvedImagePrank.catalogItem.categorySlug : null,
           categoryTitle: typeof resolvedImagePrank.catalogItem.categoryTitle === 'string' ? resolvedImagePrank.catalogItem.categoryTitle : null,
+          subcategorySlug: typeof resolvedImagePrank.catalogItem.subcategorySlug === 'string' ? resolvedImagePrank.catalogItem.subcategorySlug : null,
+          subcategoryTitle: typeof resolvedImagePrank.catalogItem.subcategoryTitle === 'string' ? resolvedImagePrank.catalogItem.subcategoryTitle : null,
         }
       : null;
+    if (catalogItem?.id) {
+      const catalogRecord = await prisma.imagePrankItem.findFirst({
+        where: { id: catalogItem.id },
+        include: {
+          category: true,
+          subcategory: true,
+        },
+      });
+      if (catalogRecord?.category) {
+        catalogItem = {
+          ...catalogItem,
+          slug: catalogRecord.slug || catalogItem.slug,
+          title: catalogRecord.titleEn || catalogRecord.titleRu || catalogItem.title,
+          categorySlug: catalogRecord.category.slug,
+          categoryTitle: catalogRecord.category.titleEn || catalogRecord.category.titleRu || catalogItem.categoryTitle,
+          subcategorySlug: catalogRecord.subcategory?.slug ?? null,
+          subcategoryTitle: catalogRecord.subcategory
+            ? catalogRecord.subcategory.titleEn || catalogRecord.subcategory.titleRu || catalogItem.subcategoryTitle
+            : null,
+        };
+      }
+    }
     const imageKind = typeof initialPayload.imageKind === 'string'
       ? initialPayload.imageKind
       : (typeof imageStatusInfo?.imageKind === 'string' ? imageStatusInfo.imageKind : 'standalone');

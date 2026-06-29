@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Download, FileText, ImageIcon, Loader2, MoreVertical, Repeat2, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, FileText, ImageIcon, Loader2, MoreVertical, Repeat2, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -162,6 +162,15 @@ function sanitizeFilename(input: string | null | undefined) {
   return (value || 'yumcut-image').slice(0, 120);
 }
 
+function buildImagePrankCatalogHref(categorySlug?: string | null, subcategorySlug?: string | null) {
+  const params = new URLSearchParams({ openMode: 'image-prank' });
+  const category = categorySlug?.trim();
+  const subcategory = subcategorySlug?.trim();
+  if (category) params.set('category', category);
+  if (category && subcategory) params.set('subcategory', subcategory);
+  return `/?${params.toString()}`;
+}
+
 function extensionFromContentType(type: string | null | undefined, fallback: string) {
   const lower = (type || '').toLowerCase();
   if (lower.includes('png')) return 'png';
@@ -267,6 +276,13 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
   const originalFormat = (image?.resultFormat || 'jpg').toLowerCase();
   const baseFilename = sanitizeFilename(project.title || prompt);
   const catalogItemHref = image?.catalogItem?.slug ? `/image-prank/${encodeURIComponent(image.catalogItem.slug)}` : null;
+  const imagePrankRootHref = buildImagePrankCatalogHref();
+  const categorySlug = image?.catalogItem?.categorySlug?.trim() || null;
+  const categoryTitle = image?.catalogItem?.categoryTitle?.trim() || null;
+  const subcategorySlug = image?.catalogItem?.subcategorySlug?.trim() || null;
+  const subcategoryTitle = image?.catalogItem?.subcategoryTitle?.trim() || null;
+  const categoryHref = categorySlug ? buildImagePrankCatalogHref(categorySlug) : null;
+  const subcategoryHref = categorySlug && subcategorySlug ? buildImagePrankCatalogHref(categorySlug, subcategorySlug) : null;
   const reuseHref = isImagePrank
     ? `${catalogItemHref ?? '/image-prank/custom'}?reuseProjectId=${encodeURIComponent(projectId)}`
     : null;
@@ -359,15 +375,52 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
 
       <Card>
         <CardHeader className="flex flex-col gap-3 border-b border-gray-200/80 pb-3 dark:border-gray-800/80 sm:flex-row sm:items-center sm:justify-between">
-          <div className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100">
             <ImageIcon className="h-4 w-4 text-blue-500" />
-            {isImagePrank
-              ? t.imagePrank
-              : resultImageUrl
-                ? t.generatedImage
-                : isError
-                  ? t.generationFailed
-                  : t.generatingImage}
+            {isImagePrank ? (
+              <>
+                <Link
+                  href={imagePrankRootHref}
+                  className="min-w-0 cursor-pointer rounded-sm hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-blue-300"
+                >
+                  {t.imagePrank}
+                </Link>
+                {categoryTitle ? (
+                  <>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                    {categoryHref ? (
+                      <Link
+                        href={categoryHref}
+                        className="min-w-0 cursor-pointer truncate rounded-sm hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-blue-300"
+                      >
+                        {categoryTitle}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 truncate">{categoryTitle}</span>
+                    )}
+                  </>
+                ) : null}
+                {subcategoryTitle ? (
+                  <>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                    {subcategoryHref ? (
+                      <Link
+                        href={subcategoryHref}
+                        className="min-w-0 cursor-pointer truncate rounded-sm hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-blue-300"
+                      >
+                        {subcategoryTitle}
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 truncate">{subcategoryTitle}</span>
+                    )}
+                  </>
+                ) : null}
+              </>
+            ) : resultImageUrl
+              ? t.generatedImage
+              : isError
+                ? t.generationFailed
+                : t.generatingImage}
           </div>
         </CardHeader>
         <CardContent className="pt-5">

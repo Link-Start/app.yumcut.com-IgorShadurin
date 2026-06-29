@@ -181,7 +181,10 @@ export interface ImagePrankReuseDTO {
     id: string;
     slug: string;
     title: string;
+    categorySlug?: string | null;
     categoryTitle?: string | null;
+    subcategorySlug?: string | null;
+    subcategoryTitle?: string | null;
   } | null;
   sourceImages: ImagePrankSourceImageDTO[];
 }
@@ -390,7 +393,10 @@ export interface ProjectDetailDTO {
       id: string;
       slug: string;
       title: string;
+      categorySlug?: string | null;
       categoryTitle?: string | null;
+      subcategorySlug?: string | null;
+      subcategoryTitle?: string | null;
     } | null;
     estimatedDurationSeconds: number;
     startedAt: string;

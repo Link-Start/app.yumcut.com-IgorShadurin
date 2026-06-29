@@ -7,6 +7,7 @@ import { IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS } from '@/shared/constants/image-g
 const prismaMock = {
   project: { findFirst: vi.fn() },
   job: { findFirst: vi.fn() },
+  imagePrankItem: { findFirst: vi.fn() },
   projectTemplateImage: { findMany: vi.fn() },
   character: { findUnique: vi.fn() },
   characterVariation: { findUnique: vi.fn() },
@@ -29,6 +30,7 @@ describe('project experience routing payload', () => {
     vi.mocked(authenticateApiRequest).mockResolvedValue({ userId: 'user-1', source: 'session' } as any);
     vi.mocked(getAdminImageEditorSettings).mockResolvedValue({ enabled: false });
     prismaMock.projectTemplateImage.findMany.mockResolvedValue([]);
+    prismaMock.imagePrankItem.findFirst.mockResolvedValue(null);
     prismaMock.project.findFirst.mockResolvedValue({
       id: 'p1',
       userId: 'user-1',
@@ -111,6 +113,79 @@ describe('project experience routing payload', () => {
     expect(body.languageVariants?.[0]).toEqual(expect.objectContaining({
       finalVideoPath: 'https://cdn.test/final.mp4',
       rawVideoPath: 'https://cdn.test/raw.mp4',
+    }));
+  });
+
+  it('enriches legacy image prank catalog metadata for breadcrumbs', async () => {
+    prismaMock.project.findFirst.mockResolvedValue({
+      id: 'p1',
+      userId: 'user-1',
+      title: 'Image Prank: Demo',
+      prompt: 'Prompt',
+      rawScript: null,
+      status: ProjectStatus.Done,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+      languages: ['en'],
+      scripts: [],
+      audios: [],
+      videos: [],
+      images: [{ path: 'projects/p1/result.jpg', publicUrl: 'https://cdn.test/result.jpg' }],
+      statusLog: [{ status: ProjectStatus.Done, extra: {} }],
+      selection: null,
+      template: null,
+    });
+    prismaMock.job.findFirst.mockResolvedValue({
+      payload: {
+        projectExperience: 'image-generation',
+        imageKind: 'image-prank',
+        prompt: 'System prompt',
+        userPrompt: 'Place the prank image',
+        provider: 'runware',
+        model: 'bytedance:seedream@4.5',
+        width: 1440,
+        height: 2560,
+        imagePrank: {
+          mode: 'catalog',
+          catalogItem: {
+            id: 'item-1',
+            slug: 'club-nika',
+            title: 'Nika',
+            categoryTitle: 'Main',
+          },
+          sourceImages: [],
+        },
+      },
+    });
+    prismaMock.imagePrankItem.findFirst.mockResolvedValue({
+      id: 'item-1',
+      slug: 'club-nika',
+      titleEn: 'Nika',
+      titleRu: '',
+      category: {
+        slug: 'main',
+        titleEn: 'Main',
+        titleRu: '',
+      },
+      subcategory: {
+        slug: 'club-women',
+        titleEn: 'Club women',
+        titleRu: '',
+      },
+    });
+    const route = await import('@/app/api/projects/[projectId]/route');
+    const req = new NextRequest('http://localhost/api/projects/p1');
+
+    const res = await route.GET(req, { params: Promise.resolve({ projectId: 'p1' }) });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.imageGeneration?.catalogItem).toEqual(expect.objectContaining({
+      id: 'item-1',
+      slug: 'club-nika',
+      categorySlug: 'main',
+      categoryTitle: 'Main',
+      subcategorySlug: 'club-women',
+      subcategoryTitle: 'Club women',
     }));
   });
 });
