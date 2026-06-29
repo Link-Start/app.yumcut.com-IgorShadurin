@@ -784,7 +784,7 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
             </p>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 self-start">
             <div className="flex flex-col space-y-2">
               <Label htmlFor="image-prank-prompt" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {copy.promptLabel}
@@ -794,75 +794,77 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder={promptPlaceholder}
-                className="h-[260px] resize-none lg:h-[320px]"
+                className="h-[160px] resize-none sm:h-[170px] lg:h-[190px]"
                 disabled={submitting || reuseLoading}
               />
             </div>
 
-            <div className="grid gap-2 sm:max-w-[360px]">
-              <Label htmlFor="image-prank-model" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {copy.modelLabel}
-              </Label>
-              <Select
-                value={selectedModel ?? DEFAULT_MODEL_SELECT_VALUE}
-                onValueChange={(value) => {
-                  setSelectedModel(value === DEFAULT_MODEL_SELECT_VALUE ? null : normalizeSelectableImagePrankGenerationModel(value));
-                }}
-                disabled={submitting || reuseLoading}
-              >
-                <SelectTrigger id="image-prank-model" className="cursor-pointer">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={DEFAULT_MODEL_SELECT_VALUE} className="cursor-pointer">
-                    {copy.defaultModelLabel}
-                  </SelectItem>
-                  {IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS.filter((model) => !model.isDefault).map((model) => (
-                    <SelectItem key={model.id} value={model.id} className="cursor-pointer">
-                      {model.label}
+            <div className="grid items-end gap-3 lg:grid-cols-[minmax(220px,320px)_minmax(0,1fr)]">
+              <div className="grid gap-2">
+                <Label htmlFor="image-prank-model" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {copy.modelLabel}
+                </Label>
+                <Select
+                  value={selectedModel ?? DEFAULT_MODEL_SELECT_VALUE}
+                  onValueChange={(value) => {
+                    setSelectedModel(value === DEFAULT_MODEL_SELECT_VALUE ? null : normalizeSelectableImagePrankGenerationModel(value));
+                  }}
+                  disabled={submitting || reuseLoading}
+                >
+                  <SelectTrigger id="image-prank-model" className="h-9 cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DEFAULT_MODEL_SELECT_VALUE} className="cursor-pointer">
+                      {copy.defaultModelLabel}
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS.filter((model) => !model.isDefault).map((model) => (
+                      <SelectItem key={model.id} value={model.id} className="cursor-pointer">
+                        {model.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {!item ? (
+                <div className="inline-flex h-9 w-full items-center gap-1 rounded-full border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-900">
+                  {[
+                    { value: false, label: copy.twoImages, Icon: Images },
+                    { value: true, label: copy.oneImage, Icon: ImagePlus },
+                  ].map((option) => {
+                    const active = oneImageMode === option.value;
+                    const OptionIcon = option.Icon;
+                    return (
+                      <button
+                        key={String(option.value)}
+                        type="button"
+                        onClick={() => {
+                          setOneImageMode(option.value);
+                          if (option.value) {
+                            setPrankFile(null);
+                            setPrankSource(null);
+                          }
+                        }}
+                        className={cn(
+                          'inline-flex h-7 min-w-0 cursor-pointer items-center gap-1 rounded-full px-3 text-sm font-medium leading-none transition-[background-color,color,box-shadow]',
+                          active
+                            ? 'bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.35)]'
+                            : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white',
+                        )}
+                        aria-pressed={active}
+                        disabled={submitting || reuseLoading}
+                      >
+                        <OptionIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span className="inline-flex min-w-0 items-center whitespace-nowrap leading-none">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
 
-            {!item ? (
-              <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-900">
-                {[
-                  { value: false, label: copy.twoImages, Icon: Images },
-                  { value: true, label: copy.oneImage, Icon: ImagePlus },
-                ].map((option) => {
-                  const active = oneImageMode === option.value;
-                  const OptionIcon = option.Icon;
-                  return (
-                    <button
-                      key={String(option.value)}
-                      type="button"
-                      onClick={() => {
-                        setOneImageMode(option.value);
-                        if (option.value) {
-                          setPrankFile(null);
-                          setPrankSource(null);
-                        }
-                      }}
-                      className={cn(
-                        'inline-flex h-8 cursor-pointer items-center gap-1 rounded-full px-3 text-sm font-medium leading-none transition-[background-color,color,box-shadow]',
-                        active
-                          ? 'bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.35)]'
-                          : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white',
-                      )}
-                      aria-pressed={active}
-                      disabled={submitting || reuseLoading}
-                    >
-                      <OptionIcon className="h-4 w-4" aria-hidden="true" />
-                      <span className="inline-flex items-center whitespace-nowrap leading-none">{option.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            <Button type="button" className="w-full cursor-pointer" onClick={() => void handleContinue()} disabled={submitting || reuseLoading}>
+            <Button type="button" className="h-10 w-full cursor-pointer" onClick={() => void handleContinue()} disabled={submitting || reuseLoading}>
               {submitting || reuseLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
               {submitting ? copy.uploading : reuseLoading ? copy.loading : copy.create}
             </Button>
