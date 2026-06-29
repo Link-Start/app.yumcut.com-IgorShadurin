@@ -158,8 +158,19 @@ function formatCountdown(ms: number) {
 }
 
 function sanitizeFilename(input: string | null | undefined) {
-  const value = (input || 'yumcut-image').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
-  return (value || 'yumcut-image').slice(0, 120);
+  const value = (input || 'image-prank')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/[^\p{L}\p{N}._ -]+/gu, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .trim();
+  return (value || 'image-prank').slice(0, 96).replace(/^-|-$/g, '') || 'image-prank';
+}
+
+function buildDownloadBaseFilename(input: string | null | undefined, projectId: string) {
+  const shortProjectId = projectId.trim().slice(0, 8) || 'project';
+  return `${sanitizeFilename(input)}-${shortProjectId}-yumcut.com`;
 }
 
 function buildImagePrankCatalogHref(categorySlug?: string | null, subcategorySlug?: string | null) {
@@ -274,7 +285,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
       ? t.progressCountdown(formatCountdown(remainingGenerationMs))
       : t.progressWaiting;
   const originalFormat = (image?.resultFormat || 'jpg').toLowerCase();
-  const baseFilename = sanitizeFilename(project.title || prompt);
+  const baseFilename = buildDownloadBaseFilename(prompt || project.title, projectId);
   const catalogItemHref = image?.catalogItem?.slug ? `/image-prank/${encodeURIComponent(image.catalogItem.slug)}` : null;
   const imagePrankRootHref = buildImagePrankCatalogHref();
   const categorySlug = image?.catalogItem?.categorySlug?.trim() || null;
