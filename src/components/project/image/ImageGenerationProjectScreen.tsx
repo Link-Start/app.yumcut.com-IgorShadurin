@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, FileText, ImageIcon, Loader2, MoreVertical, Repeat2, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, FileText, ImageIcon, Loader2, Maximize2, MoreVertical, Repeat2, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,7 @@ const COPY: Record<AppLanguageCode, {
   reuse: string;
   sourceImage: string;
   referenceImages: string;
+  zoomImage: string;
   catalogCharacter: string;
   noSourceImage: string;
   source: string;
@@ -89,6 +90,7 @@ const COPY: Record<AppLanguageCode, {
     reuse: 'Reuse',
     sourceImage: 'Source image',
     referenceImages: 'Reference images',
+    zoomImage: 'Open image preview',
     catalogCharacter: 'Catalog character',
     noSourceImage: 'No source image was attached.',
     source: 'Source',
@@ -124,11 +126,17 @@ const COPY: Record<AppLanguageCode, {
     reuse: 'Повторить',
     sourceImage: 'Исходное изображение',
     referenceImages: 'Референсные изображения',
+    zoomImage: 'Открыть предпросмотр изображения',
     catalogCharacter: 'Персонаж из каталога',
     noSourceImage: 'Исходное изображение не было прикреплено.',
     source: 'Источник',
     unknown: 'Неизвестно',
   },
+};
+
+type ZoomImage = {
+  url: string;
+  label: string;
 };
 
 function getProgressPercent(project: ProjectDetailDTO, nowMs: number) {
@@ -268,6 +276,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState<DownloadFormat | null>(null);
+  const [zoomImage, setZoomImage] = useState<ZoomImage | null>(null);
   const image = project.imageGeneration ?? null;
   const isImagePrank = image?.kind === 'image-prank';
   const sourceImages = image?.sourceImages?.filter((source) => source.imageUrl) ?? [];
@@ -344,6 +353,12 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
     } finally {
       setDownloading(null);
     }
+  };
+
+  const openZoomImage = (url: string | null | undefined, label: string) => {
+    const normalizedUrl = url?.trim();
+    if (!normalizedUrl) return;
+    setZoomImage({ url: normalizedUrl, label });
   };
 
   return (
@@ -583,14 +598,28 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                         const isCatalogPrankCard = source.role === 'prank' && Boolean(catalogItemHref);
                         const cardContent = (
                           <>
-                            <div className="flex min-h-[240px] flex-1 items-center justify-center overflow-hidden md:min-h-[300px]">
+                            <button
+                              type="button"
+                              className="group relative flex min-h-[240px] flex-1 cursor-pointer items-center justify-center overflow-hidden md:min-h-[300px]"
+                              aria-label={`${t.zoomImage}: ${source.label || t.referenceImages}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openZoomImage(source.imageUrl || source.previewImageUrl, source.label || t.referenceImages);
+                              }}
+                            >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={source.previewImageUrl || source.imageUrl || ''}
                                 alt={source.label || t.referenceImages}
                                 className="h-full max-h-[360px] w-full object-contain"
                               />
-                            </div>
+                              <span
+                                className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white opacity-85 shadow-lg transition-opacity group-hover:opacity-100"
+                                aria-hidden="true"
+                              >
+                                <Maximize2 className="h-4 w-4" />
+                              </span>
+                            </button>
                             <div className="min-w-0">
                               <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                                 {source.label || t.referenceImages}
@@ -601,13 +630,13 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
 
                         if (isCatalogPrankCard && catalogItemHref) {
                           return (
-                            <Link
+                            <div
                               key={key}
-                              href={catalogItemHref}
                               className="grid h-full cursor-pointer gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900/60 dark:hover:bg-gray-900"
+                              onClick={() => router.push(catalogItemHref)}
                             >
                               {cardContent}
-                            </Link>
+                            </div>
                           );
                         }
 
@@ -624,10 +653,21 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                   </div>
                 ) : image?.originalImageUrl ? (
                   <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
-                    <div className="flex h-[160px] w-[160px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+                    <button
+                      type="button"
+                      className="group relative flex h-[160px] w-[160px] cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900"
+                      aria-label={`${t.zoomImage}: ${t.sourceImage}`}
+                      onClick={() => openZoomImage(image.originalImageUrl, t.sourceImage)}
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={image.originalImageUrl} alt={t.sourceImage} className="h-full w-full object-contain" />
-                    </div>
+                      <span
+                        className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white opacity-85 shadow-lg transition-opacity group-hover:opacity-100"
+                        aria-hidden="true"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </span>
+                    </button>
                     <dl className="space-y-2 text-sm">
                       <div>
                         <dt className="text-gray-500 dark:text-gray-400">{t.source}</dt>
@@ -649,6 +689,23 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
+        <DialogContent
+          className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] border-0 bg-transparent p-0 shadow-none sm:max-w-[calc(100vw-3rem)]"
+          ariaDescription={zoomImage?.label ?? t.zoomImage}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{zoomImage?.label ?? t.zoomImage}</DialogTitle>
+          </DialogHeader>
+          {zoomImage ? (
+            <div className="flex max-h-[calc(100vh-2rem)] w-full items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={zoomImage.url} alt={zoomImage.label} className="max-h-[calc(100vh-4rem)] max-w-full object-contain" />
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
