@@ -68,6 +68,12 @@ const IMAGE_PRANK_MODEL_DIMENSIONS: Record<ImagePrankGenerationModel, { width: n
   'krea:krea@2-turbo': { width: 928, height: 1152 },
 };
 
+const IMAGE_PRANK_DIMENSION_STEP = 16;
+
+function roundDimensionToStep(value: number): number {
+  return Math.max(IMAGE_PRANK_DIMENSION_STEP, Math.round(value / IMAGE_PRANK_DIMENSION_STEP) * IMAGE_PRANK_DIMENSION_STEP);
+}
+
 export function normalizeImagePrankGenerationModel(value: string | null | undefined): ImagePrankGenerationModel | null {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return null;
@@ -76,6 +82,32 @@ export function normalizeImagePrankGenerationModel(value: string | null | undefi
 
 export function imagePrankGenerationDimensions(model: ImagePrankGenerationModel): { width: number; height: number } {
   return IMAGE_PRANK_MODEL_DIMENSIONS[model];
+}
+
+export function imagePrankGenerationDimensionsForAspect(
+  model: ImagePrankGenerationModel,
+  aspectRatio: number | null | undefined,
+): { width: number; height: number } {
+  const base = imagePrankGenerationDimensions(model);
+  if (!Number.isFinite(aspectRatio) || !aspectRatio || aspectRatio <= 0) {
+    return base;
+  }
+
+  const pixelBudget = base.width * base.height;
+  const maxSide = Math.max(base.width, base.height);
+  let width = Math.sqrt(pixelBudget * aspectRatio);
+  let height = Math.sqrt(pixelBudget / aspectRatio);
+  const longestSide = Math.max(width, height);
+  if (longestSide > maxSide) {
+    const scale = maxSide / longestSide;
+    width *= scale;
+    height *= scale;
+  }
+
+  return {
+    width: roundDimensionToStep(width),
+    height: roundDimensionToStep(height),
+  };
 }
 
 export type ImageGenerationModel = {

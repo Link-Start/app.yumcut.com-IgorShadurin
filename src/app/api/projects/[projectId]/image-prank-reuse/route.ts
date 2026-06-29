@@ -22,6 +22,10 @@ function normalizeRole(value: unknown): ImagePrankSourceImageRole {
     : 'reference';
 }
 
+function normalizeDimension(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
 function normalizeSourceImage(entry: unknown): ImagePrankSourceImageDTO | null {
   if (!entry || typeof entry !== 'object') return null;
   const source = entry as Record<string, unknown>;
@@ -44,6 +48,8 @@ function normalizeSourceImage(entry: unknown): ImagePrankSourceImageDTO | null {
     previewImageUrl: typeof source.previewImageUrl === 'string' && source.previewImageUrl.trim()
       ? source.previewImageUrl.trim()
       : normalizeMediaUrl(previewImagePath),
+    width: normalizeDimension(source.width),
+    height: normalizeDimension(source.height),
   };
 }
 

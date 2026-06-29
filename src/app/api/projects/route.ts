@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import path from 'path';
+import sharp, { type Metadata } from 'sharp';
 import { prisma } from '@/server/db';
 import { ok, unauthorized, error } from '@/server/http';
 import { withApiError } from '@/server/errors';
@@ -12,7 +14,7 @@ import {
   DEFAULT_IMAGE_GENERATION_HEIGHT,
   DEFAULT_IMAGE_GENERATION_WIDTH,
   type ImagePrankGenerationModel,
-  imagePrankGenerationDimensions,
+  imagePrankGenerationDimensionsForAspect,
   normalizeSelectableImagePrankGenerationModel,
 } from '@/shared/constants/image-generation';
 import { spendTokens, makeUserInitiator, TOKEN_TRANSACTION_TYPES } from '@/server/tokens';
@@ -35,7 +37,7 @@ import { defaultCharacterVideoGeneration } from '@/shared/constants/video-genera
 import { CHARACTER_PROJECT_TARGET_DURATION_SECONDS } from '@/shared/constants/character-project';
 import { linkProjectCreationAttemptToProject } from '@/server/analytics/project-attempts';
 import { getPublicImagePrankItemById } from '@/server/image-pranks';
-import { normalizeMediaUrl, toStoredMediaPath } from '@/server/storage';
+import { mediaRoot, normalizeMediaUrl, toStoredMediaPath } from '@/server/storage';
 import type {
   ImagePrankCatalogItemDTO,
   ImagePrankMode,
@@ -578,6 +580,11 @@ type ResolvedImagePrankPayload = {
   } | null;
 };
 
+type ImageDimensions = {
+  width: number;
+  height: number;
+};
+
 const IMAGE_PRANK_SYSTEM_PROMPT = [
   'System instruction for Image Prank generation:',
   'Use the provided reference images in the exact order supplied.',
@@ -615,6 +622,52 @@ function normalizeUploadedImageSource(source: ImagePrankRequestSource): ImagePra
     imagePath: path,
     imageUrl: normalizeMediaUrl(path),
   };
+}
+
+function safePositiveInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+function orientedImageDimensions(metadata: Metadata): ImageDimensions | null {
+  let width = safePositiveInteger(metadata.width);
+  let height = safePositiveInteger(metadata.height);
+  if (!width || !height) return null;
+
+  const orientation = typeof metadata.orientation === 'number' ? metadata.orientation : null;
+  if (orientation && orientation >= 5 && orientation <= 8) {
+    [width, height] = [height, width];
+  }
+
+  return { width, height };
+}
+
+async function readStoredImageDimensions(mediaPath: string | null | undefined): Promise<ImageDimensions | null> {
+  if (!mediaPath) return null;
+  try {
+    const storedPath = toStoredMediaPath(mediaPath);
+    const root = path.resolve(mediaRoot());
+    const filePath = path.resolve(root, storedPath);
+    if (filePath !== root && !filePath.startsWith(`${root}${path.sep}`)) return null;
+
+    const metadata = await sharp(filePath).metadata();
+    return orientedImageDimensions(metadata);
+  } catch {
+    return null;
+  }
+}
+
+async function withSourceImageDimensions(source: ImagePrankSourceImageDTO): Promise<ImagePrankSourceImageDTO> {
+  const dimensions = await readStoredImageDimensions(source.imagePath);
+  return dimensions ? { ...source, ...dimensions } : source;
+}
+
+function imagePrankReferenceAspectRatio(payload: ResolvedImagePrankPayload): number | null {
+  const source = payload.sourceImages.find((entry) => entry.role === 'target')
+    ?? payload.sourceImages.find((entry) => entry.role === 'reference')
+    ?? null;
+  const width = safePositiveInteger(source?.width);
+  const height = safePositiveInteger(source?.height);
+  return width && height ? width / height : null;
 }
 
 async function resolveImagePrankPayload(input: {
@@ -670,6 +723,8 @@ async function resolveImagePrankPayload(input: {
     }
     sourceImages = [{ ...target, label: target.label || 'Reference image' }];
   }
+
+  sourceImages = await Promise.all(sourceImages.map(withSourceImageDimensions));
 
   return {
     mode: imagePrank.mode,
@@ -728,7 +783,10 @@ async function createImageGenerationProject(params: {
   }
 
   const imagePrankDimensions = resolvedImagePrank
-    ? imagePrankGenerationDimensions(resolvedImagePrank.model)
+    ? imagePrankGenerationDimensionsForAspect(
+        resolvedImagePrank.model,
+        imagePrankReferenceAspectRatio(resolvedImagePrank),
+      )
     : null;
   const imageSpec = {
     provider: 'runware',

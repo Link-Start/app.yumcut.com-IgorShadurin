@@ -126,6 +126,8 @@ export interface ImagePrankSourceImageDTO {
   imagePath?: string | null;
   previewImageUrl?: string | null;
   previewImagePath?: string | null;
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface ImagePrankCatalogItemDTO {
