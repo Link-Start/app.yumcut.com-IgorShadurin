@@ -219,6 +219,31 @@ describe('project creation from character slug', () => {
     }));
   });
 
+  it('rejects explicit NSFW image prompts from mobile before charging tokens', async () => {
+    authenticateApiRequestMock.mockResolvedValue({
+      userId: 'user-1',
+      source: 'mobile',
+    });
+
+    const route = await import('@/app/api/projects/route');
+    const req = new NextRequest('http://localhost/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({
+        prompt: 'Generate a naked person',
+        projectExperience: 'image-generation',
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const res = await route.POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error?.message).toBe('This prompt cannot be generated from the iOS app.');
+    expect(spendTokensMock).not.toHaveBeenCalled();
+    expect(prismaMock.project.create).not.toHaveBeenCalled();
+    expect(prismaMock.job.create).not.toHaveBeenCalled();
+  });
+
   it('charges low-quality character projects at the low-quality fixed cost', async () => {
     prismaMock.character.findFirst.mockResolvedValue({
       id: 'char-1',

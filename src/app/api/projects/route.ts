@@ -618,8 +618,33 @@ const IOS_IMAGE_GENERATION_NEGATIVE_PROMPT = [
   'sexualized minors',
 ].join(', ');
 
+const IOS_BLOCKED_NSFW_PROMPT_PATTERNS = [
+  /\bnud(e|ity)\b/i,
+  /\bnaked\b/i,
+  /\bporn(?:ographic|ography)?\b/i,
+  /\bexplicit\s+sexual\b/i,
+  /\bsexual\s+content\b/i,
+  /\bsex\b/i,
+  /\berotic\b/i,
+  /\bfetish\b/i,
+  /\bmasturbat\w*\b/i,
+  /\borgasm\w*\b/i,
+  /\bgenitals?\b/i,
+  /\bpenis\b/i,
+  /\bvagina\b/i,
+  /\bblow\s*job\b/i,
+  /\bhand\s*job\b/i,
+  /\bcum(?:shot)?\b/i,
+  /\bunderage\b/i,
+  /\bminor\s+sexual\b/i,
+] as const;
+
 function shouldBlockNsfwForAuth(auth: NonNullable<Awaited<ReturnType<typeof authenticateApiRequest>>>) {
   return auth.source === 'mobile';
+}
+
+function hasBlockedIosNsfwPrompt(prompt: string) {
+  return IOS_BLOCKED_NSFW_PROMPT_PATTERNS.some((pattern) => pattern.test(prompt));
 }
 
 function buildImageGenerationPrompt(userPrompt: string, blockNsfw: boolean) {
@@ -796,6 +821,13 @@ async function createImageGenerationProject(params: {
     return error('VALIDATION_ERROR', 'Prompt cannot be empty', 400);
   }
   const blockNsfw = shouldBlockNsfwForAuth(params.auth);
+  if (blockNsfw && hasBlockedIosNsfwPrompt(prompt)) {
+    return error(
+      'VALIDATION_ERROR',
+      'This prompt cannot be generated from the iOS app.',
+      400,
+    );
+  }
   const generationPrompt = buildImageGenerationPrompt(prompt, blockNsfw);
 
   const normalizedCharacterSlug =
