@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, FileText, ImageIcon, Loader2, Maximize2, MoreVertical, Repeat2, Trash2, UserRound } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, ExternalLink, FileText, ImageIcon, Loader2, Maximize2, MoreVertical, Repeat2, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -629,9 +629,20 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                               </span>
                             </button>
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                                {source.label || t.referenceImages}
-                              </div>
+                              {isCatalogPrankCard && catalogItemHref ? (
+                                <Link
+                                  href={catalogItemHref}
+                                  className="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-sm text-sm font-medium text-gray-900 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-100 dark:hover:text-blue-300"
+                                  onClick={(event) => event.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-500 dark:text-gray-400" />
+                                  <span className="truncate">{source.label || t.referenceImages}</span>
+                                </Link>
+                              ) : (
+                                <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {source.label || t.referenceImages}
+                                </div>
+                              )}
                             </div>
                           </>
                         );
