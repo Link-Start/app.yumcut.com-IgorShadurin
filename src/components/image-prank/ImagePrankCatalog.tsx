@@ -134,6 +134,16 @@ function findSubcategoryBySlugOrId(categories: ImagePrankCatalogCategoryDTO[], v
   return null;
 }
 
+function getDirectCategoryItems(category: ImagePrankCatalogCategoryDTO) {
+  return category.items.filter((item) => !item.subcategoryId);
+}
+
+function getSingleSubcategoryShortcut(category: ImagePrankCatalogCategoryDTO) {
+  const subcategories = category.subcategories ?? [];
+  if (subcategories.length !== 1) return null;
+  return getDirectCategoryItems(category).length === 0 ? subcategories[0] : null;
+}
+
 function resolveCatalogSelectionFromSearchParams(
   categories: ImagePrankCatalogCategoryDTO[],
   searchParams: URLSearchParams,
@@ -150,9 +160,10 @@ function resolveCatalogSelectionFromSearchParams(
   }
 
   const category = findCategoryBySlugOrId(categories, searchParams.get(IMAGE_PRANK_CATEGORY_PARAM));
+  const shortcutSubcategory = category ? getSingleSubcategoryShortcut(category) : null;
   return {
     categoryId: category?.id ?? null,
-    subcategoryId: null,
+    subcategoryId: shortcutSubcategory?.id ?? null,
     page,
   };
 }
@@ -450,8 +461,7 @@ export function ImagePrankCatalog({ categories }: Props) {
     if (hasMultipleCategories) return [];
     const onlyCategory = categories[0] ?? null;
     return onlyCategory
-      ? onlyCategory.items
-          .filter((item) => !item.subcategoryId)
+      ? getDirectCategoryItems(onlyCategory)
           .filter((item) => itemMatches(item, normalizedQuery, language))
       : [];
   }, [categories, hasMultipleCategories, language, normalizedQuery]);
@@ -463,11 +473,6 @@ export function ImagePrankCatalog({ categories }: Props) {
       : [];
   }, [categories, hasMultipleCategories, language, normalizedQuery]);
 
-  const categoryItems = useMemo(() => (
-    selectedCategory
-      ? selectedCategory.items.filter((item) => itemMatches(item, normalizedQuery, language))
-      : []
-  ), [language, normalizedQuery, selectedCategory]);
   const categorySubcategories = useMemo(() => (
     selectedCategory && !selectedSubcategory
       ? (selectedCategory.subcategories ?? []).filter((subcategory) => subcategoryMatches(subcategory, normalizedQuery, language))
@@ -475,9 +480,9 @@ export function ImagePrankCatalog({ categories }: Props) {
   ), [language, normalizedQuery, selectedCategory, selectedSubcategory]);
   const directCategoryItems = useMemo(() => (
     selectedCategory && !selectedSubcategory
-      ? categoryItems.filter((item) => !item.subcategoryId)
+      ? getDirectCategoryItems(selectedCategory).filter((item) => itemMatches(item, normalizedQuery, language))
       : []
-  ), [categoryItems, selectedCategory, selectedSubcategory]);
+  ), [language, normalizedQuery, selectedCategory, selectedSubcategory]);
   const subcategoryItems = useMemo(() => (
     selectedSubcategory
       ? selectedSubcategory.items.filter((item) => itemMatches(item, normalizedQuery, language))
@@ -530,9 +535,10 @@ export function ImagePrankCatalog({ categories }: Props) {
   const selectCategory = (categoryId: string) => {
     const category = categories.find((item) => item.id === categoryId) ?? null;
     if (!category) return;
-    pushCatalogUrl(buildImagePrankCatalogUrl({ category, page: 1 }));
+    const shortcutSubcategory = getSingleSubcategoryShortcut(category);
+    pushCatalogUrl(buildImagePrankCatalogUrl({ category, subcategory: shortcutSubcategory, page: 1 }));
     setSelectedCategoryId(category.id);
-    setSelectedSubcategoryId(null);
+    setSelectedSubcategoryId(shortcutSubcategory?.id ?? null);
     setPage(1);
   };
 
@@ -677,12 +683,13 @@ export function ImagePrankCatalog({ categories }: Props) {
           {pageEntries.map((entry, index) => {
             if (entry.type === 'custom') return <CustomCard key="custom" copy={copy} />;
             if (entry.type === 'category') {
+              const shortcutSubcategory = getSingleSubcategoryShortcut(entry.category);
               return (
                 <CategoryCard
                   key={entry.category.id}
                   category={entry.category}
                   language={language}
-                  href={buildImagePrankCatalogUrl({ category: entry.category, page: 1 })}
+                  href={buildImagePrankCatalogUrl({ category: entry.category, subcategory: shortcutSubcategory, page: 1 })}
                   onSelect={() => selectCategory(entry.category.id)}
                 />
               );
