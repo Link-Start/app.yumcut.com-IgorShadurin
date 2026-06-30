@@ -205,12 +205,12 @@ function CssPlus() {
 }
 
 function Streaks({
-  color = '#d19a3d',
-  highlight = '#ffd996',
+  color = '#f0b24b',
+  highlight = '#ffe2a1',
   offset = 0,
-  lineCount = 10,
-  baseOpacity = 0.34,
-  highlightOpacity = 0.32,
+  lineCount = 12,
+  baseOpacity = 0.5,
+  highlightOpacity = 0.44,
 }: {
   color?: string;
   highlight?: string;
@@ -220,10 +220,10 @@ function Streaks({
   highlightOpacity?: number;
 }) {
   const frame = useCurrentFrame();
-  const progress = fade(frame, 18 + offset, 62 + offset);
+  const progress = fade(frame, 4 + offset, 32 + offset);
   const exit = fade(frame, 78 + offset, 98 + offset);
   const opacity = clamp(progress - exit, 0, 1);
-  const gradientOpacity = Math.min(0.72, baseOpacity + 0.18);
+  const gradientOpacity = Math.min(0.78, baseOpacity + 0.24);
 
   return (
     <AbsoluteFill style={{ opacity, mixBlendMode: 'screen', pointerEvents: 'none' }}>
@@ -254,16 +254,16 @@ function Streaks({
                 d={path}
                 fill="none"
                 stroke={`url(#streak-${offset})`}
-                strokeWidth={2.2 + (index % 3) * 0.7}
+                strokeWidth={2.8 + (index % 3) * 0.8}
                 strokeLinecap="round"
                 opacity={linePulse * baseOpacity}
-                filter="blur(0.8px)"
+                filter="blur(0.7px)"
               />
               <path
                 d={path}
                 fill="none"
                 stroke={highlight}
-                strokeWidth={1.5 + (index % 2) * 0.4}
+                strokeWidth={1.7 + (index % 2) * 0.45}
                 strokeLinecap="round"
                 strokeDasharray="120 560"
                 strokeDashoffset={sweep}
