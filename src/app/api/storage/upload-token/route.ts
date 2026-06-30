@@ -7,6 +7,7 @@ import { authenticateApiRequest } from '@/server/api-user';
 
 const bodySchema = z.object({
   ttlMs: z.number().int().min(1_000).max(30 * 60 * 1_000).optional(),
+  maxBytes: z.number().int().positive().max(10 * 1024 * 1024).optional(),
 });
 
 export const runtime = 'nodejs';
@@ -26,6 +27,7 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     userId,
     purpose: 'user-character-image',
     ttlMs: parsed.data.ttlMs,
+    maxBytes: parsed.data.maxBytes,
   });
 
   return ok({

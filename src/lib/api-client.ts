@@ -196,7 +196,11 @@ export const Api = {
     }),
   getCharacters: () => api('/api/characters'),
   getImagePrankCatalog: () => api<import('@/shared/types').ImagePrankCatalogDTO>('/api/image-pranks'),
-  createCharacterUploadToken: () => api<{ data: string; signature: string; expiresAt: string; mimeTypes: string[]; maxBytes: number }>('/api/storage/upload-token', { method: 'POST' }),
+  createCharacterUploadToken: (payload?: { maxBytes?: number; ttlMs?: number }) =>
+    api<{ data: string; signature: string; expiresAt: string; mimeTypes: string[]; maxBytes: number }>('/api/storage/upload-token', {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {}),
+    }),
   completeCharacterUpload: (payload: { data: string; signature: string; path: string; url: string; title: string; description?: string; attachToCharacterId?: string }) =>
     api('/api/characters/custom/upload', { method: 'POST', body: JSON.stringify(payload) }),
   generateCharacterImage: (payload: { title: string; description: string; attachToCharacterId?: string }) =>

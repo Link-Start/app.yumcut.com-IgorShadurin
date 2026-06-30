@@ -57,7 +57,8 @@ type DeleteImageTarget = {
   label: string;
 };
 
-const MAX_STORAGE_IMAGE_DIMENSION = 2000;
+const MAX_STORAGE_IMAGE_DIMENSION = 1080;
+const IMAGE_PRANK_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_MODEL_SELECT_VALUE = '__default__';
 
 const MODEL_LABELS: Record<ImagePrankSelectableModel, string> = Object.fromEntries(
@@ -350,9 +351,9 @@ function UploadSlot({
 }
 
 async function uploadSource(file: File, role: ImagePrankSourceImageRole, label: string, storageBaseUrl: string): Promise<UploadedSource> {
-  const uploadFile = role === 'target' ? await resizeImageForStorage(file) : file;
-  const grant = await Api.createCharacterUploadToken();
+  const grant = await Api.createCharacterUploadToken({ maxBytes: IMAGE_PRANK_UPLOAD_MAX_BYTES });
   if (!grant?.data || !grant.signature) throw new Error('Upload authorization failed');
+  const uploadFile = await prepareImageForStorage(file, grant.maxBytes);
   if (!grant.mimeTypes.includes(uploadFile.type)) throw new Error('Selected file type is not allowed');
   if (uploadFile.size > grant.maxBytes) {
     throw new Error(`File is too large. Maximum size is ${Math.floor(grant.maxBytes / 1024 / 1024)}MB`);
@@ -381,15 +382,13 @@ async function uploadSource(file: File, role: ImagePrankSourceImageRole, label: 
   };
 }
 
-function imageMimeAndName(file: File) {
-  if (file.type === 'image/png') return { mimeType: 'image/png', extension: 'png' };
-  if (file.type === 'image/webp') return { mimeType: 'image/webp', extension: 'webp' };
-  return { mimeType: 'image/jpeg', extension: 'jpg' };
-}
-
 function fileNameWithExtension(fileName: string, extension: string) {
   const base = fileName.trim().replace(/\.[a-z0-9]+$/i, '') || 'target-image';
   return `${base}.${extension}`;
+}
+
+function isSupportedUploadImage(file: File) {
+  return file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp';
 }
 
 async function decodeImageFile(file: File): Promise<HTMLImageElement> {
@@ -409,29 +408,37 @@ async function decodeImageFile(file: File): Promise<HTMLImageElement> {
   });
 }
 
-async function resizeImageForStorage(file: File): Promise<File> {
+async function prepareImageForStorage(file: File, maxBytes: number): Promise<File> {
   const decoded = await decodeImageFile(file);
   const width = decoded.naturalWidth;
   const height = decoded.naturalHeight;
   const maxDimension = Math.max(width, height);
-  if (!width || !height || maxDimension <= MAX_STORAGE_IMAGE_DIMENSION) return file;
-
-  const scale = MAX_STORAGE_IMAGE_DIMENSION / maxDimension;
-  const targetWidth = Math.max(1, Math.round(width * scale));
-  const targetHeight = Math.max(1, Math.round(height * scale));
-  const { mimeType, extension } = imageMimeAndName(file);
-  const quality = mimeType === 'image/jpeg' ? 0.94 : mimeType === 'image/webp' ? 0.95 : undefined;
-  const fileName = fileNameWithExtension(file.name, extension);
-
-  if (typeof OffscreenCanvas !== 'undefined') {
-    const canvas = new OffscreenCanvas(targetWidth, targetHeight);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas is not available');
-    ctx.drawImage(decoded, 0, 0, targetWidth, targetHeight);
-    const blob = await canvas.convertToBlob({ type: mimeType, quality });
-    return new File([blob], fileName, { type: mimeType });
+  if (!width || !height) return file;
+  if (maxDimension <= MAX_STORAGE_IMAGE_DIMENSION && file.size <= maxBytes && isSupportedUploadImage(file)) {
+    return file;
   }
 
+  let scale = Math.min(1, MAX_STORAGE_IMAGE_DIMENSION / maxDimension);
+  const fileName = fileNameWithExtension(file.name, 'jpg');
+  const qualitySteps = [0.92, 0.86, 0.8, 0.72, 0.64, 0.56, 0.48, 0.4];
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+
+    for (const quality of qualitySteps) {
+      const blob = await renderImageBlob(decoded, targetWidth, targetHeight, quality);
+      if (blob.size <= maxBytes) {
+        return new File([blob], fileName, { type: 'image/jpeg' });
+      }
+    }
+    scale *= 0.85;
+  }
+
+  throw new Error(`File is too large. Maximum size is ${Math.floor(maxBytes / 1024 / 1024)}MB`);
+}
+
+async function renderImageBlob(decoded: HTMLImageElement, targetWidth: number, targetHeight: number, quality: number): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = targetWidth;
   canvas.height = targetHeight;
@@ -439,10 +446,10 @@ async function resizeImageForStorage(file: File): Promise<File> {
   if (!ctx) throw new Error('Canvas is not available');
   ctx.drawImage(decoded, 0, 0, targetWidth, targetHeight);
   const blob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob((output) => resolve(output), mimeType, quality);
+    canvas.toBlob((output) => resolve(output), 'image/jpeg', quality);
   });
   if (!blob) throw new Error('Failed to resize image');
-  return new File([blob], fileName, { type: mimeType });
+  return blob;
 }
 
 export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO | null }) {

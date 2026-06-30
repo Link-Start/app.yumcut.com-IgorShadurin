@@ -218,6 +218,7 @@ export function issueSignedUploadGrant(params: {
   userId: string;
   purpose: UploadGrantPurpose;
   ttlMs?: number;
+  maxBytes?: number;
 }): SignedUploadGrant & { payload: UploadGrantPayload } {
   const now = new Date();
   const ttl = params.ttlMs && params.ttlMs > 0 ? params.ttlMs : DEFAULT_TTL_MS;
@@ -229,7 +230,7 @@ export function issueSignedUploadGrant(params: {
     issuedAt: now.toISOString(),
     expiresAt: expires.toISOString(),
     nonce: Buffer.from(randomBytes(16)).toString('hex'),
-    maxBytes: 10 * 1024 * 1024,
+    maxBytes: params.maxBytes ?? 10 * 1024 * 1024,
     mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
   };
   const keyId = signingKeyId();
