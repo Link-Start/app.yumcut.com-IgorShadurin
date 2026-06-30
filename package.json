@@ -6,7 +6,7 @@
     "dev": "next dev --webpack",
     "build": "next build --turbopack",
     "start": "next start",
-    "types:check": "tsc --noEmit",
+    "types:check": "tsc --noEmit && tsc --noEmit -p tsconfig.welcome-prank-video.json",
     "types:check:common": "tsc --noEmit -p tsconfig.common.json",
     "prisma:generate": "prisma generate",
     "prisma:dev": "prisma migrate dev",
