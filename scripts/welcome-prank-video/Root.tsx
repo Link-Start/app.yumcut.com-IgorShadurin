@@ -468,6 +468,77 @@ function PinkEnergyBloom({ start = 126 }: { start?: number }) {
   );
 }
 
+function WomanDissolveGlow({ start = 136 }: { start?: number }) {
+  const frame = useCurrentFrame();
+  const progress = fade(frame, start, start + 14);
+  const exit = fade(frame, start + 34, start + 50);
+  const opacity = clamp(progress - exit, 0, 1);
+  const cardProgress = fade(frame, 93, 140);
+  const centerX = interpolate(cardProgress, [0, 1], [735, 807]);
+  const centerY = interpolate(cardProgress, [0, 1], [676, 986]);
+  const dissolve = fade(frame, start, start + 38);
+  const coreOpacity = clamp(fade(frame, start, start + 14) - fade(frame, start + 34, start + 50), 0, 1);
+
+  return (
+    <AbsoluteFill style={{ opacity, mixBlendMode: 'screen', pointerEvents: 'none' }}>
+      <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={{ position: 'absolute', inset: 0 }}>
+        <defs>
+          <radialGradient id="woman-dissolve-core" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fff6ff" stopOpacity="0.42" />
+            <stop offset="32%" stopColor="#f7b4ff" stopOpacity="0.22" />
+            <stop offset="70%" stopColor="#d76aff" stopOpacity="0.08" />
+            <stop offset="100%" stopColor="#d76aff" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="woman-dissolve-line" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#f8a8ff" stopOpacity="0" />
+            <stop offset="50%" stopColor="#ffe7ff" stopOpacity="0.42" />
+            <stop offset="100%" stopColor="#f8a8ff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <ellipse
+          cx={centerX}
+          cy={centerY + 42}
+          rx={interpolate(dissolve, [0, 1], [230, 340])}
+          ry={interpolate(dissolve, [0, 1], [170, 240])}
+          fill="url(#woman-dissolve-core)"
+          opacity={coreOpacity}
+          filter="blur(20px)"
+        />
+        {Array.from({ length: 8 }).map((_, index) => {
+          const y = centerY - 250 + index * 68 + Math.sin((frame + index * 11) / 8) * 12;
+          const sweep = -420 + ((frame * (14 + index) + index * 51) % 840);
+          const path = `M ${centerX - 360} ${y} C ${centerX - 120} ${y - 34} ${centerX + 140} ${y + 42} ${centerX + 390} ${y - 18}`;
+
+          return (
+            <g key={index}>
+              <path
+                d={path}
+                fill="none"
+                stroke="url(#woman-dissolve-line)"
+                strokeWidth={3 + (index % 3)}
+                strokeLinecap="round"
+                opacity={0.18 + coreOpacity * 0.2}
+                filter="blur(0.5px)"
+              />
+              <path
+                d={path}
+                fill="none"
+                stroke="#ffe6ff"
+                strokeWidth={1.4}
+                strokeLinecap="round"
+                strokeDasharray="90 360"
+                strokeDashoffset={sweep}
+                opacity={0.34 * coreOpacity}
+                filter="blur(0.2px)"
+              />
+            </g>
+          );
+        })}
+      </svg>
+    </AbsoluteFill>
+  );
+}
+
 function DoorEdgeEnergy({ start = 56 }: { start?: number }) {
   const frame = useCurrentFrame();
   const progress = fade(frame, start, start + 18);
@@ -599,8 +670,9 @@ function DoorResult() {
 function SecondCombination() {
   const frame = useCurrentFrame();
   const inOpacity = fade(frame, 89, 103);
-  const outOpacity = 1 - fade(frame, 132, 150);
-  const cardOpacity = 1 - fade(frame, 128, 144);
+  const outOpacity = 1 - fade(frame, 158, 172);
+  const dissolve = fade(frame, 136, 158);
+  const cardOpacity = 1 - fade(frame, 140, 162);
   const cardProgress = fade(frame, 93, 140);
   const cardLeft = interpolate(cardProgress, [0, 1], [540, 612]);
   const cardTop = interpolate(cardProgress, [0, 1], [330, 640]);
@@ -622,8 +694,9 @@ function SecondCombination() {
           overflow: 'hidden',
           borderRadius: 32,
           border: '4px solid rgba(255,255,255,0.9)',
-          boxShadow: '0 34px 120px rgba(207,85,255,0.45)',
+          boxShadow: `0 34px 120px rgba(207,85,255,${0.45 + dissolve * 0.18})`,
           opacity: cardOpacity,
+          filter: `brightness(${1 + dissolve * 0.16}) saturate(${1 + dissolve * 0.08})`,
           transform: `rotate(${interpolate(cardProgress, [0, 1], [6, -2])}deg) scale(${interpolate(cardProgress, [0, 1], [0.85, 1.02])})`,
         }}
       >
@@ -636,20 +709,11 @@ function SecondCombination() {
 
 function FinalMontage() {
   const frame = useCurrentFrame();
-  const inOpacity = fade(frame, 138, 152);
-  const flash = 1 - fade(frame, 160, 172);
+  const inOpacity = fade(frame, 138, 160);
 
   return (
     <AbsoluteFill style={{ opacity: inOpacity, backgroundColor: '#0b0b0d' }}>
-      <BedroomFrameImage src={assets.bedPrank} finalDrift />
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: `radial-gradient(circle at 52% 44%, rgba(255,255,255,${0.38 * flash}) 0%, rgba(255,219,114,${0.12 * flash}) 24%, transparent 58%)`,
-          mixBlendMode: 'screen',
-        }}
-      />
+      <BedroomFrameImage src={assets.bedPrank} />
       <ParticleField color="#fff0a6" start={146} />
     </AbsoluteFill>
   );
@@ -670,6 +734,7 @@ function WelcomeImagePrankPromo() {
       <Sequence from={0}>
         <FinalMontage />
       </Sequence>
+      <WomanDissolveGlow start={136} />
       <AbsoluteFill
         style={{
           pointerEvents: 'none',
