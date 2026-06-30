@@ -204,11 +204,26 @@ function CssPlus() {
   );
 }
 
-function Streaks({ color = '#ffbd54', offset = 0 }: { color?: string; offset?: number }) {
+function Streaks({
+  color = '#d19a3d',
+  highlight = '#ffd996',
+  offset = 0,
+  lineCount = 10,
+  baseOpacity = 0.34,
+  highlightOpacity = 0.32,
+}: {
+  color?: string;
+  highlight?: string;
+  offset?: number;
+  lineCount?: number;
+  baseOpacity?: number;
+  highlightOpacity?: number;
+}) {
   const frame = useCurrentFrame();
   const progress = fade(frame, 18 + offset, 62 + offset);
   const exit = fade(frame, 78 + offset, 98 + offset);
   const opacity = clamp(progress - exit, 0, 1);
+  const gradientOpacity = Math.min(0.72, baseOpacity + 0.18);
 
   return (
     <AbsoluteFill style={{ opacity, mixBlendMode: 'screen', pointerEvents: 'none' }}>
@@ -216,12 +231,12 @@ function Streaks({ color = '#ffbd54', offset = 0 }: { color?: string; offset?: n
         <defs>
           <linearGradient id={`streak-${offset}`} x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor={color} stopOpacity="0" />
-            <stop offset="42%" stopColor={color} stopOpacity="0.78" />
-            <stop offset="57%" stopColor="#fff9df" stopOpacity="0.96" />
+            <stop offset="42%" stopColor={color} stopOpacity={gradientOpacity} />
+            <stop offset="57%" stopColor={highlight} stopOpacity={Math.min(0.82, gradientOpacity + 0.16)} />
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
-        {Array.from({ length: 14 }).map((_, index) => {
+        {Array.from({ length: lineCount }).map((_, index) => {
           const y = 610 + index * 48;
           const travel = interpolate(frame, [12 + offset, 92 + offset], [-390 - index * 26, 910 + index * 20], {
             extrapolateLeft: 'clamp',
@@ -239,21 +254,21 @@ function Streaks({ color = '#ffbd54', offset = 0 }: { color?: string; offset?: n
                 d={path}
                 fill="none"
                 stroke={`url(#streak-${offset})`}
-                strokeWidth={4 + (index % 4)}
+                strokeWidth={2.2 + (index % 3) * 0.7}
                 strokeLinecap="round"
-                opacity={linePulse * 0.78}
-                filter="blur(0.6px)"
+                opacity={linePulse * baseOpacity}
+                filter="blur(0.8px)"
               />
               <path
                 d={path}
                 fill="none"
-                stroke="#fff9df"
-                strokeWidth={3 + (index % 2)}
+                stroke={highlight}
+                strokeWidth={1.5 + (index % 2) * 0.4}
                 strokeLinecap="round"
-                strokeDasharray="145 520"
+                strokeDasharray="120 560"
                 strokeDashoffset={sweep}
-                opacity={0.62 + Math.sin((frame + index * 21) / 6) * 0.22}
-                filter="blur(0.3px)"
+                opacity={highlightOpacity + Math.sin((frame + index * 21) / 6) * 0.12}
+                filter="blur(0.45px)"
               />
             </g>
           );
@@ -532,7 +547,7 @@ function ParticleField({ color = '#ffcf74', start = 0 }: { color?: string; start
 
 function FirstCombination() {
   const frame = useCurrentFrame();
-  const exit = fade(frame, 58, 76);
+  const exit = fade(frame, 43, 61);
 
   return (
     <AbsoluteFill
@@ -552,31 +567,31 @@ function FirstCombination() {
 
 function DoorResult() {
   const frame = useCurrentFrame();
-  const inOpacity = fade(frame, 54, 70);
-  const outOpacity = 1 - fade(frame, 102, 122);
+  const inOpacity = fade(frame, 43, 61);
+  const outOpacity = 1 - fade(frame, 88, 108);
 
   return (
     <AbsoluteFill style={{ opacity: inOpacity * outOpacity, backgroundColor: '#09090a' }}>
-      <FullFrameImage src={assets.doorHomeless} start={54} end={122} />
-      <DoorEdgeEnergy start={56} />
-      <ParticleField start={54} />
+      <FullFrameImage src={assets.doorHomeless} start={43} end={108} />
+      <DoorEdgeEnergy start={48} />
+      <ParticleField start={43} />
     </AbsoluteFill>
   );
 }
 
 function SecondCombination() {
   const frame = useCurrentFrame();
-  const inOpacity = fade(frame, 104, 118);
+  const inOpacity = fade(frame, 89, 103);
   const outOpacity = 1 - fade(frame, 140, 158);
-  const cardProgress = fade(frame, 108, 138);
+  const cardProgress = fade(frame, 93, 140);
   const cardLeft = interpolate(cardProgress, [0, 1], [540, 612]);
   const cardTop = interpolate(cardProgress, [0, 1], [330, 640]);
 
   return (
     <AbsoluteFill style={{ opacity: inOpacity * outOpacity, backgroundColor: '#100d16' }}>
-      <FullFrameImage src={assets.bed} start={104} end={158} opacity={0.82} />
-      <ParticleField color="#e27bff" start={104} />
-      <Streaks color="#db76ff" offset={92} />
+      <FullFrameImage src={assets.bed} start={89} end={158} opacity={0.82} />
+      <ParticleField color="#e27bff" start={89} />
+      <Streaks color="#db76ff" highlight="#ffe1ff" offset={76} lineCount={9} baseOpacity={0.34} highlightOpacity={0.34} />
       <div
         style={{
           position: 'absolute',
@@ -593,7 +608,7 @@ function SecondCombination() {
       >
         <Img src={assets.womanSource} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
-      <PinkEnergyBloom start={126} />
+      <PinkEnergyBloom start={116} />
     </AbsoluteFill>
   );
 }
