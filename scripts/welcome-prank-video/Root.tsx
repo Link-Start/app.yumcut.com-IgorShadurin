@@ -206,11 +206,14 @@ function CssPlus() {
 
 function Streaks({
   color = '#f0b24b',
-  highlight = '#ffe2a1',
+  highlight = '#ffe8b8',
   offset = 0,
-  lineCount = 12,
-  baseOpacity = 0.5,
-  highlightOpacity = 0.44,
+  lineCount = 14,
+  baseOpacity = 0.76,
+  highlightOpacity = 0.62,
+  sparkColor = '#ffd06c',
+  travelStart = 0,
+  travelEnd = 78,
 }: {
   color?: string;
   highlight?: string;
@@ -218,12 +221,15 @@ function Streaks({
   lineCount?: number;
   baseOpacity?: number;
   highlightOpacity?: number;
+  sparkColor?: string;
+  travelStart?: number;
+  travelEnd?: number;
 }) {
   const frame = useCurrentFrame();
-  const progress = fade(frame, 4 + offset, 32 + offset);
+  const progress = fade(frame, offset, 22 + offset);
   const exit = fade(frame, 78 + offset, 98 + offset);
   const opacity = clamp(progress - exit, 0, 1);
-  const gradientOpacity = Math.min(0.78, baseOpacity + 0.24);
+  const gradientOpacity = Math.min(0.9, baseOpacity + 0.14);
 
   return (
     <AbsoluteFill style={{ opacity, mixBlendMode: 'screen', pointerEvents: 'none' }}>
@@ -237,15 +243,15 @@ function Streaks({
           </linearGradient>
         </defs>
         {Array.from({ length: lineCount }).map((_, index) => {
-          const y = 610 + index * 48;
-          const travel = interpolate(frame, [12 + offset, 92 + offset], [-390 - index * 26, 910 + index * 20], {
+          const y = 585 + index * 46;
+          const travel = interpolate(frame, [travelStart + offset, travelEnd + offset], [-320 - index * 24, 980 + index * 24], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
           });
-          const wave = Math.sin((frame + index * 13) / 9) * 38;
-          const curve = 44 + Math.sin((frame + index * 19) / 11) * 30;
-          const sweep = -520 + ((frame * (17 + (index % 4) * 2) + index * 57) % 1040);
-          const path = `M ${travel - 430} ${y + wave} C ${travel - 250} ${y - curve} ${travel + 88} ${y + curve} ${travel + 430} ${y - wave * 0.42}`;
+          const wave = Math.sin((frame + index * 13) / 9) * 46;
+          const curve = 58 + Math.sin((frame + index * 19) / 11) * 34;
+          const sweep = -620 + ((frame * (20 + (index % 4) * 2.5) + index * 57) % 1240);
+          const path = `M ${travel - 540} ${y + wave} C ${travel - 320} ${y - curve} ${travel + 120} ${y + curve} ${travel + 540} ${y - wave * 0.42}`;
           const linePulse = 0.48 + Math.sin((frame + index * 17) / 5.5) * 0.24;
 
           return (
@@ -254,21 +260,32 @@ function Streaks({
                 d={path}
                 fill="none"
                 stroke={`url(#streak-${offset})`}
-                strokeWidth={2.8 + (index % 3) * 0.8}
+                strokeWidth={5 + (index % 4)}
                 strokeLinecap="round"
                 opacity={linePulse * baseOpacity}
-                filter="blur(0.7px)"
+                filter="blur(0.75px)"
               />
               <path
                 d={path}
                 fill="none"
                 stroke={highlight}
-                strokeWidth={1.7 + (index % 2) * 0.45}
+                strokeWidth={3 + (index % 2) * 0.85}
                 strokeLinecap="round"
-                strokeDasharray="120 560"
+                strokeDasharray="150 520"
                 strokeDashoffset={sweep}
-                opacity={highlightOpacity + Math.sin((frame + index * 21) / 6) * 0.12}
-                filter="blur(0.45px)"
+                opacity={highlightOpacity + Math.sin((frame + index * 21) / 6) * 0.16}
+                filter="blur(0.38px)"
+              />
+              <path
+                d={path}
+                fill="none"
+                stroke={sparkColor}
+                strokeWidth={1.45}
+                strokeLinecap="round"
+                strokeDasharray="54 310"
+                strokeDashoffset={sweep * 1.35}
+                opacity={0.5 + Math.sin((frame + index * 17) / 5) * 0.18}
+                filter="blur(0.15px)"
               />
             </g>
           );
@@ -594,7 +611,7 @@ function SecondCombination() {
         <BedroomFrameImage src={assets.bed} />
       </AbsoluteFill>
       <ParticleField color="#e27bff" start={89} />
-      <Streaks color="#db76ff" highlight="#ffe1ff" offset={76} lineCount={9} baseOpacity={0.34} highlightOpacity={0.34} />
+      <Streaks color="#db76ff" highlight="#ffe1ff" sparkColor="#f5a2ff" offset={76} lineCount={9} baseOpacity={0.34} highlightOpacity={0.34} travelStart={12} travelEnd={92} />
       <div
         style={{
           position: 'absolute',
