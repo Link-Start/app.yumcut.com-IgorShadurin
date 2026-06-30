@@ -79,6 +79,38 @@ function FullFrameImage({
   );
 }
 
+function FocusedBedroomResult() {
+  const frame = useCurrentFrame();
+  const progress = interpolate(frame, [146, 180], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const scale = interpolate(progress, [0, 1], [1.56, 1.82]);
+  const translateX = interpolate(progress, [0, 1], [-372, -448]);
+  const translateY = interpolate(progress, [0, 1], [104, 154]);
+
+  return (
+    <AbsoluteFill
+      style={{
+        overflow: 'hidden',
+        backgroundColor: '#0d0d0f',
+      }}
+    >
+      <Img
+        src={assets.bedPrank}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`,
+          transformOrigin: 'center center',
+          filter: 'contrast(1.08) saturate(1.08)',
+        }}
+      />
+    </AbsoluteFill>
+  );
+}
+
 function ImageCard({
   src,
   x,
@@ -537,6 +569,8 @@ function SecondCombination() {
   const inOpacity = fade(frame, 104, 118);
   const outOpacity = 1 - fade(frame, 140, 158);
   const cardProgress = fade(frame, 108, 138);
+  const cardLeft = interpolate(cardProgress, [0, 1], [540, 612]);
+  const cardTop = interpolate(cardProgress, [0, 1], [330, 640]);
 
   return (
     <AbsoluteFill style={{ opacity: inOpacity * outOpacity, backgroundColor: '#100d16' }}>
@@ -546,8 +580,8 @@ function SecondCombination() {
       <div
         style={{
           position: 'absolute',
-          left: 540 + cardProgress * 70,
-          top: 360 - cardProgress * 80,
+          left: cardLeft,
+          top: cardTop,
           width: 390,
           height: 692,
           overflow: 'hidden',
@@ -571,7 +605,7 @@ function FinalMontage() {
 
   return (
     <AbsoluteFill style={{ opacity: inOpacity, backgroundColor: '#0b0b0d' }}>
-      <FullFrameImage src={assets.bedPrank} start={146} end={180} />
+      <FocusedBedroomResult />
       <div
         style={{
           position: 'absolute',
