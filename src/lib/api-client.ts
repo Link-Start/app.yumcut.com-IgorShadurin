@@ -104,6 +104,13 @@ export const Api = {
       body: JSON.stringify(payload),
       errorToastTitle: 'Failed to update image editor settings',
     }),
+  getAdminEmailSettings: () => api<import('@/shared/types').AdminEmailSettingsDTO>('/api/admin/emails'),
+  updateAdminEmailSettings: (payload: Partial<import('@/shared/types').AdminEmailSettingsDTO>) =>
+    api<import('@/shared/types').AdminEmailSettingsDTO>('/api/admin/emails', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      errorToastTitle: 'Failed to update email settings',
+    }),
   getAdminProjectCreationSettings: () =>
     api<import('@/shared/types').AdminProjectCreationSettingsDTO>('/api/admin/project-creation'),
   updateAdminProjectCreationSettings: (payload: import('@/shared/types').AdminProjectCreationSettingsDTO) =>

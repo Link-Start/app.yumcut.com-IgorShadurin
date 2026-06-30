@@ -5,6 +5,7 @@ import { prisma } from '@/server/db';
 import { config } from '@/server/config';
 import { getResendClient } from '@/server/emails/resend';
 import { TOKEN_COSTS } from '@/shared/constants/token-costs';
+import { shouldSendRegistrationEmails } from '@/server/admin/emails';
 
 export const EMAIL_KIND_WELCOME = 'welcome_v1';
 export const EMAIL_KIND_FOLLOW_UP_24H = 'follow_up_24h_v1';
@@ -583,6 +584,10 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
 }
 
 export async function scheduleUserOnboardingEmails(input: ScheduleUserOnboardingEmailsInput): Promise<{ queued: boolean; processed: ProcessPlannedEmailsResult | null }> {
+  if (!(await shouldSendRegistrationEmails())) {
+    return { queued: false, processed: null };
+  }
+
   const queued = await queueUserOnboardingEmails(input);
   if (!queued) {
     return { queued: false, processed: null };

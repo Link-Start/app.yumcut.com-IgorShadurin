@@ -303,6 +303,10 @@ export interface AdminImageEditorSettingsDTO {
   enabled: boolean;
 }
 
+export interface AdminEmailSettingsDTO {
+  registrationEmailsEnabled: boolean;
+}
+
 export interface AdminProjectCreationSettingsDTO {
   projectCreationEnabled: boolean;
   projectCreationDisabledReason: string;

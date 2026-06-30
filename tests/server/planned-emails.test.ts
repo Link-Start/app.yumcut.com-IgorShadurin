@@ -14,6 +14,7 @@ const prismaMock = vi.hoisted(() => ({
 }));
 
 const resendSendMock = vi.hoisted(() => vi.fn());
+const shouldSendRegistrationEmailsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/db', () => ({
   prisma: prismaMock,
@@ -34,11 +35,16 @@ vi.mock('@/server/emails/resend', () => ({
   }),
 }));
 
+vi.mock('@/server/admin/emails', () => ({
+  shouldSendRegistrationEmails: shouldSendRegistrationEmailsMock,
+}));
+
 import {
   buildReplyBonusReplyToAddress,
   parseReplyBonusReplyToAddress,
   processPlannedEmails,
   queueUserOnboardingEmails,
+  scheduleUserOnboardingEmails,
 } from '@/server/emails/planned';
 
 function mockClaimedEmails(claimed: Array<{
@@ -75,6 +81,7 @@ describe('planned emails localization', () => {
     prismaMock.plannedEmail.deleteMany.mockResolvedValue({ count: 1 });
     prismaMock.plannedEmail.updateMany.mockResolvedValue({ count: 1 });
     resendSendMock.mockResolvedValue({ data: { id: 're_test_1' } });
+    shouldSendRegistrationEmailsMock.mockResolvedValue(true);
   });
 
   it('stores targetLanguage when queueing onboarding emails', async () => {
@@ -95,6 +102,19 @@ describe('planned emails localization', () => {
         ]),
       }),
     );
+  });
+
+  it('does not queue onboarding emails when registration emails are disabled', async () => {
+    shouldSendRegistrationEmailsMock.mockResolvedValue(false);
+
+    const result = await scheduleUserOnboardingEmails({
+      userId: 'user-1',
+      email: 'user@example.com',
+      name: 'Ivan',
+    });
+
+    expect(result).toEqual({ queued: false, processed: null });
+    expect(prismaMock.plannedEmail.createMany).not.toHaveBeenCalled();
   });
 
   it('builds and verifies signed reply bonus aliases', () => {

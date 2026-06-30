@@ -9,19 +9,21 @@ import { getAdminNotificationSettings } from '@/server/admin/notifications';
 import { getPublishTaskSnapshot } from '@/server/admin/publish-tasks';
 import { getAdminVoiceProviderSettings } from '@/server/admin/voice-providers';
 import { getAdminImageEditorSettings } from '@/server/admin/image-editor';
+import { getAdminEmailSettings } from '@/server/admin/emails';
 import { AdminStatusPill } from '@/components/admin/AdminStatusPill';
 import { formatDateTimeAdmin } from '@/lib/date';
 import { AdminNotificationSettingsForm } from '@/components/admin/AdminNotificationSettingsForm';
 import { AdminVoiceProviderSettingsForm } from '@/components/admin/AdminVoiceProviderSettingsForm';
 import { AdminImageEditorSettingsForm } from '@/components/admin/AdminImageEditorSettingsForm';
 import { AdminProjectCreationSettingsForm } from '@/components/admin/AdminProjectCreationSettingsForm';
+import { AdminEmailSettingsForm } from '@/components/admin/AdminEmailSettingsForm';
 import { getProjectCreationSettings } from '@/server/admin/project-creation';
 import { AdminDashboardUserMetricsSection } from '@/components/admin/AdminDashboardUserMetricsSection';
 import { listTransactions } from '@/server/admin/transactions';
 import { AdminRecentTransactionsCard } from '@/components/admin/AdminRecentTransactionsCard';
 
 export default async function AdminHomePage() {
-  const [snapshotWithoutGuests, snapshotWithGuests, notificationSettings, publishQueue, voiceProviderSettings, imageEditorSettings, projectCreationSettings, recentTransactions] = await Promise.all([
+  const [snapshotWithoutGuests, snapshotWithGuests, notificationSettings, publishQueue, voiceProviderSettings, imageEditorSettings, projectCreationSettings, emailSettings, recentTransactions] = await Promise.all([
     getAdminDashboardSnapshot(),
     getAdminDashboardSnapshot({ includeGuestUsers: true }),
     getAdminNotificationSettings(),
@@ -29,6 +31,7 @@ export default async function AdminHomePage() {
     getAdminVoiceProviderSettings(),
     getAdminImageEditorSettings(),
     getProjectCreationSettings(),
+    getAdminEmailSettings(),
     listTransactions({ page: 1, pageSize: 10 }),
   ]);
   const snapshot = snapshotWithoutGuests;
@@ -408,6 +411,18 @@ export default async function AdminHomePage() {
               }}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="space-y-1">
+          <CardTitle>Email controls</CardTitle>
+          <CardDescription>
+            Control automatic emails sent during registration without changing scheduled email processing.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AdminEmailSettingsForm initial={emailSettings} />
         </CardContent>
       </Card>
     </div>
