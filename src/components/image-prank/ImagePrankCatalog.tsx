@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button-1';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ImagePreviewDialog } from '@/components/image-prank/ImagePreviewDialog';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from '@/components/ui/pagination';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
 import type {
@@ -721,22 +721,13 @@ export function ImagePrankCatalog({ categories }: Props) {
 
       {renderPagination('bottom')}
 
-      <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
-        <DialogContent
-          className="top-1/2 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] -translate-y-1/2 overflow-hidden p-3 sm:max-w-5xl"
-          ariaDescription={zoomImage?.label ?? copy.zoomImage}
-        >
-          <DialogHeader className="sr-only">
-            <DialogTitle>{zoomImage?.label ?? copy.zoomImage}</DialogTitle>
-          </DialogHeader>
-          {zoomImage ? (
-            <div className="flex max-h-[calc(100vh-4rem)] w-full items-center justify-center bg-gray-50 dark:bg-gray-950">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={zoomImage.url} alt={zoomImage.label} className="max-h-[calc(100vh-4rem)] max-w-full object-contain" />
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <ImagePreviewDialog
+        image={zoomImage}
+        openLabel={copy.zoomImage}
+        onOpenChange={(open) => {
+          if (!open) setZoomImage(null);
+        }}
+      />
     </div>
   );
 }

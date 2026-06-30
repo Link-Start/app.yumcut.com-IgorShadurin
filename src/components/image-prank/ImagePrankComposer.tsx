@@ -8,6 +8,7 @@ import { Api } from '@/lib/api-client';
 import { resolveStorageBaseUrl } from '@/components/main/character-modal/storage';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ImagePreviewDialog } from '@/components/image-prank/ImagePreviewDialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -872,22 +873,13 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
         </div>
       </div>
 
-      <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
-        <DialogContent
-          className="top-1/2 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] -translate-y-1/2 overflow-hidden p-3 sm:max-w-5xl"
-          ariaDescription={zoomImage?.label ?? copy.zoomImage}
-        >
-          <DialogHeader className="sr-only">
-            <DialogTitle>{zoomImage?.label ?? copy.zoomImage}</DialogTitle>
-          </DialogHeader>
-          {zoomImage ? (
-            <div className="flex max-h-[calc(100vh-4rem)] w-full items-center justify-center bg-gray-50 dark:bg-gray-950">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={zoomImage.url} alt={zoomImage.label} className="max-h-[calc(100vh-4rem)] max-w-full object-contain" />
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <ImagePreviewDialog
+        image={zoomImage}
+        openLabel={copy.zoomImage}
+        onOpenChange={(open) => {
+          if (!open) setZoomImage(null);
+        }}
+      />
 
       <Dialog open={!!deleteImageTarget} onOpenChange={(open) => !open && setDeleteImageTarget(null)}>
         <DialogContent className="sm:max-w-[420px]">

@@ -9,6 +9,7 @@ import { Api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ImagePreviewDialog } from '@/components/image-prank/ImagePreviewDialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ProjectStatus } from '@/shared/constants/status';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
@@ -697,22 +698,13 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
         </CardContent>
       </Card>
 
-      <Dialog open={!!zoomImage} onOpenChange={(open) => !open && setZoomImage(null)}>
-        <DialogContent
-          className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] border-0 bg-transparent p-0 shadow-none sm:max-w-[calc(100vw-3rem)]"
-          ariaDescription={zoomImage?.label ?? t.zoomImage}
-        >
-          <DialogHeader className="sr-only">
-            <DialogTitle>{zoomImage?.label ?? t.zoomImage}</DialogTitle>
-          </DialogHeader>
-          {zoomImage ? (
-            <div className="flex max-h-[calc(100vh-2rem)] w-full items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={zoomImage.url} alt={zoomImage.label} className="max-h-[calc(100vh-4rem)] max-w-full object-contain" />
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <ImagePreviewDialog
+        image={zoomImage}
+        openLabel={t.zoomImage}
+        onOpenChange={(open) => {
+          if (!open) setZoomImage(null);
+        }}
+      />
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
