@@ -79,15 +79,14 @@ function FullFrameImage({
   );
 }
 
-function FocusedBedroomResult() {
+function BedroomFrameImage({ src, finalDrift = false }: { src: string; finalDrift?: boolean }) {
   const frame = useCurrentFrame();
-  const progress = interpolate(frame, [146, 180], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const scale = interpolate(progress, [0, 1], [1.56, 1.82]);
-  const translateX = interpolate(progress, [0, 1], [-372, -448]);
-  const translateY = interpolate(progress, [0, 1], [104, 154]);
+  const drift = finalDrift ? fade(frame, 160, 180) : 0;
+  const scale = interpolate(drift, [0, 1], [1.2, 1.28]);
+  const width = WIDTH * scale;
+  const height = HEIGHT * scale;
+  const left = interpolate(drift, [0, 1], [-170, -216]);
+  const top = interpolate(drift, [0, 1], [-54, -78]);
 
   return (
     <AbsoluteFill
@@ -97,13 +96,14 @@ function FocusedBedroomResult() {
       }}
     >
       <Img
-        src={assets.bedPrank}
+        src={src}
         style={{
-          width: '100%',
-          height: '100%',
+          position: 'absolute',
+          width,
+          height,
+          left,
+          top,
           objectFit: 'cover',
-          transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`,
-          transformOrigin: 'center center',
           filter: 'contrast(1.08) saturate(1.08)',
         }}
       />
@@ -582,14 +582,17 @@ function DoorResult() {
 function SecondCombination() {
   const frame = useCurrentFrame();
   const inOpacity = fade(frame, 89, 103);
-  const outOpacity = 1 - fade(frame, 140, 158);
+  const outOpacity = 1 - fade(frame, 132, 150);
+  const cardOpacity = 1 - fade(frame, 128, 144);
   const cardProgress = fade(frame, 93, 140);
   const cardLeft = interpolate(cardProgress, [0, 1], [540, 612]);
   const cardTop = interpolate(cardProgress, [0, 1], [330, 640]);
 
   return (
     <AbsoluteFill style={{ opacity: inOpacity * outOpacity, backgroundColor: '#100d16' }}>
-      <FullFrameImage src={assets.bed} start={89} end={158} opacity={0.82} />
+      <AbsoluteFill style={{ opacity: 0.86 }}>
+        <BedroomFrameImage src={assets.bed} />
+      </AbsoluteFill>
       <ParticleField color="#e27bff" start={89} />
       <Streaks color="#db76ff" highlight="#ffe1ff" offset={76} lineCount={9} baseOpacity={0.34} highlightOpacity={0.34} />
       <div
@@ -603,6 +606,7 @@ function SecondCombination() {
           borderRadius: 32,
           border: '4px solid rgba(255,255,255,0.9)',
           boxShadow: '0 34px 120px rgba(207,85,255,0.45)',
+          opacity: cardOpacity,
           transform: `rotate(${interpolate(cardProgress, [0, 1], [6, -2])}deg) scale(${interpolate(cardProgress, [0, 1], [0.85, 1.02])})`,
         }}
       >
@@ -615,12 +619,12 @@ function SecondCombination() {
 
 function FinalMontage() {
   const frame = useCurrentFrame();
-  const inOpacity = fade(frame, 146, 160);
+  const inOpacity = fade(frame, 138, 152);
   const flash = 1 - fade(frame, 160, 172);
 
   return (
     <AbsoluteFill style={{ opacity: inOpacity, backgroundColor: '#0b0b0d' }}>
-      <FocusedBedroomResult />
+      <BedroomFrameImage src={assets.bedPrank} finalDrift />
       <div
         style={{
           position: 'absolute',
