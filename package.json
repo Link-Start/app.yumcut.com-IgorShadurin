@@ -40,7 +40,8 @@
     "voice:clone": "tsx scripts/voice-clone.ts",
     "db:check": "tsx scripts/check-db-connection.ts",
     "tools:convert-video-preview": "tsx scripts/convert-video-preview.ts",
-    "characters:migrate-assets-to-storage": "tsx scripts/characters/migrate-assets-to-storage.ts"
+    "characters:migrate-assets-to-storage": "tsx scripts/characters/migrate-assets-to-storage.ts",
+    "welcome:prank-video": "tsx scripts/welcome-prank-video/render.ts"
   },
   "dependencies": {
     "@apple/app-store-server-library": "^3.1.0",
@@ -77,6 +78,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@remotion/bundler": "4.0.484",
+    "@remotion/renderer": "4.0.484",
     "@tailwindcss/postcss": "^4.2.4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.6.2",
@@ -86,6 +89,7 @@
     "eslint-config-next": "^16.2.6",
     "globals": "^17.6.0",
     "prisma": "6.19.3",
+    "remotion": "4.0.484",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.2.4",
     "tsx": "^4.21.0",
