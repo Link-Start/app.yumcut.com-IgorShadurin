@@ -9,8 +9,10 @@ const COMPOSITION_ID = 'WelcomeImagePrankPromo';
 const DEFAULT_OUTPUT = '/Users/test/Downloads/yumcut-video-prank/yumcut-image-prank-welcome.mp4';
 const REQUIRED_RESOURCES = [
   'semi-open-door.jpg',
+  'homeless-source.jpg',
   'door-homeless.jpg',
   'bed.jpg',
+  'woman-source.jpg',
   'bed-prank.jpg',
 ] as const;
 

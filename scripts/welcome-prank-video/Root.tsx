@@ -20,8 +20,10 @@ const COMPOSITION_ID = 'WelcomeImagePrankPromo';
 
 const assets = {
   semiOpenDoor: staticFile('semi-open-door.jpg'),
+  homelessSource: staticFile('homeless-source.jpg'),
   doorHomeless: staticFile('door-homeless.jpg'),
   bed: staticFile('bed.jpg'),
+  womanSource: staticFile('woman-source.jpg'),
   bedPrank: staticFile('bed-prank.jpg'),
 };
 
@@ -381,7 +383,7 @@ function FirstCombination() {
     >
       <ParticleField start={0} />
       <ImageCard src={assets.semiOpenDoor} x={72} y={448} width={420} height={746} rotate={-2} delay={0} />
-      <ImageCard src={assets.doorHomeless} x={588} y={420} width={420} height={746} rotate={2.5} delay={7} />
+      <ImageCard src={assets.homelessSource} x={588} y={420} width={420} height={746} rotate={2.5} delay={7} />
       <CssPlus />
       <Streaks />
     </AbsoluteFill>
@@ -427,7 +429,7 @@ function SecondCombination() {
           transform: `rotate(${interpolate(cardProgress, [0, 1], [6, -2])}deg) scale(${interpolate(cardProgress, [0, 1], [0.85, 1.02])})`,
         }}
       >
-        <Img src={assets.bedPrank} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <Img src={assets.womanSource} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
       <SideBloom color="#ee95ff" start={126} x={78} y={56} radius={30} />
     </AbsoluteFill>
