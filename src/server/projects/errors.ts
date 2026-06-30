@@ -136,7 +136,7 @@ function isProjectLogPath(candidate: string, projectId: string): boolean {
 function normalizeWorkspace(value: string | null | undefined): string | null {
   const normalized = normalizeString(value);
   if (!normalized) return null;
-  return path.isAbsolute(normalized) ? normalized : path.resolve(process.cwd(), normalized);
+  return path.isAbsolute(normalized) ? normalized : path.resolve(/* turbopackIgnore: true */ process.cwd(), normalized);
 }
 
 function parseEnvFileValue(filePath: string, key: string): string | null {
@@ -162,8 +162,8 @@ function parseEnvFileValue(filePath: string, key: string): string | null {
 function resolveProjectsWorkspace(): string | null {
   const raw =
     normalizeString(process.env.DAEMON_PROJECTS_WORKSPACE)
-    ?? (process.env.DAEMON_ENV_FILE ? parseEnvFileValue(path.resolve(process.cwd(), process.env.DAEMON_ENV_FILE), 'DAEMON_PROJECTS_WORKSPACE') : null)
-    ?? parseEnvFileValue(path.resolve(process.cwd(), '.daemon.env'), 'DAEMON_PROJECTS_WORKSPACE');
+    ?? (process.env.DAEMON_ENV_FILE ? parseEnvFileValue(path.resolve(/* turbopackIgnore: true */ process.cwd(), process.env.DAEMON_ENV_FILE), 'DAEMON_PROJECTS_WORKSPACE') : null)
+    ?? parseEnvFileValue(path.resolve(/* turbopackIgnore: true */ process.cwd(), '.daemon.env'), 'DAEMON_PROJECTS_WORKSPACE');
   return normalizeWorkspace(raw);
 }
 

@@ -11,7 +11,9 @@ const ROOT_CERT_FILES = [
 ];
 
 function loadRootCertificates(): Buffer[] {
-  const buffers = ROOT_CERT_FILES.filter((filePath) => fs.existsSync(filePath)).map((filePath) => fs.readFileSync(filePath));
+  const buffers = ROOT_CERT_FILES
+    .filter((filePath) => fs.existsSync(/* turbopackIgnore: true */ filePath))
+    .map((filePath) => fs.readFileSync(/* turbopackIgnore: true */ filePath));
   if (buffers.length === 0) {
     throw new Error('Apple root certificates are missing. Add them under keys/ and redeploy.');
   }

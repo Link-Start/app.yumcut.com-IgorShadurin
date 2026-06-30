@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import { ImagePrankComposer } from '@/components/image-prank/ImagePrankComposer';
 import { getPublicImagePrankItemBySlug } from '@/server/image-pranks';
 
@@ -18,5 +19,9 @@ export default async function ImagePrankItemPage({ params }: { params: Promise<P
   const { slug } = await params;
   const item = await getPublicImagePrankItemBySlug(slug);
   if (!item) notFound();
-  return <ImagePrankComposer item={item} />;
+  return (
+    <Suspense fallback={null}>
+      <ImagePrankComposer item={item} />
+    </Suspense>
+  );
 }

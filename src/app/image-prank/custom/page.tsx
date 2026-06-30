@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { ImagePrankComposer } from '@/components/image-prank/ImagePrankComposer';
 
 export const metadata: Metadata = {
@@ -6,5 +7,9 @@ export const metadata: Metadata = {
 };
 
 export default function CustomImagePrankPage() {
-  return <ImagePrankComposer />;
+  return (
+    <Suspense fallback={null}>
+      <ImagePrankComposer />
+    </Suspense>
+  );
 }

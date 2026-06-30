@@ -90,10 +90,10 @@ function resolveProjectsWorkspace(): string | null {
   const fromEnv = process.env.DAEMON_PROJECTS_WORKSPACE?.trim();
   const raw =
     fromEnv
-    || (process.env.DAEMON_ENV_FILE ? parseEnvFileValue(path.resolve(process.cwd(), process.env.DAEMON_ENV_FILE), 'DAEMON_PROJECTS_WORKSPACE') : null)
-    || parseEnvFileValue(path.resolve(process.cwd(), '.daemon.env'), 'DAEMON_PROJECTS_WORKSPACE');
+    || (process.env.DAEMON_ENV_FILE ? parseEnvFileValue(path.resolve(/* turbopackIgnore: true */ process.cwd(), process.env.DAEMON_ENV_FILE), 'DAEMON_PROJECTS_WORKSPACE') : null)
+    || parseEnvFileValue(path.resolve(/* turbopackIgnore: true */ process.cwd(), '.daemon.env'), 'DAEMON_PROJECTS_WORKSPACE');
   if (!raw) return null;
-  return path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+  return path.isAbsolute(raw) ? raw : path.resolve(/* turbopackIgnore: true */ process.cwd(), raw);
 }
 
 function normalizeLanguageCodes(values: unknown): string[] {
@@ -107,7 +107,7 @@ export async function invalidateResetMetadataArtifacts(
 ): Promise<WorkspaceInvalidationResult> {
   const explicitProjectsWorkspace = options.projectsWorkspace?.trim();
   const projectsWorkspace = explicitProjectsWorkspace
-    ? (path.isAbsolute(explicitProjectsWorkspace) ? explicitProjectsWorkspace : path.resolve(process.cwd(), explicitProjectsWorkspace))
+    ? (path.isAbsolute(explicitProjectsWorkspace) ? explicitProjectsWorkspace : path.resolve(/* turbopackIgnore: true */ process.cwd(), explicitProjectsWorkspace))
     : resolveProjectsWorkspace();
 
   if (!projectsWorkspace) {
