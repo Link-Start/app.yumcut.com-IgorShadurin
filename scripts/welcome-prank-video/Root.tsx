@@ -179,37 +179,116 @@ function Streaks({ color = '#ffbd54', offset = 0 }: { color?: string; offset?: n
   const opacity = clamp(progress - exit, 0, 1);
 
   return (
-    <AbsoluteFill style={{ opacity, mixBlendMode: 'screen' }}>
-      {Array.from({ length: 14 }).map((_, index) => {
-        const y = 650 + index * 42;
-        const speed = 800 + index * 24;
-        const linePulse = 0.72 + Math.sin((frame + index * 17) / 5.5) * 0.28;
-        const drift = Math.sin((frame + index * 9) / 7) * 34;
-        const stretch = 0.86 + Math.sin((frame + index * 19) / 8) * 0.18;
-        const x = interpolate(frame, [12 + offset, 92 + offset], [-380 - index * 28, speed], {
+    <AbsoluteFill style={{ opacity, mixBlendMode: 'screen', pointerEvents: 'none' }}>
+      <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={{ position: 'absolute', inset: 0 }}>
+        <defs>
+          <linearGradient id={`streak-${offset}`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={color} stopOpacity="0" />
+            <stop offset="42%" stopColor={color} stopOpacity="0.78" />
+            <stop offset="57%" stopColor="#fff9df" stopOpacity="0.96" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {Array.from({ length: 14 }).map((_, index) => {
+          const y = 610 + index * 48;
+          const travel = interpolate(frame, [12 + offset, 92 + offset], [-390 - index * 26, 910 + index * 20], {
+            extrapolateLeft: 'clamp',
+            extrapolateRight: 'clamp',
+          });
+          const wave = Math.sin((frame + index * 13) / 9) * 38;
+          const curve = 44 + Math.sin((frame + index * 19) / 11) * 30;
+          const sweep = -520 + ((frame * (17 + (index % 4) * 2) + index * 57) % 1040);
+          const path = `M ${travel - 430} ${y + wave} C ${travel - 250} ${y - curve} ${travel + 88} ${y + curve} ${travel + 430} ${y - wave * 0.42}`;
+          const linePulse = 0.48 + Math.sin((frame + index * 17) / 5.5) * 0.24;
+
+          return (
+            <g key={index}>
+              <path
+                d={path}
+                fill="none"
+                stroke={`url(#streak-${offset})`}
+                strokeWidth={4 + (index % 4)}
+                strokeLinecap="round"
+                opacity={linePulse * 0.78}
+                filter="blur(0.6px)"
+              />
+              <path
+                d={path}
+                fill="none"
+                stroke="#fff9df"
+                strokeWidth={3 + (index % 2)}
+                strokeLinecap="round"
+                strokeDasharray="145 520"
+                strokeDashoffset={sweep}
+                opacity={0.62 + Math.sin((frame + index * 21) / 6) * 0.22}
+                filter="blur(0.3px)"
+              />
+            </g>
+          );
+        })}
+      </svg>
+    </AbsoluteFill>
+  );
+}
+
+function EdgeSnakeStreaks({ start = 56 }: { start?: number }) {
+  const frame = useCurrentFrame();
+  const progress = fade(frame, start, start + 18);
+  const exit = fade(frame, start + 48, start + 66);
+  const opacity = clamp(progress - exit, 0, 1);
+
+  return (
+    <AbsoluteFill style={{ opacity, mixBlendMode: 'screen', pointerEvents: 'none' }}>
+      <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={{ position: 'absolute', inset: 0 }}>
+        <defs>
+          <linearGradient id="door-snake" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#ffd15c" stopOpacity="0" />
+            <stop offset="42%" stopColor="#ffd15c" stopOpacity="0.66" />
+            <stop offset="57%" stopColor="#fff4c9" stopOpacity="0.92" />
+            <stop offset="100%" stopColor="#ffd15c" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {Array.from({ length: 18 }).map((_, index) => {
+          const side = index % 2 === 0 ? -1 : 1;
+          const baseX = side === -1 ? 170 : 910;
+          const baseY = 990 + (index % 6) * 88;
+          const travel = interpolate(frame, [start, start + 58], [0, 1], {
           extrapolateLeft: 'clamp',
           extrapolateRight: 'clamp',
-        });
+          });
+          const wave = Math.sin((frame + index * 11) / 8) * 28;
+          const sweep = -460 + ((frame * (18 + (index % 5) * 2) + index * 79) % 930);
+          const startX = baseX + side * travel * (86 + index * 4);
+          const endX = startX + side * (360 + (index % 4) * 54);
+          const path = `M ${startX} ${baseY + wave} C ${startX + side * 126} ${baseY - 52} ${endX - side * 118} ${baseY + 54} ${endX} ${baseY - wave * 0.5}`;
+          const pulse = 0.46 + Math.sin((frame + index * 19) / 5) * 0.22;
 
-        return (
-          <div
-            key={index}
-            style={{
-              position: 'absolute',
-              left: x + drift,
-              top: y + Math.sin((frame + index * 11) / 9) * 28,
-              width: 620 + Math.sin((frame + index * 13) / 6) * 86,
-              height: 5 + (index % 3) * 2,
-              opacity: linePulse,
-              borderRadius: 999,
-              background: `linear-gradient(90deg, transparent, ${color}, rgba(255,255,255,0.98), transparent)`,
-              filter: `blur(${index % 2 ? 1.4 : 0.2}px)`,
-              transform: `rotate(${index % 2 ? -7 : 8}deg) scaleX(${stretch})`,
-              transformOrigin: 'center',
-            }}
-          />
-        );
-      })}
+          return (
+            <g key={index}>
+              <path
+                d={path}
+                fill="none"
+                stroke="url(#door-snake)"
+                strokeWidth={4 + (index % 4)}
+                strokeLinecap="round"
+                opacity={pulse * 0.84}
+                filter="blur(0.7px)"
+              />
+              <path
+                d={path}
+                fill="none"
+                stroke="#fff6cf"
+                strokeWidth={3 + (index % 2)}
+                strokeLinecap="round"
+                strokeDasharray="125 380"
+                strokeDashoffset={sweep}
+                opacity={0.66 + Math.sin((frame + index * 23) / 6) * 0.22}
+                filter="blur(0.25px)"
+              />
+            </g>
+          );
+        })}
+      </svg>
     </AbsoluteFill>
   );
 }
@@ -282,35 +361,7 @@ function DoorEdgeEnergy({ start = 56 }: { start?: number }) {
           transform: `rotate(18deg) translateX(${Math.sin(frame / 9) * -24}px)`,
         }}
       />
-      {Array.from({ length: 16 }).map((_, index) => {
-        const side = index % 2 === 0 ? -1 : 1;
-        const baseX = side === -1 ? 190 : 830;
-        const baseY = 1060 + (index % 5) * 88;
-        const travel = interpolate(frame, [start, start + 58], [0, 1], {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-        });
-        const pulse = 0.55 + Math.sin((frame + index * 21) / 4.5) * 0.35;
-
-        return (
-          <div
-            key={index}
-            style={{
-              position: 'absolute',
-              left: baseX + side * travel * (145 + index * 6),
-              top: baseY - travel * (240 + index * 8) + Math.sin((frame + index) / 5) * 18,
-              width: 330 + (index % 4) * 46,
-              height: 5 + (index % 3),
-              opacity: pulse,
-              borderRadius: 999,
-              background: 'linear-gradient(90deg, transparent, rgba(255,241,176,0.94), rgba(255,177,54,0.72), transparent)',
-              filter: 'blur(0.8px)',
-              transform: `rotate(${side * (-20 - (index % 4) * 7)}deg)`,
-              transformOrigin: side === -1 ? 'right center' : 'left center',
-            }}
-          />
-        );
-      })}
+      <EdgeSnakeStreaks start={start} />
       {Array.from({ length: 28 }).map((_, index) => {
         const side = index % 2 === 0 ? -1 : 1;
         const drift = frame - start;
@@ -453,25 +504,6 @@ function FinalMontage() {
         }}
       />
       <ParticleField color="#fff0a6" start={146} />
-      <div
-        style={{
-          position: 'absolute',
-          right: 46,
-          bottom: 70,
-          width: 245,
-          height: 436,
-          overflow: 'hidden',
-          borderRadius: 28,
-          border: '3px solid rgba(255,255,255,0.82)',
-          boxShadow: '0 18px 70px rgba(0,0,0,0.52)',
-          transform: `translateY(${interpolate(frame, [150, 180], [44, 0], {
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          })}px) rotate(3deg)`,
-        }}
-      >
-        <Img src={assets.doorHomeless} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      </div>
     </AbsoluteFill>
   );
 }
