@@ -409,7 +409,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                   <>
                     <button
                       type="button"
-                      className="flex h-full w-full cursor-pointer items-center justify-center"
+                      className="flex h-full w-full cursor-zoom-in items-center justify-center"
                       aria-label={`${t.zoomImage}: ${t.generatedImage}`}
                       onClick={() => openZoomImage(resultImageUrl, t.generatedImage)}
                     >
@@ -560,7 +560,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                             <div className="flex min-h-[240px] flex-1 items-center justify-center overflow-hidden md:min-h-[300px]">
                               <button
                                 type="button"
-                                className="group relative inline-flex max-h-[360px] max-w-full cursor-pointer items-center justify-center"
+                                className="group relative inline-flex max-h-[360px] max-w-full cursor-zoom-in items-center justify-center"
                                 aria-label={`${t.zoomImage}: ${source.label || t.referenceImages}`}
                                 onClick={(event) => {
                                   event.stopPropagation();
@@ -626,7 +626,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                   <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
                     <button
                       type="button"
-                      className="group relative flex h-[160px] w-[160px] cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900"
+                      className="group relative flex h-[160px] w-[160px] cursor-zoom-in items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900"
                       aria-label={`${t.zoomImage}: ${t.sourceImage}`}
                       onClick={() => openZoomImage(image.originalImageUrl, t.sourceImage)}
                     >

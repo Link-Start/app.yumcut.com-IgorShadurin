@@ -19,7 +19,7 @@ export function ImagePreviewDialog({ image, openLabel, onOpenChange }: ImagePrev
   return (
     <Dialog open={!!image} onOpenChange={onOpenChange}>
       <DialogContent
-        className="top-1/2 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-6xl -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-3 shadow-2xl dark:border-gray-800 dark:bg-gray-950"
+        className="top-1/2 flex h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-3 shadow-2xl dark:border-gray-800 dark:bg-gray-950 sm:max-w-[calc(100vw-2rem)]"
         ariaDescription={label}
       >
         <DialogHeader className="mb-2 pr-8">
@@ -33,7 +33,7 @@ export function ImagePreviewDialog({ image, openLabel, onOpenChange }: ImagePrev
             <img
               src={image.url}
               alt={image.label}
-              className="max-h-[calc(100dvh-6.5rem)] max-w-full object-contain"
+              className="h-full max-h-full max-w-full object-contain"
             />
           </div>
         ) : null}
