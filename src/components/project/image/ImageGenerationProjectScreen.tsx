@@ -191,14 +191,6 @@ function buildImagePrankCatalogHref(categorySlug?: string | null, subcategorySlu
   return `/?${params.toString()}`;
 }
 
-function extensionFromContentType(type: string | null | undefined, fallback: string) {
-  const lower = (type || '').toLowerCase();
-  if (lower.includes('png')) return 'png';
-  if (lower.includes('webp')) return 'webp';
-  if (lower.includes('jpeg') || lower.includes('jpg')) return 'jpg';
-  return fallback;
-}
-
 function triggerBlobDownload(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -210,61 +202,18 @@ function triggerBlobDownload(blob: Blob, filename: string) {
   window.URL.revokeObjectURL(url);
 }
 
-async function decodeImageBlob(blob: Blob): Promise<ImageBitmap | HTMLImageElement> {
-  if (typeof createImageBitmap === 'function') {
-    return createImageBitmap(blob);
-  }
-  return new Promise((resolve, reject) => {
-    const url = window.URL.createObjectURL(blob);
-    const image = new Image();
-    image.onload = () => {
-      window.URL.revokeObjectURL(url);
-      resolve(image);
-    };
-    image.onerror = () => {
-      window.URL.revokeObjectURL(url);
-      reject(new Error('Failed to decode image'));
-    };
-    image.src = url;
-  });
-}
-
-async function convertImageBlob(blob: Blob, format: Exclude<DownloadFormat, 'original'>) {
-  const decoded = await decodeImageBlob(blob);
-  const isHtmlImage = typeof HTMLImageElement !== 'undefined' && decoded instanceof HTMLImageElement;
-  const width = isHtmlImage ? decoded.naturalWidth : decoded.width;
-  const height = isHtmlImage ? decoded.naturalHeight : decoded.height;
-  const mimeType = format === 'png' ? 'image/png' : format === 'jpg' ? 'image/jpeg' : 'image/webp';
-  const quality = format === 'jpg' ? 0.95 : format === 'webp' ? 0.98 : undefined;
-
-  if (typeof OffscreenCanvas !== 'undefined') {
-    const canvas = new OffscreenCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas is not available');
-    if (format === 'jpg') {
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, width, height);
+function filenameFromContentDisposition(value: string | null) {
+  if (!value) return null;
+  const encoded = value.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
     }
-    ctx.drawImage(decoded as CanvasImageSource, 0, 0);
-    return canvas.convertToBlob({ type: mimeType, quality });
   }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas is not available');
-  if (format === 'jpg') {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, height);
-  }
-  ctx.drawImage(decoded as CanvasImageSource, 0, 0);
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((converted) => {
-      if (converted) resolve(converted);
-      else reject(new Error('Image conversion failed'));
-    }, mimeType, quality);
-  });
+  const quoted = value.match(/filename="([^"]+)"/i)?.[1];
+  return quoted || null;
 }
 
 export function ImageGenerationProjectScreen({ project, projectId }: Props) {
@@ -296,6 +245,11 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
       : t.progressWaiting;
   const originalFormat = (image?.resultFormat || 'jpg').toLowerCase();
   const baseFilename = buildDownloadBaseFilename(prompt || project.title, projectId);
+  const titleDotClass = isError
+    ? 'bg-red-500'
+    : resultImageUrl
+      ? 'bg-green-500'
+      : 'bg-blue-500 motion-safe:animate-pulse';
   const catalogItemHref = image?.catalogItem?.slug ? `/image-prank/${encodeURIComponent(image.catalogItem.slug)}` : null;
   const imagePrankRootHref = buildImagePrankCatalogHref();
   const categorySlug = image?.catalogItem?.categorySlug?.trim() || null;
@@ -333,19 +287,15 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
     if (!resultImageUrl || downloading) return;
     setDownloading(format);
     try {
-      const imageUrl = new URL(resultImageUrl, window.location.href);
-      const response = await fetch(resultImageUrl, {
-        credentials: imageUrl.origin === window.location.origin ? 'include' : 'omit',
-      });
-      if (!response.ok) throw new Error(`Image fetch failed: ${response.status}`);
+      const response = await fetch(
+        `/api/projects/${encodeURIComponent(projectId)}/image/download?format=${encodeURIComponent(format)}`,
+        { credentials: 'include' },
+      );
+      if (!response.ok) throw new Error(`Image download failed: ${response.status}`);
       const blob = await response.blob();
-      if (format === 'original') {
-        const ext = extensionFromContentType(blob.type, originalFormat === 'jpeg' ? 'jpg' : originalFormat);
-        triggerBlobDownload(blob, `${baseFilename}.${ext}`);
-      } else {
-        const converted = await convertImageBlob(blob, format);
-        triggerBlobDownload(converted, `${baseFilename}.${format}`);
-      }
+      const fallbackExt = format === 'original' ? (originalFormat === 'jpeg' ? 'jpg' : originalFormat) : format;
+      const filename = filenameFromContentDisposition(response.headers.get('content-disposition')) || `${baseFilename}.${fallbackExt || 'jpg'}`;
+      triggerBlobDownload(blob, filename);
       setDownloadMenuOpen(false);
     } catch (err) {
       toast.error(t.downloadFailed, {
@@ -366,6 +316,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
     <div className="mx-auto w-full max-w-6xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${titleDotClass}`} aria-hidden="true" />
           <h1 className="truncate text-xl font-semibold leading-6 text-gray-900 dark:text-gray-100">
             {project.title}
           </h1>
@@ -453,8 +404,8 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
         <CardContent className="pt-5">
           <div className="grid gap-5 lg:grid-cols-[minmax(240px,360px)_minmax(0,1fr)] lg:items-stretch">
             <div className="flex justify-center lg:justify-start">
-              <div className="relative flex aspect-[9/16] w-full max-w-[360px] items-center justify-center overflow-hidden border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
-                {resultImageUrl ? (
+              {resultImageUrl ? (
+                <div className="relative flex aspect-[9/16] w-full max-w-[360px] items-center justify-center overflow-hidden border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950">
                   <>
                     <button
                       type="button"
@@ -516,43 +467,43 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                       </Popover>
                     </div>
                   </>
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-5 text-center">
+                </div>
+              ) : (
+                <div className="w-full max-w-[360px] space-y-3 py-4 text-center lg:text-left">
+                  <div className="flex items-center justify-center gap-2 lg:justify-start">
                     {isError ? (
-                      <AlertTriangle className="h-8 w-8 text-red-500" />
+                      <AlertTriangle className="h-5 w-5 text-red-500" />
                     ) : (
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
                     )}
-                    <div className="w-full max-w-[260px] space-y-2">
-                      <div className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {isError ? t.generationFailed : t.generatingImage}
-                      </div>
-                      {isError ? (
-                        <div className="space-y-1 text-sm leading-5 text-gray-600 dark:text-gray-400">
-                          <p>{t.generationFailedAdminMessage}</p>
-                          <p className="font-semibold text-gray-900 dark:text-gray-100">{errorRefundMessage}</p>
-                        </div>
-                      ) : (
-                        <>
-                          <div
-                            className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
-                            role="progressbar"
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-valuenow={progress}
-                          >
-                            <div
-                              className="h-full rounded-full bg-blue-600 transition-[width] duration-700 ease-out"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">{progressCaption}</p>
-                        </>
-                      )}
+                    <div className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                      {isError ? t.generationFailed : t.generatingImage}
                     </div>
                   </div>
-                )}
-              </div>
+                  {isError ? (
+                    <div className="space-y-1 text-sm leading-5 text-gray-600 dark:text-gray-400">
+                      <p>{t.generationFailedAdminMessage}</p>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">{errorRefundMessage}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress}
+                      >
+                        <div
+                          className="h-full rounded-full bg-blue-600 transition-[width] duration-700 ease-out"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{progressCaption}</p>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex h-full flex-col gap-4">
