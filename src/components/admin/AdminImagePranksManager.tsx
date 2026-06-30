@@ -201,6 +201,7 @@ function bulkPathInfo(file: File): BulkPathInfo | null {
   const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
   const parts = relativePath.split('/').filter(Boolean);
   if (parts.length < 2) return null;
+  if (parts.slice(0, -1).some((part) => part.startsWith('_'))) return null;
   const folderName = parts.at(-2) ?? '';
   if (!folderName) return null;
   return {
@@ -215,7 +216,28 @@ function isBulkImageFile(file: File) {
 }
 
 function isMetadataFile(file: File) {
-  return /\.json$/i.test(file.name);
+  return file.name.toLowerCase() === 'metadata.json';
+}
+
+async function readImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  if ('createImageBitmap' in window) {
+    const bitmap = await createImageBitmap(file);
+    const dimensions = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return dimensions;
+  }
+
+  const previewUrl = URL.createObjectURL(file);
+  try {
+    return await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => reject(new Error('Failed to read image dimensions'));
+      image.src = previewUrl;
+    });
+  } finally {
+    URL.revokeObjectURL(previewUrl);
+  }
 }
 
 function formatAdminDate(value: string | null) {
@@ -547,8 +569,14 @@ export function AdminImagePranksManager() {
       }
 
       const nextItems: BulkImportItem[] = [];
+      let skippedBadImages = 0;
       for (const group of grouped.values()) {
         if (!group.image || !group.metadata) continue;
+        const dimensions = await readImageDimensions(group.image);
+        if (dimensions.width >= dimensions.height) {
+          skippedBadImages += 1;
+          continue;
+        }
         const parsedMetadata = await readJsonFile(group.metadata);
         const metadata = toBulkMetadata(parsedMetadata, group.pathInfo);
         nextItems.push({
@@ -566,7 +594,10 @@ export function AdminImagePranksManager() {
       if (nextItems.length === 0) {
         toast.error('No valid prank items found. Each item subfolder needs one image and one metadata JSON file.');
       } else {
-        toast.success(`Loaded ${nextItems.length.toLocaleString()} prank items for preview`);
+        const skippedText = skippedBadImages > 0
+          ? ` Skipped ${skippedBadImages.toLocaleString()} landscape/contact-sheet image${skippedBadImages === 1 ? '' : 's'}.`
+          : '';
+        toast.success(`Loaded ${nextItems.length.toLocaleString()} prank items for preview.${skippedText}`);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to parse import directory');

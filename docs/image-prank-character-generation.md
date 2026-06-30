@@ -31,6 +31,8 @@ metadata.json
 ```
 
 `image.png` is the high-quality generated original. `image.json` is the generator report. `metadata.json` is used for import/re-import.
+The admin bulk importer reads only `metadata.json` as item metadata. Folders whose path contains a segment starting with `_`, such as `_Archived`, are ignored.
+Landscape images are also skipped during admin preview because they are usually contact sheets or multi-character previews, not single prank characters.
 
 ## Generator
 
