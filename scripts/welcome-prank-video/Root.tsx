@@ -166,15 +166,16 @@ function ImageCard({
   );
 }
 
-function CssPlus({ yOffset = 0 }: { yOffset?: number }) {
+function CssPlus({ xOffset = 0, yOffset = 0, opacity = 1 }: { xOffset?: number; yOffset?: number; opacity?: number }) {
   return (
     <div
       style={{
         position: 'absolute',
-        left: 506,
+        left: 506 + xOffset,
         top: 858 + yOffset,
         width: 70,
         height: 70,
+        opacity,
         filter: 'drop-shadow(0 0 22px rgba(255,185,74,0.9))',
       }}
     >
@@ -204,7 +205,7 @@ function CssPlus({ yOffset = 0 }: { yOffset?: number }) {
   );
 }
 
-function WomanTopRightWind({ start = 96 }: { start?: number }) {
+function WomanTopWind({ start = 96 }: { start?: number }) {
   const frame = useCurrentFrame();
   const progress = fade(frame, start, start + 18);
   const exit = fade(frame, start + 54, start + 74);
@@ -212,7 +213,7 @@ function WomanTopRightWind({ start = 96 }: { start?: number }) {
   const cardProgress = fade(frame, 93, 140);
   const cardLeft = interpolate(cardProgress, [0, 1], [540, 612]);
   const cardTop = interpolate(cardProgress, [0, 1], [330, 640]);
-  const cardRight = cardLeft + 390;
+  const cardCenter = cardLeft + 195;
   const drift = interpolate(frame, [start, start + 64], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
@@ -222,29 +223,31 @@ function WomanTopRightWind({ start = 96 }: { start?: number }) {
     <AbsoluteFill style={{ opacity, mixBlendMode: 'screen', pointerEvents: 'none' }}>
       <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={{ position: 'absolute', inset: 0 }}>
         <defs>
-          <linearGradient id="woman-top-right-wind" x1="100%" y1="0%" x2="0%" y2="100%">
+          <linearGradient id="woman-top-wind" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#ffe9ff" stopOpacity="0" />
-            <stop offset="44%" stopColor="#ffc9ff" stopOpacity="0.5" />
-            <stop offset="58%" stopColor="#fff5ff" stopOpacity="0.68" />
+            <stop offset="42%" stopColor="#ffc9ff" stopOpacity="0.44" />
+            <stop offset="58%" stopColor="#fff5ff" stopOpacity="0.62" />
             <stop offset="100%" stopColor="#e58aff" stopOpacity="0" />
           </linearGradient>
         </defs>
         {Array.from({ length: 9 }).map((_, index) => {
-          const baseY = cardTop - 190 + index * 68;
-          const travel = drift * (170 + index * 10);
-          const wave = Math.sin((frame + index * 13) / 8) * 18;
+          const offsetX = -160 + index * 40;
+          const travel = drift * (160 + index * 8);
+          const wave = Math.sin((frame + index * 13) / 8) * 12;
           const sweep = -420 + ((frame * (16 + index) + index * 61) % 900);
-          const path = `M ${cardRight + 330 - travel} ${baseY - 92 + wave} C ${cardRight + 170 - travel * 0.8} ${baseY - 44} ${cardLeft + 330 - travel * 0.36} ${baseY + 132 + wave} ${cardLeft - 10 - travel * 0.14} ${baseY + 258 - wave * 0.4}`;
+          const x = cardCenter + offsetX + Math.sin((frame + index * 17) / 10) * 10;
+          const y = cardTop - 300 + travel;
+          const path = `M ${x + wave} ${y} C ${x - 24} ${y + 180} ${x + 28} ${y + 360} ${x - wave * 0.4} ${y + 650}`;
 
           return (
             <g key={index}>
               <path
                 d={path}
                 fill="none"
-                stroke="url(#woman-top-right-wind)"
+                stroke="url(#woman-top-wind)"
                 strokeWidth={3.8 + (index % 3)}
                 strokeLinecap="round"
-                opacity={0.48 + Math.sin((frame + index * 17) / 6) * 0.12}
+                opacity={0.42 + Math.sin((frame + index * 17) / 6) * 0.1}
                 filter="blur(0.5px)"
               />
               <path
@@ -471,11 +474,6 @@ function PinkEnergyBloom({ start = 126 }: { start?: number }) {
             <stop offset="58%" stopColor="#d66cff" stopOpacity="0.16" />
             <stop offset="100%" stopColor="#d66cff" stopOpacity="0" />
           </radialGradient>
-          <linearGradient id="pink-energy-wisp" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#e77cff" stopOpacity="0" />
-            <stop offset="45%" stopColor="#ffc7ff" stopOpacity="0.44" />
-            <stop offset="100%" stopColor="#e77cff" stopOpacity="0" />
-          </linearGradient>
         </defs>
         <ellipse
           cx={710 + drift}
@@ -495,36 +493,6 @@ function PinkEnergyBloom({ start = 126 }: { start?: number }) {
           filter="blur(24px)"
           transform={`rotate(-16 ${865 - drift * 0.6} ${870 + Math.sin(frame / 13) * 18})`}
         />
-        {Array.from({ length: 8 }).map((_, index) => {
-          const y = 780 + index * 82 + Math.sin((frame + index * 9) / 9) * 18;
-          const sweep = -360 + ((frame * (16 + index) + index * 49) % 780);
-          const path = `M ${-80 + drift * 0.2} ${y} C ${220} ${y - 54} ${620} ${y + 86} ${1160} ${y - 24}`;
-
-          return (
-            <g key={index}>
-              <path
-                d={path}
-                fill="none"
-                stroke="url(#pink-energy-wisp)"
-                strokeWidth={4 + (index % 3)}
-                strokeLinecap="round"
-                opacity={0.42}
-                filter="blur(0.8px)"
-              />
-              <path
-                d={path}
-                fill="none"
-                stroke="#ffe1ff"
-                strokeWidth={1.8 + (index % 2)}
-                strokeLinecap="round"
-                strokeDasharray="110 430"
-                strokeDashoffset={sweep}
-                opacity={0.44}
-                filter="blur(0.25px)"
-              />
-            </g>
-          );
-        })}
       </svg>
     </AbsoluteFill>
   );
@@ -698,6 +666,12 @@ function ParticleField({ color = '#ffcf74', start = 0 }: { color?: string; start
 function FirstCombination() {
   const frame = useCurrentFrame();
   const exit = fade(frame, 43, 61);
+  const join = fade(frame, 20, 43);
+  const leftX = interpolate(join, [0, 1], [72, 184]);
+  const leftY = interpolate(join, [0, 1], [582, 628]);
+  const rightX = interpolate(join, [0, 1], [588, 476]);
+  const rightY = interpolate(join, [0, 1], [546, 610]);
+  const plusOpacity = 1 - fade(frame, 30, 43);
 
   return (
     <AbsoluteFill
@@ -707,9 +681,9 @@ function FirstCombination() {
       }}
     >
       <ParticleField start={0} />
-      <ImageCard src={assets.semiOpenDoor} x={72} y={582} width={420} height={746} rotate={-2} delay={0} />
-      <ImageCard src={assets.homelessSource} x={588} y={546} width={420} height={746} rotate={2.5} delay={7} />
-      <CssPlus yOffset={134} />
+      <ImageCard src={assets.semiOpenDoor} x={leftX} y={leftY} width={420} height={746} rotate={interpolate(join, [0, 1], [-2, -0.6])} delay={0} />
+      <ImageCard src={assets.homelessSource} x={rightX} y={rightY} width={420} height={746} rotate={interpolate(join, [0, 1], [2.5, 0.6])} delay={7} />
+      <CssPlus yOffset={interpolate(join, [0, 1], [134, 154])} opacity={plusOpacity} />
     </AbsoluteFill>
   );
 }
@@ -762,7 +736,7 @@ function SecondCombination() {
       >
         <Img src={assets.womanSource} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
-      <WomanTopRightWind start={98} />
+      <WomanTopWind start={98} />
       <PinkEnergyBloom start={116} />
     </AbsoluteFill>
   );
