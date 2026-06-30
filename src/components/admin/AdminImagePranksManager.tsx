@@ -144,6 +144,14 @@ type DeleteTarget =
   | { kind: 'category'; id: string; title: string }
   | { kind: 'subcategory'; id: string; title: string };
 
+type AdminImagePranksTab = 'pranks' | 'categories' | 'subcategories' | 'paywall';
+
+const ADMIN_IMAGE_PRANK_TABS = new Set<AdminImagePranksTab>(['pranks', 'categories', 'subcategories', 'paywall']);
+
+function normalizeAdminImagePranksTab(value: string | null | undefined): AdminImagePranksTab {
+  return ADMIN_IMAGE_PRANK_TABS.has(value as AdminImagePranksTab) ? value as AdminImagePranksTab : 'pranks';
+}
+
 function slugifyImportValue(value: string) {
   return value
     .trim()
@@ -262,7 +270,7 @@ async function readJsonFile(file: File): Promise<unknown> {
   return JSON.parse(text);
 }
 
-export function AdminImagePranksManager() {
+export function AdminImagePranksManager({ initialTab = 'pranks' }: { initialTab?: string }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -280,7 +288,7 @@ export function AdminImagePranksManager() {
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [subcategoryFilter, setSubcategoryFilter] = useState('');
-  const [activeTab, setActiveTab] = useState('pranks');
+  const [activeTab, setActiveTab] = useState<AdminImagePranksTab>(() => normalizeAdminImagePranksTab(initialTab));
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [bulkItems, setBulkItems] = useState<BulkImportItem[]>([]);
@@ -356,10 +364,27 @@ export function AdminImagePranksManager() {
     }
   };
 
+  const updateActiveTab = (nextTab: string) => {
+    const normalizedTab = normalizeAdminImagePranksTab(nextTab);
+    setActiveTab(normalizedTab);
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (normalizedTab === 'pranks') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', normalizedTab);
+    }
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  };
+
   useEffect(() => {
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setActiveTab(normalizeAdminImagePranksTab(initialTab));
+  }, [initialTab]);
 
   useEffect(() => () => {
     bulkPreviewUrlsRef.current.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
@@ -742,7 +767,7 @@ export function AdminImagePranksManager() {
         <p className="text-sm text-gray-500 dark:text-gray-300">Manage prank catalog categories and source images.</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={updateActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="pranks" className="cursor-pointer">Prank images</TabsTrigger>
           <TabsTrigger value="categories" className="cursor-pointer">Categories</TabsTrigger>

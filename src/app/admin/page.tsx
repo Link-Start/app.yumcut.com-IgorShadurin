@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutTemplate, Palette, AudioLines, Mic, Music, Subtitles, Layers, Images, UsersRound } from 'lucide-react';
+import { FileText, LayoutTemplate, Palette, AudioLines, Mic, Music, Subtitles, Layers, Images, UsersRound } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -131,9 +131,17 @@ export default async function AdminHomePage() {
             </CardTitle>
             <CardDescription>CRUD Image Prank catalog images and categories.</CardDescription>
           </div>
-          <Button asChild className="cursor-pointer">
-            <Link href="/admin/pranks">Manage</Link>
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button asChild variant="outline" className="cursor-pointer">
+              <Link href="/admin/pranks?tab=paywall">
+                <FileText className="mr-2 h-4 w-4" />
+                Paywall texts
+              </Link>
+            </Button>
+            <Button asChild className="cursor-pointer">
+              <Link href="/admin/pranks">Manage</Link>
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 
