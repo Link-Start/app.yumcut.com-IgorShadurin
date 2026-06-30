@@ -327,6 +327,83 @@ function SideBloom({
   );
 }
 
+function PinkEnergyBloom({ start = 126 }: { start?: number }) {
+  const frame = useCurrentFrame();
+  const progress = fade(frame, start, start + 18);
+  const exit = fade(frame, start + 42, start + 62);
+  const opacity = clamp(progress - exit, 0, 1);
+  const drift = Math.sin((frame - start) / 12) * 34;
+  const pulse = 0.78 + Math.sin((frame - start) / 7) * 0.12;
+
+  return (
+    <AbsoluteFill style={{ opacity, mixBlendMode: 'screen', pointerEvents: 'none' }}>
+      <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={{ position: 'absolute', inset: 0 }}>
+        <defs>
+          <radialGradient id="pink-energy-core" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fff0ff" stopOpacity="0.58" />
+            <stop offset="24%" stopColor="#f8a5ff" stopOpacity="0.38" />
+            <stop offset="58%" stopColor="#d66cff" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="#d66cff" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="pink-energy-wisp" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#e77cff" stopOpacity="0" />
+            <stop offset="45%" stopColor="#ffc7ff" stopOpacity="0.44" />
+            <stop offset="100%" stopColor="#e77cff" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <ellipse
+          cx={710 + drift}
+          cy={1100 + Math.sin(frame / 10) * 22}
+          rx={450 * pulse}
+          ry={330 * pulse}
+          fill="url(#pink-energy-core)"
+          filter="blur(18px)"
+        />
+        <ellipse
+          cx={865 - drift * 0.6}
+          cy={870 + Math.sin(frame / 13) * 18}
+          rx={300}
+          ry={520}
+          fill="url(#pink-energy-core)"
+          opacity={0.42}
+          filter="blur(24px)"
+          transform={`rotate(-16 ${865 - drift * 0.6} ${870 + Math.sin(frame / 13) * 18})`}
+        />
+        {Array.from({ length: 8 }).map((_, index) => {
+          const y = 780 + index * 82 + Math.sin((frame + index * 9) / 9) * 18;
+          const sweep = -360 + ((frame * (16 + index) + index * 49) % 780);
+          const path = `M ${-80 + drift * 0.2} ${y} C ${220} ${y - 54} ${620} ${y + 86} ${1160} ${y - 24}`;
+
+          return (
+            <g key={index}>
+              <path
+                d={path}
+                fill="none"
+                stroke="url(#pink-energy-wisp)"
+                strokeWidth={4 + (index % 3)}
+                strokeLinecap="round"
+                opacity={0.42}
+                filter="blur(0.8px)"
+              />
+              <path
+                d={path}
+                fill="none"
+                stroke="#ffe1ff"
+                strokeWidth={1.8 + (index % 2)}
+                strokeLinecap="round"
+                strokeDasharray="110 430"
+                strokeDashoffset={sweep}
+                opacity={0.44}
+                filter="blur(0.25px)"
+              />
+            </g>
+          );
+        })}
+      </svg>
+    </AbsoluteFill>
+  );
+}
+
 function DoorEdgeEnergy({ start = 56 }: { start?: number }) {
   const frame = useCurrentFrame();
   const progress = fade(frame, start, start + 18);
@@ -482,7 +559,7 @@ function SecondCombination() {
       >
         <Img src={assets.womanSource} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
-      <SideBloom color="#ee95ff" start={126} x={78} y={56} radius={30} />
+      <PinkEnergyBloom start={126} />
     </AbsoluteFill>
   );
 }
