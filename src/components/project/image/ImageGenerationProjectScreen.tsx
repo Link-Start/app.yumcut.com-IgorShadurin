@@ -606,28 +606,30 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                         const isCatalogPrankCard = source.role === 'prank' && Boolean(catalogItemHref);
                         const cardContent = (
                           <>
-                            <button
-                              type="button"
-                              className="group relative flex min-h-[240px] flex-1 cursor-pointer items-center justify-center overflow-hidden md:min-h-[300px]"
-                              aria-label={`${t.zoomImage}: ${source.label || t.referenceImages}`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openZoomImage(source.imageUrl || source.previewImageUrl, source.label || t.referenceImages);
-                              }}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={source.previewImageUrl || source.imageUrl || ''}
-                                alt={source.label || t.referenceImages}
-                                className="h-full max-h-[360px] w-full object-contain"
-                              />
-                              <span
-                                className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white opacity-85 shadow-lg transition-opacity group-hover:opacity-100"
-                                aria-hidden="true"
+                            <div className="flex min-h-[240px] flex-1 items-center justify-center overflow-hidden md:min-h-[300px]">
+                              <button
+                                type="button"
+                                className="group relative inline-flex max-h-[360px] max-w-full cursor-pointer items-center justify-center"
+                                aria-label={`${t.zoomImage}: ${source.label || t.referenceImages}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openZoomImage(source.imageUrl || source.previewImageUrl, source.label || t.referenceImages);
+                                }}
                               >
-                                <Maximize2 className="h-4 w-4" />
-                              </span>
-                            </button>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={source.previewImageUrl || source.imageUrl || ''}
+                                  alt={source.label || t.referenceImages}
+                                  className="max-h-[360px] max-w-full object-contain"
+                                />
+                                <span
+                                  className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white opacity-85 shadow-lg transition-opacity group-hover:opacity-100"
+                                  aria-hidden="true"
+                                >
+                                  <Maximize2 className="h-4 w-4" />
+                                </span>
+                              </button>
+                            </div>
                             <div className="min-w-0">
                               {isCatalogPrankCard && catalogItemHref ? (
                                 <Link
@@ -651,8 +653,7 @@ export function ImageGenerationProjectScreen({ project, projectId }: Props) {
                           return (
                             <div
                               key={key}
-                              className="grid h-full cursor-pointer gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900/60 dark:hover:bg-gray-900"
-                              onClick={() => router.push(catalogItemHref)}
+                              className="grid h-full gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900/60"
                             >
                               {cardContent}
                             </div>
