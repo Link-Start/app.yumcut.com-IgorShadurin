@@ -181,6 +181,9 @@ function Streaks({ color = '#ffbd54', offset = 0 }: { color?: string; offset?: n
       {Array.from({ length: 14 }).map((_, index) => {
         const y = 650 + index * 42;
         const speed = 800 + index * 24;
+        const linePulse = 0.72 + Math.sin((frame + index * 17) / 5.5) * 0.28;
+        const drift = Math.sin((frame + index * 9) / 7) * 34;
+        const stretch = 0.86 + Math.sin((frame + index * 19) / 8) * 0.18;
         const x = interpolate(frame, [12 + offset, 92 + offset], [-380 - index * 28, speed], {
           extrapolateLeft: 'clamp',
           extrapolateRight: 'clamp',
@@ -191,14 +194,16 @@ function Streaks({ color = '#ffbd54', offset = 0 }: { color?: string; offset?: n
             key={index}
             style={{
               position: 'absolute',
-              left: x,
+              left: x + drift,
               top: y + Math.sin((frame + index * 11) / 9) * 28,
-              width: 620,
+              width: 620 + Math.sin((frame + index * 13) / 6) * 86,
               height: 5 + (index % 3) * 2,
+              opacity: linePulse,
               borderRadius: 999,
               background: `linear-gradient(90deg, transparent, ${color}, rgba(255,255,255,0.98), transparent)`,
-              filter: `blur(${index % 2 ? 1.2 : 0}px)`,
-              transform: `rotate(${index % 2 ? -7 : 8}deg)`,
+              filter: `blur(${index % 2 ? 1.4 : 0.2}px)`,
+              transform: `rotate(${index % 2 ? -7 : 8}deg) scaleX(${stretch})`,
+              transformOrigin: 'center',
             }}
           />
         );
@@ -207,12 +212,24 @@ function Streaks({ color = '#ffbd54', offset = 0 }: { color?: string; offset?: n
   );
 }
 
-function Burst({ color = '#ffd66d', start = 54 }: { color?: string; start?: number }) {
+function SideBloom({
+  color = '#ffd66d',
+  start = 54,
+  x = 50,
+  y = 74,
+  radius = 34,
+}: {
+  color?: string;
+  start?: number;
+  x?: number;
+  y?: number;
+  radius?: number;
+}) {
   const frame = useCurrentFrame();
   const progress = fade(frame, start, start + 18);
   const exit = fade(frame, start + 40, start + 64);
   const opacity = clamp(progress - exit, 0, 1);
-  const scale = interpolate(frame, [start, start + 50], [0.3, 1.35], {
+  const scale = interpolate(frame, [start, start + 50], [0.55, 1.18], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -222,10 +239,99 @@ function Burst({ color = '#ffd66d', start = 54 }: { color?: string; start?: numb
       style={{
         opacity,
         mixBlendMode: 'screen',
-        background: `radial-gradient(circle at 50% 46%, rgba(255,255,255,0.95) 0%, ${color} 8%, rgba(255,183,52,0.45) 22%, transparent 50%)`,
+        background: `radial-gradient(circle at ${x}% ${y}%, rgba(255,255,255,0.82) 0%, ${color} 10%, rgba(255,183,52,0.28) 25%, transparent ${radius}%)`,
         transform: `scale(${scale})`,
       }}
     />
+  );
+}
+
+function DoorEdgeEnergy({ start = 56 }: { start?: number }) {
+  const frame = useCurrentFrame();
+  const progress = fade(frame, start, start + 18);
+  const exit = fade(frame, start + 48, start + 66);
+  const opacity = clamp(progress - exit, 0, 1);
+
+  return (
+    <AbsoluteFill style={{ opacity, mixBlendMode: 'screen', pointerEvents: 'none' }}>
+      <div
+        style={{
+          position: 'absolute',
+          left: -110,
+          top: 1120,
+          width: 560,
+          height: 130,
+          opacity: 0.56 + Math.sin(frame / 6) * 0.18,
+          background: 'linear-gradient(90deg, transparent, rgba(255,205,72,0.66), rgba(255,246,188,0.42), transparent)',
+          filter: 'blur(32px)',
+          transform: `rotate(-24deg) translateX(${Math.sin(frame / 8) * 28}px)`,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          right: -90,
+          top: 980,
+          width: 520,
+          height: 120,
+          opacity: 0.5 + Math.sin((frame + 13) / 7) * 0.16,
+          background: 'linear-gradient(90deg, transparent, rgba(255,246,188,0.38), rgba(255,185,54,0.58), transparent)',
+          filter: 'blur(30px)',
+          transform: `rotate(18deg) translateX(${Math.sin(frame / 9) * -24}px)`,
+        }}
+      />
+      {Array.from({ length: 16 }).map((_, index) => {
+        const side = index % 2 === 0 ? -1 : 1;
+        const baseX = side === -1 ? 190 : 830;
+        const baseY = 1060 + (index % 5) * 88;
+        const travel = interpolate(frame, [start, start + 58], [0, 1], {
+          extrapolateLeft: 'clamp',
+          extrapolateRight: 'clamp',
+        });
+        const pulse = 0.55 + Math.sin((frame + index * 21) / 4.5) * 0.35;
+
+        return (
+          <div
+            key={index}
+            style={{
+              position: 'absolute',
+              left: baseX + side * travel * (145 + index * 6),
+              top: baseY - travel * (240 + index * 8) + Math.sin((frame + index) / 5) * 18,
+              width: 330 + (index % 4) * 46,
+              height: 5 + (index % 3),
+              opacity: pulse,
+              borderRadius: 999,
+              background: 'linear-gradient(90deg, transparent, rgba(255,241,176,0.94), rgba(255,177,54,0.72), transparent)',
+              filter: 'blur(0.8px)',
+              transform: `rotate(${side * (-20 - (index % 4) * 7)}deg)`,
+              transformOrigin: side === -1 ? 'right center' : 'left center',
+            }}
+          />
+        );
+      })}
+      {Array.from({ length: 28 }).map((_, index) => {
+        const side = index % 2 === 0 ? -1 : 1;
+        const drift = frame - start;
+        const size = 4 + (index % 4);
+
+        return (
+          <div
+            key={`spark-${index}`}
+            style={{
+              position: 'absolute',
+              left: (side === -1 ? 245 : 820) + Math.sin((drift + index * 7) / 5) * 56,
+              top: 720 + ((index * 73) % 760) - drift * (1.8 + (index % 3) * 0.28),
+              width: size,
+              height: size,
+              opacity: 0.5 + Math.sin((frame + index * 12) / 4) * 0.32,
+              borderRadius: 999,
+              backgroundColor: '#fff3b7',
+              boxShadow: '0 0 18px #ffd265',
+            }}
+          />
+        );
+      })}
+    </AbsoluteFill>
   );
 }
 
@@ -290,7 +396,7 @@ function DoorResult() {
   return (
     <AbsoluteFill style={{ opacity: inOpacity * outOpacity, backgroundColor: '#09090a' }}>
       <FullFrameImage src={assets.doorHomeless} start={54} end={122} />
-      <Burst start={56} />
+      <DoorEdgeEnergy start={56} />
       <ParticleField start={54} />
     </AbsoluteFill>
   );
@@ -323,7 +429,7 @@ function SecondCombination() {
       >
         <Img src={assets.bedPrank} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
-      <Burst color="#ee95ff" start={126} />
+      <SideBloom color="#ee95ff" start={126} x={78} y={56} radius={30} />
     </AbsoluteFill>
   );
 }
@@ -407,4 +513,3 @@ function RemotionRoot() {
 }
 
 registerRoot(RemotionRoot);
-
