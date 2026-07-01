@@ -19,6 +19,7 @@ export const IMAGE_PRANK_TWO_REFERENCE_MODELS = [
   'bfl:5@1',
   'krea:krea@2-medium',
   'prunaai:2@1',
+  'google:nano-banana@2-lite',
   'krea:krea@2-turbo',
 ] as const;
 
@@ -30,6 +31,7 @@ export const IMAGE_PRANK_UI_MODEL_OPTIONS = [
   'bytedance:5@0',
   'alibaba:wan@2.7-image',
   'prunaai:2@1',
+  'google:nano-banana@2-lite',
 ] as const satisfies readonly ImagePrankGenerationModel[];
 
 export type ImagePrankSelectableModel = typeof IMAGE_PRANK_UI_MODEL_OPTIONS[number];
@@ -46,6 +48,7 @@ export const IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS = [
   { id: 'bytedance:5@0', label: 'Bytedance 5', isDefault: false },
   { id: 'alibaba:wan@2.7-image', label: 'Alibaba Wan 2.7', isDefault: false },
   { id: 'prunaai:2@1', label: 'Pruna 2.1', isDefault: false },
+  { id: 'google:nano-banana@2-lite', label: 'Nano Banana 2 Lite', isDefault: false },
 ] as const satisfies readonly ImagePrankSelectableModelOption[];
 
 export function normalizeSelectableImagePrankGenerationModel(value: string | null | undefined): ImagePrankSelectableModel | null {
@@ -65,6 +68,7 @@ const IMAGE_PRANK_MODEL_DIMENSIONS: Record<ImagePrankGenerationModel, { width: n
   'bfl:5@1': { width: DEFAULT_IMAGE_GENERATION_WIDTH, height: DEFAULT_IMAGE_GENERATION_HEIGHT },
   'krea:krea@2-medium': { width: 928, height: 1152 },
   'prunaai:2@1': { width: 896, height: 1184 },
+  'google:nano-banana@2-lite': { width: 768, height: 1376 },
   'krea:krea@2-turbo': { width: 928, height: 1152 },
 };
 

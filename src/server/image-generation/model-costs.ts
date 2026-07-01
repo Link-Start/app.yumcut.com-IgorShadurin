@@ -10,7 +10,7 @@ export type ImageGenerationCostMetadata = {
   estimatedCostUsd: number;
   currency: 'USD';
   unit: 'image_generation';
-  source: 'runware_response_cost';
+  source: 'runware_response_cost' | 'runware_model_pricing';
   verifiedAt: string;
   evidence?: string;
   notes?: string;
@@ -60,6 +60,16 @@ export const IMAGE_PRANK_MODEL_COST_METADATA = {
     ...COST_SOURCE,
     model: 'prunaai:2@1',
     estimatedCostUsd: 0.0088,
+  },
+  'google:nano-banana@2-lite': {
+    currency: 'USD',
+    unit: 'image_generation',
+    source: 'runware_response_cost',
+    verifiedAt: '2026-07-01',
+    evidence: '/Users/test/Downloads/nano-banana-2-lite-door-woman.response.json',
+    model: 'google:nano-banana@2-lite',
+    estimatedCostUsd: 0.03429,
+    notes: 'Runware Nano Banana 2 Lite 1K image generation observed from the image:mix tool; docs pricing listed $0.033603.',
   },
   'krea:krea@2-turbo': {
     ...COST_SOURCE,
