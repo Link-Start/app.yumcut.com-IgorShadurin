@@ -5,8 +5,8 @@ import { buildProjectErrorStatusInfo, getLatestErrorLog, getProjectErrorLogFileF
 import { normalizeLanguageList, DEFAULT_LANGUAGE } from '@/shared/constants/languages';
 import { sortAudioCandidatesByCreatedAtDesc } from '@/server/projects/helpers';
 import { normalizeLanguageVoiceMap } from '@/shared/voices/language-voice-map';
-import { calculateProjectTokenCost } from '@/shared/constants/token-costs';
-import { normalizeProjectExperience } from '@/shared/constants/project-experience';
+import { calculateProjectTokenCost, TOKEN_COSTS, TOKEN_TRANSACTION_TYPES } from '@/shared/constants/token-costs';
+import { normalizeProjectExperience, type ProjectExperience } from '@/shared/constants/project-experience';
 import { defaultCharacterVideoGeneration } from '@/shared/constants/video-generation';
 import {
   CHARACTER_VIDEO_QUALITY_TO_GENERATION_MODE,
@@ -20,6 +20,41 @@ import {
   extractProjectIdFromTokenMetadata,
   toUsedTokensFromDelta,
 } from '@/server/admin/token-usage';
+import type { ImagePrankMode, ImagePrankSourceImageDTO, ProjectDetailDTO } from '@/shared/types';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function resolveProjectExperienceFromPayload(payload: unknown): ProjectExperience {
+  const record = isRecord(payload) ? payload : {};
+  const normalized = normalizeProjectExperience(record.projectExperience);
+  if (
+    normalized === 'image-generation'
+    || isRecord(record.imagePrank)
+    || record.imageKind === 'image-prank'
+  ) {
+    return 'image-generation';
+  }
+  return normalized;
+}
+
+function normalizeImagePrankMode(value: unknown): ImagePrankMode | null {
+  return value === 'catalog' || value === 'custom-two-image' || value === 'custom-one-image'
+    ? value
+    : null;
+}
+
+function inferImageFormat(reference: string | null | undefined): string | null {
+  if (!reference) return null;
+  const clean = reference.split('?')[0] ?? reference;
+  const match = clean.match(/\.([a-z0-9]+)$/i);
+  const ext = match?.[1]?.toLowerCase();
+  if (!ext) return null;
+  if (ext === 'jpeg') return 'jpg';
+  if (ext === 'jpg' || ext === 'png' || ext === 'webp') return ext;
+  return null;
+}
 
 export interface ListProjectsOptions {
   page?: number;
@@ -99,6 +134,7 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
       scripts: true,
       audios: true,
       videos: true,
+      images: { orderBy: { createdAt: 'desc' } },
       statusLog: { orderBy: { createdAt: 'desc' }, take: 1 },
       selection: true,
     },
@@ -130,6 +166,7 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
   }> | undefined;
   const videos = (p as any).videos as Array<{ id: string; path: string; publicUrl?: string | null; isFinal?: boolean; languageCode?: string | null }> | undefined;
   const primaryScript = scripts?.find((s) => s.languageCode === primaryLanguage) ?? scripts?.[0] ?? null;
+  const projectExperience = resolveProjectExperienceFromPayload(initialJob?.payload);
 
   const languageVariants = languages.map((languageCode, index) => {
     const isPrimary = index === 0;
@@ -185,6 +222,9 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
 
   const status = p.status as ProjectStatus;
   const latestLog = p.statusLog[0];
+  const baseStatusInfo = ((latestLog?.extra as any) && typeof latestLog.extra === 'object' && !Array.isArray(latestLog.extra))
+    ? { ...(latestLog.extra as Record<string, unknown>) }
+    : {};
   let statusInfo: Record<string, unknown> | undefined;
 
   switch (status) {
@@ -219,21 +259,33 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
       break;
     }
     case ProjectStatus.Done: {
-      const finalVariant = languageVariants.find((variant) => variant.isPrimary && variant.finalVideoUrl)
-        ?? languageVariants.find((variant) => variant.finalVideoUrl)
-        ?? null;
-      const finalUrl = finalVariant?.finalVideoUrl
-        || (p as any).finalVideoUrl
-        || normalizeMediaUrl((p as any).finalVideoPath ?? null);
-      statusInfo = {
-        url: finalUrl,
-        ...(languageVariants.length ? { languageVariants } : {}),
-      };
+      if (projectExperience === 'image-generation') {
+        const finalImage = (p as any).images?.[0] ?? null;
+        const finalImageUrl =
+          typeof baseStatusInfo.finalImageUrl === 'string'
+            ? baseStatusInfo.finalImageUrl
+            : (finalImage?.publicUrl || normalizeMediaUrl(finalImage?.path ?? null));
+        statusInfo = {
+          ...baseStatusInfo,
+          finalImageUrl,
+          finalImagePath: baseStatusInfo.finalImagePath ?? finalImage?.path ?? null,
+        };
+      } else {
+        const finalVariant = languageVariants.find((variant) => variant.isPrimary && variant.finalVideoUrl)
+          ?? languageVariants.find((variant) => variant.finalVideoUrl)
+          ?? null;
+        const finalUrl = finalVariant?.finalVideoUrl
+          || (p as any).finalVideoUrl
+          || normalizeMediaUrl((p as any).finalVideoPath ?? null);
+        statusInfo = {
+          url: finalUrl,
+          ...(languageVariants.length ? { languageVariants } : {}),
+        };
+      }
       break;
     }
     default: {
-      const extra = (latestLog?.extra as any) || undefined;
-      statusInfo = languageVariants.length ? { ...(extra || {}), languageVariants } : extra;
+      statusInfo = languageVariants.length ? { ...baseStatusInfo, languageVariants } : baseStatusInfo;
       break;
     }
   }
@@ -269,7 +321,6 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
     autoGenerated = ((variation as any)?.source === 'daemon');
   }
 
-  const projectExperience = normalizeProjectExperience((initialJob?.payload as any)?.projectExperience);
   const payloadVideoGeneration = (initialJob?.payload as any)?.videoGeneration;
   const payloadVideoGenerationMode = normalizeCharacterVideoGenerationMode(payloadVideoGeneration?.mode);
   const characterVideoQuality = projectExperience === 'character'
@@ -401,14 +452,156 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
     return sum + tx.delta;
   }, 0);
   const actionTokensUsed = toUsedTokensFromDelta(actionDeltaForProject);
+  const imageGenerationDeltaForProject = projectScopedRows.reduce((sum, tx) => {
+    if (
+      tx.type !== TOKEN_TRANSACTION_TYPES.imageGeneration
+      && tx.type !== TOKEN_TRANSACTION_TYPES.projectFailureRefund
+    ) {
+      return sum;
+    }
+    return sum + tx.delta;
+  }, 0);
+  const tokensRefunded = projectScopedRows.reduce((sum, tx) => {
+    if (tx.type !== TOKEN_TRANSACTION_TYPES.projectFailureRefund) return sum;
+    return sum + Math.max(0, tx.delta);
+  }, 0);
+  const hasExplicitImageGenerationCharge = projectScopedRows.some(
+    (tx) => tx.type === TOKEN_TRANSACTION_TYPES.imageGeneration,
+  );
   const estimatedCreationTokens = calculateProjectTokenCost(
     typeof (initialJob?.payload as any)?.durationSeconds === 'number'
       ? (initialJob?.payload as any).durationSeconds
       : null,
   ) * Math.max(languages.length, 1);
-  const tokensUsed = hasExplicitProjectCreationCharge
-    ? toUsedTokensFromDelta(projectDeltaFromLedger)
-    : Math.max(0, estimatedCreationTokens + actionTokensUsed);
+  const tokensUsed = projectExperience === 'image-generation'
+    ? (hasExplicitImageGenerationCharge
+      ? toUsedTokensFromDelta(imageGenerationDeltaForProject)
+      : TOKEN_COSTS.actions.imageGeneration)
+    : hasExplicitProjectCreationCharge
+      ? toUsedTokensFromDelta(projectDeltaFromLedger)
+      : Math.max(0, estimatedCreationTokens + actionTokensUsed);
+
+  const initialPayload = (initialJob?.payload as any) ?? {};
+  const imageStatusInfo = statusInfo as Record<string, any> | undefined;
+  const payloadImagePrank = initialPayload?.imagePrank && typeof initialPayload.imagePrank === 'object'
+    ? initialPayload.imagePrank
+    : null;
+  const statusImagePrank = imageStatusInfo?.imagePrank && typeof imageStatusInfo.imagePrank === 'object'
+    ? imageStatusInfo.imagePrank
+    : null;
+  const resolvedImagePrank = statusImagePrank ?? payloadImagePrank;
+  const sourceImages: ImagePrankSourceImageDTO[] = Array.isArray(resolvedImagePrank?.sourceImages)
+    ? resolvedImagePrank.sourceImages.map((entry: any) => ({
+        role: entry?.role === 'prank' || entry?.role === 'target' || entry?.role === 'reference' ? entry.role : 'reference',
+        label: typeof entry?.label === 'string' && entry.label.trim() ? entry.label.trim() : 'Reference image',
+        imageUrl: typeof entry?.imageUrl === 'string' && entry.imageUrl.trim()
+          ? entry.imageUrl
+          : normalizeMediaUrl(typeof entry?.imagePath === 'string' ? entry.imagePath : null),
+        imagePath: typeof entry?.imagePath === 'string' ? entry.imagePath : null,
+        previewImageUrl: typeof entry?.previewImageUrl === 'string' && entry.previewImageUrl.trim()
+          ? entry.previewImageUrl
+          : normalizeMediaUrl(typeof entry?.previewImagePath === 'string' ? entry.previewImagePath : null),
+        previewImagePath: typeof entry?.previewImagePath === 'string' ? entry.previewImagePath : null,
+        width: typeof entry?.width === 'number' ? entry.width : null,
+        height: typeof entry?.height === 'number' ? entry.height : null,
+      }))
+    : [];
+  let catalogItem: NonNullable<ProjectDetailDTO['imageGeneration']>['catalogItem'] = resolvedImagePrank?.catalogItem && typeof resolvedImagePrank.catalogItem === 'object'
+    ? {
+        id: typeof resolvedImagePrank.catalogItem.id === 'string' ? resolvedImagePrank.catalogItem.id : '',
+        slug: typeof resolvedImagePrank.catalogItem.slug === 'string' ? resolvedImagePrank.catalogItem.slug : '',
+        title: typeof resolvedImagePrank.catalogItem.title === 'string' ? resolvedImagePrank.catalogItem.title : 'Image Prank',
+        categorySlug: typeof resolvedImagePrank.catalogItem.categorySlug === 'string' ? resolvedImagePrank.catalogItem.categorySlug : null,
+        categoryTitle: typeof resolvedImagePrank.catalogItem.categoryTitle === 'string' ? resolvedImagePrank.catalogItem.categoryTitle : null,
+        subcategorySlug: typeof resolvedImagePrank.catalogItem.subcategorySlug === 'string' ? resolvedImagePrank.catalogItem.subcategorySlug : null,
+        subcategoryTitle: typeof resolvedImagePrank.catalogItem.subcategoryTitle === 'string' ? resolvedImagePrank.catalogItem.subcategoryTitle : null,
+      }
+    : null;
+  if (catalogItem?.id) {
+    const catalogRecord = await prisma.imagePrankItem.findFirst({
+      where: { id: catalogItem.id },
+      include: {
+        category: true,
+        subcategory: true,
+      },
+    });
+    if (catalogRecord?.category) {
+      catalogItem = {
+        ...catalogItem,
+        slug: catalogRecord.slug || catalogItem.slug,
+        title: catalogRecord.titleEn || catalogRecord.titleRu || catalogItem.title,
+        categorySlug: catalogRecord.category.slug,
+        categoryTitle: catalogRecord.category.titleEn || catalogRecord.category.titleRu || catalogItem.categoryTitle,
+        subcategorySlug: catalogRecord.subcategory?.slug ?? null,
+        subcategoryTitle: catalogRecord.subcategory
+          ? catalogRecord.subcategory.titleEn || catalogRecord.subcategory.titleRu || catalogItem.subcategoryTitle
+          : null,
+      };
+    }
+  }
+  const imageAssets = Array.isArray((anyProject as any).images)
+    ? (anyProject as any).images as Array<{ id: string; path: string; publicUrl?: string | null; createdAt?: Date }>
+    : [];
+  const resultImageAsset = imageAssets[0] ?? null;
+  const imageKind = typeof initialPayload.imageKind === 'string'
+    ? initialPayload.imageKind
+    : (typeof imageStatusInfo?.imageKind === 'string' ? imageStatusInfo.imageKind : 'standalone');
+  const displayPrompt = typeof imageStatusInfo?.userPrompt === 'string' && imageStatusInfo.userPrompt.trim()
+    ? imageStatusInfo.userPrompt
+    : (typeof initialPayload.userPrompt === 'string' && initialPayload.userPrompt.trim()
+      ? initialPayload.userPrompt
+      : String(initialPayload.prompt ?? p.prompt ?? ''));
+  const imageGeneration: ProjectDetailDTO['imageGeneration'] = projectExperience === 'image-generation'
+    ? {
+        kind: imageKind === 'image-prank' ? 'image-prank' : 'standalone',
+        mode: imageKind === 'image-prank' ? normalizeImagePrankMode(resolvedImagePrank?.mode) : null,
+        displayLabel: imageKind === 'image-prank' ? 'Image Prank' : 'Image',
+        prompt: displayPrompt,
+        userPrompt: displayPrompt,
+        provider: typeof initialPayload?.provider === 'string'
+          ? initialPayload.provider
+          : (typeof imageStatusInfo?.provider === 'string' ? imageStatusInfo.provider : null),
+        model: typeof initialPayload?.model === 'string'
+          ? initialPayload.model
+          : (typeof imageStatusInfo?.model === 'string' ? imageStatusInfo.model : null),
+        width: typeof initialPayload?.width === 'number'
+          ? initialPayload.width
+          : (typeof imageStatusInfo?.width === 'number' ? imageStatusInfo.width : null),
+        height: typeof initialPayload?.height === 'number'
+          ? initialPayload.height
+          : (typeof imageStatusInfo?.height === 'number' ? imageStatusInfo.height : null),
+        resultImageUrl:
+          (typeof imageStatusInfo?.finalImageUrl === 'string' && imageStatusInfo.finalImageUrl.trim())
+            ? imageStatusInfo.finalImageUrl
+            : (resultImageAsset?.publicUrl || normalizeMediaUrl(resultImageAsset?.path ?? null)),
+        resultImagePath:
+          (typeof imageStatusInfo?.finalImagePath === 'string' && imageStatusInfo.finalImagePath.trim())
+            ? imageStatusInfo.finalImagePath
+            : (resultImageAsset?.path ?? null),
+        resultFormat:
+          (typeof imageStatusInfo?.resultFormat === 'string' && imageStatusInfo.resultFormat.trim())
+            ? imageStatusInfo.resultFormat
+            : inferImageFormat(
+                (typeof imageStatusInfo?.finalImagePath === 'string' ? imageStatusInfo.finalImagePath : null)
+                ?? resultImageAsset?.path
+                ?? resultImageAsset?.publicUrl
+                ?? null,
+              ),
+        originalImageUrl: characterImageUrl,
+        characterTitle,
+        variationTitle,
+        source: p.selection?.userCharacterId ? 'user' : p.selection?.characterId ? 'global' : null,
+        sourceImages,
+        catalogItem,
+        estimatedDurationSeconds:
+          typeof initialPayload?.estimatedDurationSeconds === 'number'
+            ? initialPayload.estimatedDurationSeconds
+            : 300,
+        startedAt:
+          (typeof imageStatusInfo?.progressStartedAt === 'string' && imageStatusInfo.progressStartedAt)
+            || p.createdAt.toISOString(),
+      }
+    : null;
 
   return {
     project: {
@@ -429,6 +622,9 @@ export async function getProjectDetailForAdmin(projectId: string): Promise<Admin
       languageVariants,
       creation,
       languageProgress,
+      imageGeneration,
+      tokensUsed,
+      tokensRefunded,
     },
     user: {
       id: p.user.id,
