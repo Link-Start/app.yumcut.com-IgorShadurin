@@ -46,8 +46,8 @@ export function AdminEmailSettingsForm({ initial }: Props) {
           </p>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {settings.registrationEmailsEnabled
-              ? 'Enabled: send welcome_v1 now; follow_up_24h_v1 still sends later.'
-              : 'Disabled: skip welcome_v1; follow_up_24h_v1 still sends later.'}
+              ? 'Enabled: send welcome_v1 now.'
+              : 'Disabled: skip welcome_v1.'}
           </p>
         </div>
       </div>
