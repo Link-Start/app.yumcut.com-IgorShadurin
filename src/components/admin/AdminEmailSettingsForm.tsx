@@ -38,10 +38,16 @@ export function AdminEmailSettingsForm({ initial }: Props) {
         <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" />
         <div className="space-y-1">
           <Label className="text-base font-medium text-gray-900 dark:text-gray-100">
-            Registration emails
+            Welcome email
           </Label>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Send welcome/onboarding emails when new users register. Scheduled emails already queued are not affected.
+            Controls only welcome_v1. follow_up_24h_v1 is always scheduled after 24 hours.
+            Scheduled emails already queued are not affected.
+          </p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {settings.registrationEmailsEnabled
+              ? 'Enabled: send welcome_v1 now; follow_up_24h_v1 still sends later.'
+              : 'Disabled: skip welcome_v1; follow_up_24h_v1 still sends later.'}
           </p>
         </div>
       </div>
@@ -49,7 +55,7 @@ export function AdminEmailSettingsForm({ initial }: Props) {
         checked={settings.registrationEmailsEnabled}
         onCheckedChange={handleToggle}
         disabled={saving}
-        aria-label="Registration emails"
+        aria-label="Welcome email"
         className={saving ? undefined : 'cursor-pointer'}
       />
     </div>

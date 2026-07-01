@@ -49,6 +49,10 @@ export type ScheduleUserOnboardingEmailsInput = {
   targetLanguage?: string | null;
 };
 
+type QueueUserOnboardingEmailsOptions = {
+  includeWelcome?: boolean;
+};
+
 export type ProcessPlannedEmailsOptions = {
   limit?: number;
   userId?: string;
@@ -350,7 +354,10 @@ export async function sendLocalizedPlainTextEmail(params: {
   }
 }
 
-export async function queueUserOnboardingEmails(input: ScheduleUserOnboardingEmailsInput): Promise<boolean> {
+export async function queueUserOnboardingEmails(
+  input: ScheduleUserOnboardingEmailsInput,
+  options: QueueUserOnboardingEmailsOptions = {},
+): Promise<boolean> {
   const email = normalizeEmail(input.email);
   if (!email) {
     return false;
@@ -359,24 +366,34 @@ export async function queueUserOnboardingEmails(input: ScheduleUserOnboardingEma
   const targetLanguage = await resolveTargetLanguageForUser(input.userId, input.targetLanguage);
   const now = new Date();
   const followUpAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const data: Array<{
+    userId: string;
+    email: string;
+    kind: string;
+    targetLanguage: string;
+    scheduledAt: Date;
+  }> = [];
+
+  if (options.includeWelcome ?? true) {
+    data.push({
+      userId: input.userId,
+      email,
+      kind: EMAIL_KIND_WELCOME,
+      targetLanguage,
+      scheduledAt: now,
+    });
+  }
+
+  data.push({
+    userId: input.userId,
+    email,
+    kind: EMAIL_KIND_FOLLOW_UP_24H,
+    targetLanguage,
+    scheduledAt: followUpAt,
+  });
 
   await prisma.plannedEmail.createMany({
-    data: [
-      {
-        userId: input.userId,
-        email,
-        kind: EMAIL_KIND_WELCOME,
-        targetLanguage,
-        scheduledAt: now,
-      },
-      {
-        userId: input.userId,
-        email,
-        kind: EMAIL_KIND_FOLLOW_UP_24H,
-        targetLanguage,
-        scheduledAt: followUpAt,
-      },
-    ],
+    data,
     skipDuplicates: true,
   });
 
@@ -584,13 +601,14 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
 }
 
 export async function scheduleUserOnboardingEmails(input: ScheduleUserOnboardingEmailsInput): Promise<{ queued: boolean; processed: ProcessPlannedEmailsResult | null }> {
-  if (!(await shouldSendRegistrationEmails())) {
+  const includeWelcome = await shouldSendRegistrationEmails();
+  const queued = await queueUserOnboardingEmails(input, { includeWelcome });
+  if (!queued) {
     return { queued: false, processed: null };
   }
 
-  const queued = await queueUserOnboardingEmails(input);
-  if (!queued) {
-    return { queued: false, processed: null };
+  if (!includeWelcome) {
+    return { queued: true, processed: null };
   }
 
   const processed = await processPlannedEmails({

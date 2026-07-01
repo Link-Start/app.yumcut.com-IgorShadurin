@@ -104,7 +104,7 @@ describe('planned emails localization', () => {
     );
   });
 
-  it('does not queue onboarding emails when registration emails are disabled', async () => {
+  it('queues feedback follow-up when welcome emails are disabled', async () => {
     shouldSendRegistrationEmailsMock.mockResolvedValue(false);
 
     const result = await scheduleUserOnboardingEmails({
@@ -113,8 +113,19 @@ describe('planned emails localization', () => {
       name: 'Ivan',
     });
 
-    expect(result).toEqual({ queued: false, processed: null });
-    expect(prismaMock.plannedEmail.createMany).not.toHaveBeenCalled();
+    expect(result).toEqual({ queued: true, processed: null });
+    expect(prismaMock.plannedEmail.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({ kind: 'follow_up_24h_v1' }),
+        ],
+      }),
+    );
+    expect(prismaMock.plannedEmail.createMany.mock.calls[0]?.[0]?.data).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'welcome_v1' }),
+      ]),
+    );
   });
 
   it('builds and verifies signed reply bonus aliases', () => {
