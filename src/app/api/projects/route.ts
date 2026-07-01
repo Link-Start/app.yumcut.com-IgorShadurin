@@ -554,6 +554,8 @@ type ImagePrankRequestSource = {
   path: string;
   url: string;
   label?: string;
+  width?: number;
+  height?: number;
 };
 
 type ImagePrankRequest = {
@@ -679,6 +681,8 @@ function normalizeUploadedImageSource(source: ImagePrankRequestSource): ImagePra
     label: source.label?.trim() || (source.role === 'prank' ? 'Prank image' : 'Target image'),
     imagePath: path,
     imageUrl: normalizeMediaUrl(path),
+    width: safePositiveInteger(source.width),
+    height: safePositiveInteger(source.height),
   };
 }
 

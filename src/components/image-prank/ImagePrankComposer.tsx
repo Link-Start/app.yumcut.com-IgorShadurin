@@ -36,6 +36,8 @@ type UploadedSource = {
   path: string;
   url: string;
   label: string;
+  width?: number | null;
+  height?: number | null;
 };
 
 type PrefilledSource = UploadedSource & {
@@ -268,6 +270,8 @@ function toPrefilledSource(source: ImagePrankSourceImageDTO | null | undefined, 
     url: source.imageUrl,
     label: source.label || fallbackLabel,
     previewUrl: source.previewImageUrl || source.imageUrl,
+    width: source.width ?? null,
+    height: source.height ?? null,
   };
 }
 
@@ -354,6 +358,7 @@ async function uploadSource(file: File, role: ImagePrankSourceImageRole, label: 
   const grant = await Api.createCharacterUploadToken({ maxBytes: IMAGE_PRANK_UPLOAD_MAX_BYTES });
   if (!grant?.data || !grant.signature) throw new Error('Upload authorization failed');
   const uploadFile = await prepareImageForStorage(file, grant.maxBytes);
+  const dimensions = await readImageFileDimensions(uploadFile);
   if (!grant.mimeTypes.includes(uploadFile.type)) throw new Error('Selected file type is not allowed');
   if (uploadFile.size > grant.maxBytes) {
     throw new Error(`File is too large. Maximum size is ${Math.floor(grant.maxBytes / 1024 / 1024)}MB`);
@@ -379,6 +384,8 @@ async function uploadSource(file: File, role: ImagePrankSourceImageRole, label: 
     path: payload.path,
     url: payload.url,
     label,
+    width: dimensions?.width ?? null,
+    height: dimensions?.height ?? null,
   };
 }
 
@@ -406,6 +413,17 @@ async function decodeImageFile(file: File): Promise<HTMLImageElement> {
     };
     image.src = url;
   });
+}
+
+async function readImageFileDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  try {
+    const decoded = await decodeImageFile(file);
+    const width = decoded.naturalWidth;
+    const height = decoded.naturalHeight;
+    return width > 0 && height > 0 ? { width, height } : null;
+  } catch {
+    return null;
+  }
 }
 
 async function prepareImageForStorage(file: File, maxBytes: number): Promise<File> {
@@ -664,6 +682,8 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
             path: source.path,
             url: source.url,
             label: source.label,
+            width: source.width ?? undefined,
+            height: source.height ?? undefined,
           })),
         },
       };

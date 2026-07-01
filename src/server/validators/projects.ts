@@ -41,6 +41,8 @@ const imagePrankSourceImageSchema = z.object({
   path: z.string().trim().min(1).max(512),
   url: z.string().trim().min(1).max(1024),
   label: z.string().trim().max(120).optional(),
+  width: z.number().int().positive().max(20_000).optional(),
+  height: z.number().int().positive().max(20_000).optional(),
 }).strict();
 
 const imagePrankSchema = z.object({

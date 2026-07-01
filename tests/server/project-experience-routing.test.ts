@@ -270,8 +270,8 @@ describe('createProjectSchema projectExperience', () => {
       imagePrank: {
         mode: 'custom-two-image',
         sourceImages: [
-          { role: 'prank', path: 'characters/a.png', url: 'https://cdn.test/a.png' },
-          { role: 'target', path: 'characters/b.png', url: 'https://cdn.test/b.png' },
+          { role: 'prank', path: 'characters/a.png', url: 'https://cdn.test/a.png', width: 720, height: 1280 },
+          { role: 'target', path: 'characters/b.png', url: 'https://cdn.test/b.png', width: 810, height: 1080 },
         ],
       },
     };
@@ -286,6 +286,17 @@ describe('createProjectSchema projectExperience', () => {
     expect(createProjectSchema.safeParse({
       ...basePayload,
       imagePrank: { ...basePayload.imagePrank, model: 'bfl:5@1' },
+    }).success).toBe(false);
+
+    expect(createProjectSchema.safeParse({
+      ...basePayload,
+      imagePrank: {
+        ...basePayload.imagePrank,
+        sourceImages: [
+          { role: 'prank', path: 'characters/a.png', url: 'https://cdn.test/a.png', width: 720, height: 1280 },
+          { role: 'target', path: 'characters/b.png', url: 'https://cdn.test/b.png', width: 0, height: 1080 },
+        ],
+      },
     }).success).toBe(false);
   });
 });

@@ -636,6 +636,8 @@ export interface PendingProjectDraft {
         path: string;
         url: string;
         label?: string;
+        width?: number | null;
+        height?: number | null;
       }>;
     };
     contentTone?: ContentTone;
