@@ -17,16 +17,16 @@ export function AdminEmailSettingsForm({ initial }: Props) {
 
   const handleToggle = async () => {
     if (saving) return;
-    const previous = settings.registrationEmailsEnabled;
+    const previous = settings.followUp24hEnabled;
     const next = !previous;
-    setSettings((prev) => ({ ...prev, registrationEmailsEnabled: next }));
+    setSettings((prev) => ({ ...prev, followUp24hEnabled: next }));
     setSaving(true);
     try {
-      const updated = await Api.updateAdminEmailSettings({ registrationEmailsEnabled: next });
+      const updated = await Api.updateAdminEmailSettings({ followUp24hEnabled: next });
       setSettings(updated);
     } catch (err) {
       console.error('Failed to update admin email settings', err);
-      setSettings((prev) => ({ ...prev, registrationEmailsEnabled: previous }));
+      setSettings((prev) => ({ ...prev, followUp24hEnabled: previous }));
     } finally {
       setSaving(false);
     }
@@ -38,24 +38,23 @@ export function AdminEmailSettingsForm({ initial }: Props) {
         <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" />
         <div className="space-y-1">
           <Label className="text-base font-medium text-gray-900 dark:text-gray-100">
-            Welcome email
+            24-hour follow-up email
           </Label>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Controls only welcome_v1. follow_up_24h_v1 is always scheduled after 24 hours.
-            Scheduled emails already queued are not affected.
+            Controls only follow_up_24h_v1. Scheduled emails already queued are not affected.
           </p>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {settings.registrationEmailsEnabled
-              ? 'Enabled: send welcome_v1 now.'
-              : 'Disabled: skip welcome_v1.'}
+            {settings.followUp24hEnabled
+              ? 'Enabled: queue follow_up_24h_v1 after 24 hours.'
+              : 'Disabled: skip follow_up_24h_v1.'}
           </p>
         </div>
       </div>
       <Switch
-        checked={settings.registrationEmailsEnabled}
+        checked={settings.followUp24hEnabled}
         onCheckedChange={handleToggle}
         disabled={saving}
-        aria-label="Welcome email"
+        aria-label="24-hour follow-up email"
         className={saving ? undefined : 'cursor-pointer'}
       />
     </div>

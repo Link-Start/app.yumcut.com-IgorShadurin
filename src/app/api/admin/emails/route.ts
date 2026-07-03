@@ -6,6 +6,7 @@ import { getAdminEmailSettings, updateAdminEmailSettings } from '@/server/admin/
 
 const updateSchema = z
   .object({
+    followUp24hEnabled: z.boolean().optional(),
     registrationEmailsEnabled: z.boolean().optional(),
   })
   .refine((data) => Object.values(data).some((value) => typeof value === 'boolean'), {

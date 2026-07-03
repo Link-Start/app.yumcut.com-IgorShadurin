@@ -304,7 +304,7 @@ export interface AdminImageEditorSettingsDTO {
 }
 
 export interface AdminEmailSettingsDTO {
-  registrationEmailsEnabled: boolean;
+  followUp24hEnabled: boolean;
 }
 
 export interface AdminProjectCreationSettingsDTO {

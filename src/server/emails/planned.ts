@@ -5,7 +5,7 @@ import { prisma } from '@/server/db';
 import { config } from '@/server/config';
 import { getResendClient } from '@/server/emails/resend';
 import { TOKEN_COSTS } from '@/shared/constants/token-costs';
-import { shouldSendRegistrationEmails } from '@/server/admin/emails';
+import { shouldQueueFollowUp24hEmail } from '@/server/admin/emails';
 
 export const EMAIL_KIND_WELCOME = 'welcome_v1';
 export const EMAIL_KIND_FOLLOW_UP_24H = 'follow_up_24h_v1';
@@ -50,7 +50,7 @@ export type ScheduleUserOnboardingEmailsInput = {
 };
 
 type QueueUserOnboardingEmailsOptions = {
-  includeWelcome?: boolean;
+  includeFollowUp24h?: boolean;
 };
 
 export type ProcessPlannedEmailsOptions = {
@@ -374,23 +374,23 @@ export async function queueUserOnboardingEmails(
     scheduledAt: Date;
   }> = [];
 
-  if (options.includeWelcome ?? true) {
-    data.push({
-      userId: input.userId,
-      email,
-      kind: EMAIL_KIND_WELCOME,
-      targetLanguage,
-      scheduledAt: now,
-    });
-  }
-
   data.push({
     userId: input.userId,
     email,
-    kind: EMAIL_KIND_FOLLOW_UP_24H,
+    kind: EMAIL_KIND_WELCOME,
     targetLanguage,
-    scheduledAt: followUpAt,
+    scheduledAt: now,
   });
+
+  if (options.includeFollowUp24h ?? true) {
+    data.push({
+      userId: input.userId,
+      email,
+      kind: EMAIL_KIND_FOLLOW_UP_24H,
+      targetLanguage,
+      scheduledAt: followUpAt,
+    });
+  }
 
   await prisma.plannedEmail.createMany({
     data,
@@ -601,14 +601,10 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
 }
 
 export async function scheduleUserOnboardingEmails(input: ScheduleUserOnboardingEmailsInput): Promise<{ queued: boolean; processed: ProcessPlannedEmailsResult | null }> {
-  const includeWelcome = await shouldSendRegistrationEmails();
-  const queued = await queueUserOnboardingEmails(input, { includeWelcome });
+  const includeFollowUp24h = await shouldQueueFollowUp24hEmail();
+  const queued = await queueUserOnboardingEmails(input, { includeFollowUp24h });
   if (!queued) {
     return { queued: false, processed: null };
-  }
-
-  if (!includeWelcome) {
-    return { queued: true, processed: null };
   }
 
   const processed = await processPlannedEmails({

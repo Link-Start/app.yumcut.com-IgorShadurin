@@ -14,7 +14,7 @@ const prismaMock = vi.hoisted(() => ({
 }));
 
 const resendSendMock = vi.hoisted(() => vi.fn());
-const shouldSendRegistrationEmailsMock = vi.hoisted(() => vi.fn());
+const shouldQueueFollowUp24hEmailMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/db', () => ({
   prisma: prismaMock,
@@ -36,7 +36,7 @@ vi.mock('@/server/emails/resend', () => ({
 }));
 
 vi.mock('@/server/admin/emails', () => ({
-  shouldSendRegistrationEmails: shouldSendRegistrationEmailsMock,
+  shouldQueueFollowUp24hEmail: shouldQueueFollowUp24hEmailMock,
 }));
 
 import {
@@ -81,7 +81,7 @@ describe('planned emails localization', () => {
     prismaMock.plannedEmail.deleteMany.mockResolvedValue({ count: 1 });
     prismaMock.plannedEmail.updateMany.mockResolvedValue({ count: 1 });
     resendSendMock.mockResolvedValue({ data: { id: 're_test_1' } });
-    shouldSendRegistrationEmailsMock.mockResolvedValue(true);
+    shouldQueueFollowUp24hEmailMock.mockResolvedValue(true);
   });
 
   it('stores targetLanguage when queueing onboarding emails', async () => {
@@ -104,8 +104,9 @@ describe('planned emails localization', () => {
     );
   });
 
-  it('queues feedback follow-up when welcome emails are disabled', async () => {
-    shouldSendRegistrationEmailsMock.mockResolvedValue(false);
+  it('queues welcome email when 24-hour follow-up is disabled', async () => {
+    shouldQueueFollowUp24hEmailMock.mockResolvedValue(false);
+    prismaMock.$transaction.mockResolvedValue([]);
 
     const result = await scheduleUserOnboardingEmails({
       userId: 'user-1',
@@ -113,17 +114,28 @@ describe('planned emails localization', () => {
       name: 'Ivan',
     });
 
-    expect(result).toEqual({ queued: true, processed: null });
+    expect(result).toEqual({
+      queued: true,
+      processed: {
+        plannedDue: 1,
+        plannedPending: 1,
+        claimed: 0,
+        sent: 0,
+        rescheduled: 0,
+        failed: 0,
+        skipped: 0,
+      },
+    });
     expect(prismaMock.plannedEmail.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: [
-          expect.objectContaining({ kind: 'follow_up_24h_v1' }),
+          expect.objectContaining({ kind: 'welcome_v1' }),
         ],
       }),
     );
     expect(prismaMock.plannedEmail.createMany.mock.calls[0]?.[0]?.data).not.toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ kind: 'welcome_v1' }),
+        expect.objectContaining({ kind: 'follow_up_24h_v1' }),
       ]),
     );
   });
