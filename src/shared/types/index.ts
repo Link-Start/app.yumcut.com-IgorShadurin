@@ -307,6 +307,13 @@ export interface AdminEmailSettingsDTO {
   followUp24hEnabled: boolean;
 }
 
+export interface AdminEmailTemplatePreviewDTO {
+  language: 'en' | 'ru';
+  label: string;
+  path: string;
+  markdown: string;
+}
+
 export interface AdminProjectCreationSettingsDTO {
   projectCreationEnabled: boolean;
   projectCreationDisabledReason: string;

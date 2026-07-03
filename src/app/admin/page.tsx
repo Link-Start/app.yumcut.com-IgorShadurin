@@ -10,6 +10,7 @@ import { getPublishTaskSnapshot } from '@/server/admin/publish-tasks';
 import { getAdminVoiceProviderSettings } from '@/server/admin/voice-providers';
 import { getAdminImageEditorSettings } from '@/server/admin/image-editor';
 import { getAdminEmailSettings } from '@/server/admin/emails';
+import { getFollowUp24hTemplatePreviews } from '@/server/admin/email-template-previews';
 import { AdminStatusPill } from '@/components/admin/AdminStatusPill';
 import { formatDateTimeAdmin } from '@/lib/date';
 import { AdminNotificationSettingsForm } from '@/components/admin/AdminNotificationSettingsForm';
@@ -23,7 +24,7 @@ import { listTransactions } from '@/server/admin/transactions';
 import { AdminRecentTransactionsCard } from '@/components/admin/AdminRecentTransactionsCard';
 
 export default async function AdminHomePage() {
-  const [snapshotWithoutGuests, snapshotWithGuests, notificationSettings, publishQueue, voiceProviderSettings, imageEditorSettings, projectCreationSettings, emailSettings, recentTransactions] = await Promise.all([
+  const [snapshotWithoutGuests, snapshotWithGuests, notificationSettings, publishQueue, voiceProviderSettings, imageEditorSettings, projectCreationSettings, emailSettings, emailTemplatePreviews, recentTransactions] = await Promise.all([
     getAdminDashboardSnapshot(),
     getAdminDashboardSnapshot({ includeGuestUsers: true }),
     getAdminNotificationSettings(),
@@ -32,6 +33,7 @@ export default async function AdminHomePage() {
     getAdminImageEditorSettings(),
     getProjectCreationSettings(),
     getAdminEmailSettings(),
+    getFollowUp24hTemplatePreviews(),
     listTransactions({ page: 1, pageSize: 10 }),
   ]);
   const snapshot = snapshotWithoutGuests;
@@ -418,11 +420,11 @@ export default async function AdminHomePage() {
         <CardHeader className="space-y-1">
           <CardTitle>Email controls</CardTitle>
           <CardDescription>
-            Control automatic emails sent during registration without changing scheduled email processing.
+            Control the 24-hour follow-up email without changing scheduled email processing.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AdminEmailSettingsForm initial={emailSettings} />
+          <AdminEmailSettingsForm initial={emailSettings} templates={emailTemplatePreviews} />
         </CardContent>
       </Card>
     </div>
