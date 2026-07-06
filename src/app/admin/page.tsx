@@ -22,9 +22,11 @@ import { getProjectCreationSettings } from '@/server/admin/project-creation';
 import { AdminDashboardUserMetricsSection } from '@/components/admin/AdminDashboardUserMetricsSection';
 import { listTransactions } from '@/server/admin/transactions';
 import { AdminRecentTransactionsCard } from '@/components/admin/AdminRecentTransactionsCard';
+import { listAdminApiKeys } from '@/server/admin/api-keys';
+import { AdminApiKeysManager } from '@/components/admin/AdminApiKeysManager';
 
 export default async function AdminHomePage() {
-  const [snapshotWithoutGuests, snapshotWithGuests, notificationSettings, publishQueue, voiceProviderSettings, imageEditorSettings, projectCreationSettings, emailSettings, emailTemplatePreviews, recentTransactions] = await Promise.all([
+  const [snapshotWithoutGuests, snapshotWithGuests, notificationSettings, publishQueue, voiceProviderSettings, imageEditorSettings, projectCreationSettings, emailSettings, emailTemplatePreviews, recentTransactions, adminApiKeys] = await Promise.all([
     getAdminDashboardSnapshot(),
     getAdminDashboardSnapshot({ includeGuestUsers: true }),
     getAdminNotificationSettings(),
@@ -35,6 +37,7 @@ export default async function AdminHomePage() {
     getAdminEmailSettings(),
     getFollowUp24hTemplatePreviews(),
     listTransactions({ page: 1, pageSize: 10 }),
+    listAdminApiKeys(),
   ]);
   const snapshot = snapshotWithoutGuests;
   const queueStatuses = ['pending', 'retry', 'processing', 'scheduled', 'failed'] as const;
@@ -111,6 +114,8 @@ export default async function AdminHomePage() {
         </Card>
 
       </AdminDashboardUserMetricsSection>
+
+      <AdminApiKeysManager initialKeys={adminApiKeys} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

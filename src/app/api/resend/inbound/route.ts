@@ -6,6 +6,7 @@ import { getReceivedEmail, verifyResendWebhook } from '@/server/emails/resend';
 import { extractLatestEmailReply } from '@/server/emails/reply-parser';
 import { processInboundReplyBonus } from '@/server/emails/reply-bonus';
 import { notifyAdminsWithMessage } from '@/server/telegram';
+import { persistInboundFeedback } from '@/server/admin/feedbacks';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -283,6 +284,21 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     telegramForwardError = err instanceof Error ? err.message : String(err);
     console.error('Failed to forward inbound email to Telegram admins', { emailId, err });
   }
+
+  await persistInboundFeedback({
+    emailId,
+    from,
+    to,
+    subject,
+    latestReplyText: textBody,
+    snippetSource: apiSnippet ? 'api' : rawMimeSnippet ? 'raw' : 'none',
+    userId: replyBonusResult.userId ?? null,
+    replyBonus: replyBonusResult,
+    inboundFetchError: fetchResult.errorMessage ? trimTo(fetchResult.errorMessage, 500) : null,
+    telegramForwardError: telegramForwardError ? trimTo(telegramForwardError, 500) : null,
+    enriched: Boolean(received),
+    forwardedToTelegram: !telegramForwardError,
+  });
 
   return ok({
     ok: true,

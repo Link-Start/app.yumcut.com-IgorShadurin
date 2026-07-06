@@ -57,6 +57,9 @@ model User {
   favoriteCharacters                      UserFavoriteCharacter[]
   attribution                             UserAttribution?
   projectCreationAttempts                 ProjectCreationAttempt[]
+  createdAdminApiKeys                     AdminApiKey[]             @relation("AdminApiKeysCreated")
+  revokedAdminApiKeys                     AdminApiKey[]             @relation("AdminApiKeysRevoked")
+  inboundFeedbacks                        InboundFeedback[]
 }
 
 model UserSettings {
@@ -797,6 +800,50 @@ model AdminSetting {
   value     Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AdminApiKey {
+  id                String    @id @default(uuid()) @db.Char(36)
+  name              String    @db.VarChar(120)
+  tokenHash         String    @unique @db.Char(64)
+  tokenPrefix       String    @db.VarChar(16)
+  scopes            Json?
+  createdByUserId   String    @db.Char(36)
+  revokedByUserId   String?   @db.Char(36)
+  createdAt         DateTime  @default(now())
+  revokedAt         DateTime?
+  lastUsedAt        DateTime?
+  lastUsedIp        String?   @db.VarChar(64)
+  lastUsedUserAgent String?   @db.VarChar(512)
+  createdByUser     User      @relation("AdminApiKeysCreated", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  revokedByUser     User?     @relation("AdminApiKeysRevoked", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdByUserId, createdAt])
+  @@index([revokedAt])
+}
+
+model InboundFeedback {
+  id                   String    @id @default(uuid()) @db.Char(36)
+  emailId              String    @unique @db.VarChar(191)
+  fromEmail            String?   @db.VarChar(320)
+  fromRaw              String?   @db.VarChar(512)
+  toRecipients         Json?
+  subject              String?   @db.VarChar(512)
+  latestReplyText      String?   @db.LongText
+  snippetSource        String    @default("none") @db.VarChar(16)
+  userId               String?   @db.Char(36)
+  replyBonus           Json?
+  inboundFetchError    String?   @db.Text
+  telegramForwardError String?   @db.Text
+  enriched             Boolean   @default(false)
+  forwardedToTelegram  Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  user                 User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([fromEmail])
 }
 
 model AppStoreServerNotification {

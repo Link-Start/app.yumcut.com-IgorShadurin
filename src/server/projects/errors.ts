@@ -76,14 +76,22 @@ export async function getProjectErrorLogFileForAdmin(
   options: { projectsWorkspace?: string | null; maxBytes?: number } = {},
 ): Promise<ProjectErrorLogFile | null> {
   const maxBytes = normalizeMaxBytes(options.maxBytes);
+  const explicitWorkspaceDisabled =
+    Object.prototype.hasOwnProperty.call(options, 'projectsWorkspace')
+    && options.projectsWorkspace === null;
+  const projectsWorkspace = explicitWorkspaceDisabled
+    ? null
+    : normalizeWorkspace(options.projectsWorkspace) ?? resolveProjectsWorkspace();
 
   for (const candidate of collectDirectLogPathCandidates(extra)) {
     if (!isProjectLogPath(candidate, projectId)) continue;
+    if (!explicitWorkspaceDisabled && !isPathInsideProjectWorkspace(candidate, projectsWorkspace, projectId)) {
+      continue;
+    }
     const file = await readLogFileIfExists(candidate, 'status-log-path', maxBytes);
     if (file) return file;
   }
 
-  const projectsWorkspace = normalizeWorkspace(options.projectsWorkspace) ?? resolveProjectsWorkspace();
   if (!projectsWorkspace) return null;
 
   const latestTemplateLog = await findLatestTemplateLaunchLog(path.join(projectsWorkspace, projectId, 'workspace', 'template'));
@@ -133,6 +141,13 @@ function isProjectLogPath(candidate: string, projectId: string): boolean {
   return base.endsWith('.log') || base.endsWith('.txt');
 }
 
+function isPathInsideProjectWorkspace(candidate: string, projectsWorkspace: string | null, projectId: string): boolean {
+  if (!projectsWorkspace) return false;
+  const projectRoot = path.resolve(projectsWorkspace, projectId);
+  const resolvedCandidate = path.resolve(candidate);
+  return resolvedCandidate === projectRoot || resolvedCandidate.startsWith(`${projectRoot}${path.sep}`);
+}
+
 function normalizeWorkspace(value: string | null | undefined): string | null {
   const normalized = normalizeString(value);
   if (!normalized) return null;
@@ -159,7 +174,7 @@ function parseEnvFileValue(filePath: string, key: string): string | null {
   return null;
 }
 
-function resolveProjectsWorkspace(): string | null {
+export function resolveProjectsWorkspace(): string | null {
   const raw =
     normalizeString(process.env.DAEMON_PROJECTS_WORKSPACE)
     ?? (process.env.DAEMON_ENV_FILE ? parseEnvFileValue(path.resolve(/* turbopackIgnore: true */ process.cwd(), process.env.DAEMON_ENV_FILE), 'DAEMON_PROJECTS_WORKSPACE') : null)

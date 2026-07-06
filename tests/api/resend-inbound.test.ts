@@ -5,6 +5,7 @@ const verifyResendWebhook = vi.hoisted(() => vi.fn());
 const getReceivedEmail = vi.hoisted(() => vi.fn());
 const notifyAdminsWithMessage = vi.hoisted(() => vi.fn());
 const processInboundReplyBonus = vi.hoisted(() => vi.fn());
+const persistInboundFeedback = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/config', () => ({
   config: {
@@ -25,12 +26,17 @@ vi.mock('@/server/emails/reply-bonus', () => ({
   processInboundReplyBonus,
 }));
 
+vi.mock('@/server/admin/feedbacks', () => ({
+  persistInboundFeedback,
+}));
+
 const route = await import('@/app/api/resend/inbound/route');
 
 describe('POST /api/resend/inbound', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     notifyAdminsWithMessage.mockResolvedValue(undefined);
+    persistInboundFeedback.mockResolvedValue({});
     processInboundReplyBonus.mockResolvedValue({
       eligible: false,
       granted: false,
@@ -81,6 +87,16 @@ describe('POST /api/resend/inbound', () => {
     expect(payload.enriched).toBe(true);
     expect(payload.replyBonus.granted).toBe(false);
     expect(notifyAdminsWithMessage).toHaveBeenCalledWith(expect.stringContaining('Inbound text body'));
+    expect(persistInboundFeedback).toHaveBeenCalledWith(expect.objectContaining({
+      emailId: 'email-1',
+      from: 'sender@example.com',
+      to: ['support@app.yumcut.com'],
+      subject: 'Hello',
+      latestReplyText: 'Inbound text body',
+      snippetSource: 'api',
+      enriched: true,
+      forwardedToTelegram: true,
+    }));
   });
 
   it('returns 200 when Resend email fetch fails and uses webhook fallback fields', async () => {

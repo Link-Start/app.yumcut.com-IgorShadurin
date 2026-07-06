@@ -93,4 +93,18 @@ describe('buildProjectErrorStatusInfo', () => {
       source: 'template-launch',
     });
   });
+
+  it('does not read direct log paths outside the configured project workspace', async () => {
+    const projectId = 'fc6520d9-3b2d-4112-87d8-2650e0023bbd';
+    const projectsWorkspace = await fs.mkdtemp(path.join(os.tmpdir(), 'project-safe-workspace-'));
+    const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'project-outside-log-'));
+    const outsideLogDir = path.join(outsideRoot, projectId, 'logs');
+    const outsideLogPath = path.join(outsideLogDir, 'outside.log');
+    await fs.mkdir(outsideLogDir, { recursive: true });
+    await fs.writeFile(outsideLogPath, 'secret outside log\n', 'utf8');
+
+    const logFile = await getProjectErrorLogFileForAdmin(projectId, { logPath: outsideLogPath }, { projectsWorkspace });
+
+    expect(logFile).toBeNull();
+  });
 });
