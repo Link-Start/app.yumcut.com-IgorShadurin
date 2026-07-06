@@ -134,4 +134,33 @@ describe('daemon creation snapshot videoGeneration fallback', () => {
     expect(body.autoApproveScript).toBe(true);
     expect(body.autoApproveAudio).toBe(true);
   });
+
+  it('exposes admin-cloned snapshot character images to daemon phases', async () => {
+    prismaMock.job.findFirst.mockResolvedValue({
+      payload: {
+        projectExperience: 'story',
+        targetLanguage: 'en',
+        languages: ['en'],
+        characterSelection: {
+          source: 'snapshot',
+          imagePath: 'characters/2026/07/06/source.png',
+          label: 'Source character',
+        },
+      },
+    });
+    const route = await import('@/app/api/daemon/projects/[projectId]/creation-snapshot/route');
+
+    const res = await route.GET(new NextRequest('http://localhost/api/daemon/projects/project-1/creation-snapshot'), {
+      params: Promise.resolve({ projectId: 'project-1' }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.characterSelection).toMatchObject({
+      source: 'snapshot',
+      imagePath: 'characters/2026/07/06/source.png',
+      imageUrl: expect.stringContaining('/api/media/characters/2026/07/06/source.png'),
+      label: 'Source character',
+    });
+  });
 });

@@ -28,6 +28,14 @@ export const characterSelectionSchema = z.union([
   z.object({
     source: z.literal('dynamic'),
   }),
+  z.object({
+    source: z.literal('snapshot'),
+    imageUrl: z.string().trim().min(1).max(1024).optional(),
+    imagePath: z.string().trim().min(1).max(512).optional(),
+    label: z.string().trim().max(120).optional(),
+  }).strict().refine((value) => !!(value.imageUrl || value.imagePath), {
+    message: 'Snapshot character image is required',
+  }),
 ]);
 
 const languageVoiceIdSchema = z.string().min(1).max(128);

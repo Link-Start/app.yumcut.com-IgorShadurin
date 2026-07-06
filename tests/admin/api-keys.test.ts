@@ -65,6 +65,20 @@ describe('admin API keys', () => {
     expect(result.item).not.toHaveProperty('tokenHash');
   });
 
+  it('stores requested write scopes for generated keys', async () => {
+    await createAdminApiKey({
+      name: 'Writer key',
+      createdByUserId: 'admin-1',
+      scopes: ['read', 'write'],
+    });
+
+    expect(adminApiKeyCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        scopes: ['read', 'write'],
+      }),
+    }));
+  });
+
   it('authenticates active read keys and updates last-used metadata', async () => {
     adminApiKeyFindUnique.mockResolvedValue({
       id: 'key-1',

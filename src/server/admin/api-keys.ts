@@ -110,11 +110,14 @@ export async function listAdminApiKeys(): Promise<AdminApiKeyListItem[]> {
 export async function createAdminApiKey(input: {
   name: string;
   createdByUserId: string;
+  scopes?: AdminApiKeyScope[];
 }): Promise<CreatedAdminApiKey> {
   const name = normalizeAdminApiKeyName(input.name);
   if (!name) {
     throw new Error('API key name is required');
   }
+  const scopes = parseAdminApiKeyScopes(input.scopes);
+  const effectiveScopes = scopes.length > 0 ? scopes : DEFAULT_ADMIN_API_KEY_SCOPES;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const key = generatePlaintextKey();
@@ -126,7 +129,7 @@ export async function createAdminApiKey(input: {
           name,
           tokenHash,
           tokenPrefix,
-          scopes: DEFAULT_ADMIN_API_KEY_SCOPES,
+          scopes: effectiveScopes,
           createdByUserId: input.createdByUserId,
         },
         include: adminApiKeyInclude,

@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(120),
+  scopes: z.array(z.enum(['read', 'write'])).optional(),
 });
 
 export const GET = withApiError(async function GET() {
@@ -37,6 +38,7 @@ export const POST = withApiError(async function POST(req: Request) {
   const result = await createAdminApiKey({
     name: normalizeAdminApiKeyName(parsed.data.name),
     createdByUserId,
+    scopes: parsed.data.scopes,
   });
   return ok(result, { headers: { 'cache-control': 'no-store' } });
 }, 'Failed to create admin API key');

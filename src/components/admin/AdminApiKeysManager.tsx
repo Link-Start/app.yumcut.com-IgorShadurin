@@ -5,6 +5,7 @@ import { Copy, KeyRound, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTimeAdmin } from '@/lib/date';
@@ -26,6 +27,7 @@ async function readJsonResponse(response: Response) {
 export function AdminApiKeysManager({ initialKeys }: AdminApiKeysManagerProps) {
   const [keys, setKeys] = useState(initialKeys);
   const [name, setName] = useState('');
+  const [writeEnabled, setWriteEnabled] = useState(false);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
@@ -43,12 +45,13 @@ export function AdminApiKeysManager({ initialKeys }: AdminApiKeysManagerProps) {
       const response = await fetch('/api/admin/api-keys', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: trimmedName }),
+        body: JSON.stringify({ name: trimmedName, scopes: writeEnabled ? ['read', 'write'] : ['read'] }),
       });
       const body = await readJsonResponse(response) as { key: string; item: AdminApiKeyListItem };
       setKeys((current) => [body.item, ...current]);
       setCreatedKey(body.key);
       setName('');
+      setWriteEnabled(false);
       toast.success('API key generated');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to generate API key');
@@ -88,7 +91,7 @@ export function AdminApiKeysManager({ initialKeys }: AdminApiKeysManagerProps) {
             Admin API keys
           </CardTitle>
           <CardDescription>
-            Generate read-only bearer keys for the admin data API. Plaintext keys are shown once.
+            Generate bearer keys for the admin API. Plaintext keys are shown once.
           </CardDescription>
         </div>
         <Badge>{activeKeys.length.toLocaleString()} active</Badge>
@@ -103,6 +106,14 @@ export function AdminApiKeysManager({ initialKeys }: AdminApiKeysManagerProps) {
             disabled={creating}
             aria-label="API key name"
           />
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
+            <Checkbox
+              checked={writeEnabled}
+              onCheckedChange={(checked) => setWriteEnabled(checked === true)}
+              disabled={creating}
+            />
+            Write
+          </label>
           <Button type="button" className="cursor-pointer" onClick={() => void createKey()} disabled={creating}>
             {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
             Generate
@@ -138,7 +149,9 @@ export function AdminApiKeysManager({ initialKeys }: AdminApiKeysManagerProps) {
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-gray-900 dark:text-gray-100">{apiKey.name}</span>
-                    {apiKey.revokedAt ? <Badge variant="danger">Revoked</Badge> : <Badge>Read</Badge>}
+                    {apiKey.revokedAt ? <Badge variant="danger">Revoked</Badge> : null}
+                    {apiKey.scopes.includes('read') ? <Badge>Read</Badge> : null}
+                    {apiKey.scopes.includes('write') ? <Badge>Write</Badge> : null}
                   </div>
                   <div className="break-all font-mono text-xs text-gray-500 dark:text-gray-400">
                     Prefix: {apiKey.tokenPrefix}

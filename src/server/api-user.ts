@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { getAuthSession } from '@/server/auth';
 import { verifyMobileAccessToken } from '@/server/mobile-auth';
 import { prisma } from '@/server/db';
@@ -10,8 +11,18 @@ export interface AuthenticatedApiUser {
     email?: string | null;
     name?: string | null;
     isAdmin?: boolean;
+    preferredLanguage?: string | null;
   };
-  source: 'session' | 'mobile';
+  source: 'session' | 'mobile' | 'admin-api';
+}
+
+const authOverrideStorage = new AsyncLocalStorage<AuthenticatedApiUser>();
+
+export function runWithAuthenticatedApiUser<T>(
+  auth: AuthenticatedApiUser,
+  fn: () => T | Promise<T>,
+): T | Promise<T> {
+  return authOverrideStorage.run(auth, fn);
 }
 
 function extractBearerToken(req?: NextRequest): string | null {
@@ -25,6 +36,9 @@ function extractBearerToken(req?: NextRequest): string | null {
 }
 
 export async function authenticateApiRequest(req?: NextRequest): Promise<AuthenticatedApiUser | null> {
+  const override = authOverrideStorage.getStore();
+  if (override) return override;
+
   const bearer = extractBearerToken(req);
   if (bearer) {
     try {

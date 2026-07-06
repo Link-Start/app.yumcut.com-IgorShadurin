@@ -146,6 +146,26 @@ export const GET = withApiError(async function GET(req: NextRequest, { params }:
     } as any;
   }
 
+  if (!characterSelection && payload?.characterSelection?.source === 'snapshot') {
+    const snapshotImage = payload.characterSelection.imagePath ?? payload.characterSelection.imageUrl ?? null;
+    characterSelection = {
+      type: null,
+      characterId: null,
+      userCharacterId: null,
+      variationId: null,
+      imagePath: typeof payload.characterSelection.imagePath === 'string' ? payload.characterSelection.imagePath : null,
+      absoluteImagePath: null,
+      imageUrl: toAbsoluteUrl(
+        normalizeMediaUrl(typeof snapshotImage === 'string' ? snapshotImage : null),
+        config.STORAGE_PUBLIC_URL ?? config.NEXTAUTH_URL,
+      ),
+      // @ts-ignore — allow admin API clone snapshot metadata for daemon phases
+      source: 'snapshot',
+      // @ts-ignore — display/debug hint only
+      label: typeof payload.characterSelection.label === 'string' ? payload.characterSelection.label : null,
+    } as any;
+  }
+
   const scriptCreationEnabled = !!payload.scriptCreationGuidanceEnabled;
   const scriptAvoidanceEnabled = !!payload.scriptAvoidanceGuidanceEnabled;
   const scriptCreationGuidance = typeof payload.scriptCreationGuidance === 'string' ? payload.scriptCreationGuidance : '';

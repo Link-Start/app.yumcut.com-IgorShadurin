@@ -182,9 +182,20 @@ export const POST = withApiError(async function POST(req: NextRequest) {
     };
   }
   const dynamicCharacterRequested = (characterSelection as any)?.source === 'dynamic';
+  const snapshotCharacterSelection = (characterSelection as any)?.source === 'snapshot'
+    ? {
+        source: 'snapshot',
+        imageUrl: (characterSelection as any).imageUrl ?? null,
+        imagePath: (characterSelection as any).imagePath ?? null,
+        label: (characterSelection as any).label ?? null,
+      }
+    : null;
+  if (snapshotCharacterSelection && auth.source !== 'admin-api') {
+    return error('VALIDATION_ERROR', 'Snapshot character selection is only available to the admin API', 400);
+  }
   const normalizedCharacterSelection = dynamicCharacterRequested
     ? null
-    : (slugBasedCharacterSelection || characterSelection || null);
+    : (snapshotCharacterSelection ? null : (slugBasedCharacterSelection || characterSelection || null));
   const adminVoiceProviders = await getAdminVoiceProviderSettings();
   const allowedProviders = buildVoiceProviderSet(adminVoiceProviders.enabledProviders);
 
@@ -428,6 +439,8 @@ export const POST = withApiError(async function POST(req: NextRequest) {
           useExactTextAsScript: !!useExactTextAsScript,
           characterSelection: dynamicCharacterRequested
             ? { source: 'dynamic', status: 'processing' }
+            : snapshotCharacterSelection
+              ? snapshotCharacterSelection
             : (normalizedCharacterSelection || null),
           characterSlug: normalizedCharacterSlug ?? undefined,
           ...(dynamicCharacterRequested ? { dynamicCharacter: true } : {}),
@@ -841,6 +854,17 @@ async function createImageGenerationProject(params: {
   if (normalizedCharacterSlug && params.characterSelection) {
     return error('VALIDATION_ERROR', 'Use either character selection or character slug, not both', 400);
   }
+  const snapshotCharacterSelection = (params.characterSelection as any)?.source === 'snapshot'
+    ? {
+        source: 'snapshot',
+        imageUrl: (params.characterSelection as any).imageUrl ?? null,
+        imagePath: (params.characterSelection as any).imagePath ?? null,
+        label: (params.characterSelection as any).label ?? null,
+      }
+    : null;
+  if (snapshotCharacterSelection && params.auth.source !== 'admin-api') {
+    return error('VALIDATION_ERROR', 'Snapshot character selection is only available to the admin API', 400);
+  }
 
   let resolvedImagePrank: ResolvedImagePrankPayload | null = null;
   if (params.imagePrank) {
@@ -875,9 +899,11 @@ async function createImageGenerationProject(params: {
   const title = resolvedImagePrank
     ? `Image Prank: ${deriveTitleFromText(prompt, 18)}`
     : deriveTitleFromText(prompt, 20);
-  let normalizedSelection: Awaited<ReturnType<typeof resolveImageProjectCharacterSelection>>;
+  let normalizedSelection: Awaited<ReturnType<typeof resolveImageProjectCharacterSelection>> | typeof snapshotCharacterSelection;
   if (resolvedImagePrank) {
     normalizedSelection = null;
+  } else if (snapshotCharacterSelection) {
+    normalizedSelection = snapshotCharacterSelection;
   } else {
     try {
       normalizedSelection = await resolveImageProjectCharacterSelection({
@@ -926,7 +952,7 @@ async function createImageGenerationProject(params: {
       },
     }, tx);
 
-    if (normalizedSelection) {
+    if (normalizedSelection && !('source' in normalizedSelection)) {
       await tx.projectCharacterSelection.create({
         data: {
           projectId: created.id,
