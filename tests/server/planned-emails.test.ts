@@ -52,6 +52,8 @@ function mockClaimedEmails(claimed: Array<{
   userId: string;
   email: string;
   kind: string;
+  subject?: string | null;
+  text?: string | null;
   attempts: number;
   targetLanguage: string;
   user: { preferredLanguage: string; name: string | null; deleted: boolean } | null;
@@ -62,7 +64,11 @@ function mockClaimedEmails(claimed: Array<{
         findMany: vi
           .fn()
           .mockResolvedValueOnce(claimed.map((item) => ({ id: item.id })))
-          .mockResolvedValueOnce(claimed),
+          .mockResolvedValueOnce(claimed.map((item) => ({
+            ...item,
+            subject: item.subject ?? null,
+            text: item.text ?? null,
+          }))),
         updateMany: vi.fn().mockResolvedValue({ count: claimed.length }),
       },
     };
@@ -252,6 +258,38 @@ describe('planned emails localization', () => {
           status: 'sent',
           targetLanguage: 'en',
         }),
+      }),
+    );
+  });
+
+  it('sends queued admin subject and text without rendering a template', async () => {
+    mockClaimedEmails([
+      {
+        id: 'planned-admin-manual',
+        userId: 'user-admin-message',
+        email: 'user@example.com',
+        kind: 'admin_manual_operation-1',
+        subject: 'Manual admin notice',
+        text: 'Plain text body from admin API.',
+        attempts: 0,
+        targetLanguage: 'ru',
+        user: { preferredLanguage: 'ru', name: 'Иван', deleted: false },
+      },
+    ]);
+
+    const result = await processPlannedEmails({ limit: 10 });
+
+    expect(result.sent).toBe(1);
+    expect(resendSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: ['user@example.com'],
+        subject: 'Manual admin notice',
+        text: 'Plain text body from admin API.',
+      }),
+    );
+    expect(resendSendMock).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        replyTo: expect.anything(),
       }),
     );
   });

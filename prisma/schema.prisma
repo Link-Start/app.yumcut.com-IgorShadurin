@@ -726,6 +726,9 @@ model PlannedEmail {
   userId         String    @db.Char(36)
   email          String    @db.VarChar(320)
   kind           String    @db.VarChar(64)
+  subject        String?   @db.VarChar(512)
+  text           String?   @db.LongText
+  metadata       Json?
   targetLanguage String    @default("en") @db.VarChar(8)
   scheduledAt    DateTime
   status         String    @default("pending") @db.VarChar(32)
@@ -817,9 +820,25 @@ model AdminApiKey {
   lastUsedUserAgent String?   @db.VarChar(512)
   createdByUser     User      @relation("AdminApiKeysCreated", fields: [createdByUserId], references: [id], onDelete: Cascade)
   revokedByUser     User?     @relation("AdminApiKeysRevoked", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+  operations         AdminApiOperation[]
 
   @@index([createdByUserId, createdAt])
   @@index([revokedAt])
+}
+
+model AdminApiOperation {
+  id             String      @id @default(uuid()) @db.Char(36)
+  keyId          String      @db.Char(36)
+  idempotencyKey String      @db.VarChar(191)
+  action         String      @db.VarChar(64)
+  bodyHash       String      @db.Char(64)
+  result         Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  key            AdminApiKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
+
+  @@unique([keyId, idempotencyKey])
+  @@index([action, createdAt])
 }
 
 model InboundFeedback {

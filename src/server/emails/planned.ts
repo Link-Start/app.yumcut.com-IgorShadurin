@@ -453,6 +453,8 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
         userId: string;
         email: string;
         kind: string;
+        subject: string | null;
+        text: string | null;
         attempts: number;
         targetLanguage: string;
         user: { preferredLanguage: string; name: string | null; deleted: boolean } | null;
@@ -483,6 +485,8 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
         userId: true,
         email: true,
         kind: true,
+        subject: true,
+        text: true,
         attempts: true,
         targetLanguage: true,
         user: {
@@ -527,19 +531,27 @@ export async function processPlannedEmails(options: ProcessPlannedEmailsOptions 
     let sendResult: SendResult;
 
     try {
-      const replyTo = planned.kind === EMAIL_KIND_WELCOME || planned.kind === EMAIL_KIND_FOLLOW_UP_24H
-        ? buildReplyBonusReplyToAddress(planned.userId)
-        : null;
+      if (planned.subject && planned.text) {
+        sendResult = await sendPlainTextEmail({
+          to: planned.email,
+          subject: planned.subject,
+          text: planned.text,
+        });
+      } else {
+        const replyTo = planned.kind === EMAIL_KIND_WELCOME || planned.kind === EMAIL_KIND_FOLLOW_UP_24H
+          ? buildReplyBonusReplyToAddress(planned.userId)
+          : null;
 
-      const localizedResult = await sendLocalizedPlainTextEmail({
-        to: planned.email,
-        kind: planned.kind,
-        languageHint,
-        name: planned.user?.name,
-        replyTo,
-      });
-      resolvedLanguage = localizedResult.language ?? resolvedLanguage;
-      sendResult = localizedResult;
+        const localizedResult = await sendLocalizedPlainTextEmail({
+          to: planned.email,
+          kind: planned.kind,
+          languageHint,
+          name: planned.user?.name,
+          replyTo,
+        });
+        resolvedLanguage = localizedResult.language ?? resolvedLanguage;
+        sendResult = localizedResult;
+      }
     } catch (error) {
       sendResult = {
         ok: false,
