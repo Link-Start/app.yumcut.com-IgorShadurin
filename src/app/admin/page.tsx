@@ -62,7 +62,7 @@ export default async function AdminHomePage() {
         withoutGuests={snapshotWithoutGuests}
         withGuests={snapshotWithGuests}
         leftCard={(
-          <AdminRecentTransactionsCard transactions={recentTransactions.items} />
+          <AdminRecentTransactionsCard key="recent-transactions" transactions={recentTransactions.items} />
         )}
       >
         <Card>
