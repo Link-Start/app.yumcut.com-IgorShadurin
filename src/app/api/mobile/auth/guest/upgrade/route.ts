@@ -13,6 +13,7 @@ import {
 import { reactivateDeletedUser } from '@/server/account/reactivate-user';
 import { notifyAdminsOfGuestConversion } from '@/server/telegram';
 import { scheduleUserOnboardingEmails } from '@/server/emails/planned';
+import { addUserToResendContactsInBackground } from '@/server/emails/resend-contacts';
 
 const BaseSchema = z.object({
   deviceId: z.string().min(3).max(191),
@@ -165,6 +166,12 @@ export const POST = withApiError(async function POST(req: NextRequest) {
       console.error('Failed to schedule onboarding emails for upgraded guest user', err);
     });
   }
+
+  addUserToResendContactsInBackground({
+    userId: finalUserId,
+    email: finalUser?.email ?? normalizedEmail,
+    name: finalUser?.name ?? providerPayload.name ?? null,
+  }, 'guest-upgraded');
 
   return ok({
     user: finalUser,

@@ -5,6 +5,7 @@ import { revokeAppleTokens } from '@/server/apple/revoke-tokens';
 import { notifyAdminsOfAccountDeletion } from '@/server/telegram';
 import { deleteStoredMedia } from '@/server/storage';
 import { cancelPlannedEmailsForUser } from '@/server/emails/planned';
+import { removeUserFromResendContactsInBackground } from '@/server/emails/resend-contacts';
 import {
   cancelStripeSubscriptionForAccountDeletion,
   type StripeAccountDeletionCancellationResult,
@@ -162,6 +163,11 @@ export async function deleteUserAccount(options: DeleteUserAccountOptions): Prom
   }).catch((err) => {
     console.error('Failed to notify admins about account deletion', { userId, err });
   });
+
+  removeUserFromResendContactsInBackground({
+    userId,
+    email: existingUser.email,
+  }, 'account-deleted');
 
   return { alreadyDeleted: false, stripeCancellation };
 }

@@ -19,12 +19,14 @@ const deleteStoredMedia = vi.fn();
 const notifyAdminsOfAccountDeletion = vi.fn().mockResolvedValue(undefined);
 const revokeAppleTokens = vi.fn();
 const cancelStripeSubscriptionForAccountDeletion = vi.fn();
+const removeUserFromResendContactsInBackground = vi.fn();
 
 vi.mock('@/server/db', () => ({ prisma: prismaMock }));
 vi.mock('@/server/storage', () => ({ deleteStoredMedia }));
 vi.mock('@/server/telegram', () => ({ notifyAdminsOfAccountDeletion }));
 vi.mock('@/server/apple/revoke-tokens', () => ({ revokeAppleTokens }));
 vi.mock('@/server/stripe/subscriptions', () => ({ cancelStripeSubscriptionForAccountDeletion }));
+vi.mock('@/server/emails/resend-contacts', () => ({ removeUserFromResendContactsInBackground }));
 
 const { deleteUserAccount } = await import('@/server/account/delete-user');
 
@@ -48,6 +50,7 @@ beforeEach(() => {
     ok: true,
     action: 'no_stripe_subscription',
   });
+  removeUserFromResendContactsInBackground.mockReset();
 });
 
 describe('deleteUserAccount', () => {
@@ -95,6 +98,10 @@ describe('deleteUserAccount', () => {
 
     expect(tx.projectTemplateImage.deleteMany).toHaveBeenCalledWith({ where: { project: { userId: 'user-1' } } });
     expect(tx.plannedEmail.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1' } });
+    expect(removeUserFromResendContactsInBackground).toHaveBeenCalledWith(
+      { userId: 'user-1', email: 'user@example.com' },
+      'account-deleted',
+    );
   });
 
   it('deletes uploaded image assets from storage', async () => {

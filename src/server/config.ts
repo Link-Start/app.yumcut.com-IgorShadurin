@@ -39,6 +39,7 @@ const EnvSchema = z.object({
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM_EMAIL: z.string().min(3).optional(),
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
+  RESEND_AUDIENCE_ID: z.string().min(1).optional(),
   UPLOAD_SIGNING_PRIVATE_KEY: z.string().min(1).optional(),
   UPLOAD_SIGNING_PUBLIC_KEY: z.string().min(1).optional(),
   MEDIA_CORS_ALLOWLIST: z.string().optional(),

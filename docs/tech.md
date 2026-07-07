@@ -129,6 +129,7 @@ YumCut supports:
 Required env variables:
 - `RESEND_API_KEY` - API key from Resend. Use a **Full access** key if you process inbound emails (`email.received`) so `emails.receiving.get` can retrieve message bodies.
 - `RESEND_FROM_EMAIL` - verified sender (example: `YumCut <support@yumcut.com>`).
+- `RESEND_AUDIENCE_ID` - optional audience/list id for syncing app users into Resend contacts. If omitted and the account has exactly one audience, the app uses that audience automatically.
 - `RESEND_WEBHOOK_SECRET` - webhook signing secret from Resend.
 - `SERVICE_API_PASSWORD` - required for protected cron endpoint auth (`x-service-password` header).
 

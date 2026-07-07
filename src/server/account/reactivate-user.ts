@@ -1,7 +1,11 @@
 import { prisma } from '@/server/db';
+import { addUserToResendContactsInBackground } from '@/server/emails/resend-contacts';
 
 export async function reactivateDeletedUser(userId: string): Promise<boolean> {
-  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { deleted: true } });
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { deleted: true, email: true, name: true, isGuest: true },
+  });
   if (!existing?.deleted) {
     return false;
   }
@@ -12,5 +16,11 @@ export async function reactivateDeletedUser(userId: string): Promise<boolean> {
       deletedAt: null,
     },
   });
+  addUserToResendContactsInBackground({
+    userId,
+    email: existing.email,
+    name: existing.name,
+    isGuest: existing.isGuest,
+  }, 'account-reactivated');
   return true;
 }
