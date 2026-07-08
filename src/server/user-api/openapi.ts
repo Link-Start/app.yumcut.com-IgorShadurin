@@ -62,6 +62,13 @@ const characterSlugParam = {
   schema: { type: 'string' },
 };
 
+const imagePrankSlugParam = {
+  name: 'slug',
+  in: 'path',
+  required: true,
+  schema: { type: 'string' },
+};
+
 const userCharacterIdParam = {
   name: 'userCharacterId',
   in: 'path',
@@ -95,6 +102,14 @@ const templateIdParam = {
   in: 'path',
   required: true,
   schema: { type: 'string' },
+};
+
+const previewHeightParam = {
+  name: 'h',
+  in: 'query',
+  required: true,
+  schema: { type: 'integer', enum: [896] },
+  description: 'Preview height. Currently only 896 is supported.',
 };
 
 const responses = {
@@ -213,6 +228,162 @@ const projectCreateSchema = {
   additionalProperties: true,
 };
 
+const nullableStringSchema = { type: ['string', 'null'] } as const;
+
+const localizedCatalogTextSchema = {
+  type: 'object',
+  properties: {
+    en: { type: 'string' },
+    ru: { type: 'string' },
+  },
+  required: ['en', 'ru'],
+} as const;
+
+const imagePrankItemSchema = {
+  type: 'object',
+  description: 'Public Image Prank catalog item with source image and preview image fields.',
+  properties: {
+    id: { type: 'string' },
+    slug: { type: 'string' },
+    title: localizedCatalogTextSchema,
+    description: localizedCatalogTextSchema,
+    hiddenSearchText: localizedCatalogTextSchema,
+    imageUrl: { type: 'string', description: 'Original/source prank image URL.' },
+    imagePath: { type: 'string' },
+    previewImageUrl: { ...nullableStringSchema, description: 'Display-safe preview image URL.' },
+    previewImagePath: nullableStringSchema,
+    categoryId: { type: 'string' },
+    categorySlug: { type: 'string' },
+    categoryTitle: localizedCatalogTextSchema,
+    subcategoryId: nullableStringSchema,
+    subcategorySlug: nullableStringSchema,
+    subcategoryTitle: { anyOf: [localizedCatalogTextSchema, { type: 'null' }] },
+  },
+  required: ['id', 'slug', 'title', 'description', 'imageUrl', 'imagePath', 'categoryId', 'categorySlug', 'categoryTitle'],
+} as const;
+
+const imagePrankCatalogSchema = {
+  type: 'object',
+  properties: {
+    categories: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          slug: { type: 'string' },
+          title: localizedCatalogTextSchema,
+          subtitle: localizedCatalogTextSchema,
+          description: localizedCatalogTextSchema,
+          hiddenSearchText: localizedCatalogTextSchema,
+          subcategories: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                categoryId: { type: 'string' },
+                slug: { type: 'string' },
+                title: localizedCatalogTextSchema,
+                subtitle: localizedCatalogTextSchema,
+                description: localizedCatalogTextSchema,
+                hiddenSearchText: localizedCatalogTextSchema,
+                items: { type: 'array', items: imagePrankItemSchema },
+              },
+            },
+          },
+          items: { type: 'array', items: imagePrankItemSchema },
+        },
+      },
+    },
+  },
+  required: ['categories'],
+} as const;
+
+const characterCatalogCharacterSchema = {
+  type: 'object',
+  description: 'Public catalog character with preview image/video and metrics for the authenticated user.',
+  properties: {
+    id: { type: 'string' },
+    slug: { type: 'string' },
+    name: { type: 'string' },
+    title: { type: 'string' },
+    bio: { type: 'string' },
+    hiddenSearchText: localizedCatalogTextSchema,
+    previewImageUrl: { type: 'string' },
+    previewVideoUrl: nullableStringSchema,
+    previewVideoHasAudio: { type: 'boolean' },
+    defaultVoiceId: nullableStringSchema,
+    defaultVoiceProvider: nullableStringSchema,
+    creationsCount: { type: 'integer' },
+    favoritesCount: { type: 'integer' },
+    isFavorited: { type: 'boolean' },
+  },
+  required: ['id', 'slug', 'name', 'title', 'bio', 'previewImageUrl', 'previewVideoUrl', 'previewVideoHasAudio', 'creationsCount', 'favoritesCount', 'isFavorited'],
+} as const;
+
+const characterCatalogSchema = {
+  type: 'object',
+  properties: {
+    categories: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          title: localizedCatalogTextSchema,
+          subtitle: localizedCatalogTextSchema,
+          description: localizedCatalogTextSchema,
+          hiddenSearchText: localizedCatalogTextSchema,
+          characters: { type: 'array', items: characterCatalogCharacterSchema },
+        },
+        required: ['id', 'title', 'subtitle', 'description', 'characters'],
+      },
+    },
+  },
+  required: ['categories'],
+} as const;
+
+const characterProfileSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    characterId: { type: 'string' },
+    slug: { type: 'string' },
+    name: { type: 'string' },
+    title: { type: 'string' },
+    tagline: { type: 'string' },
+    bio: { type: 'string' },
+    previewImageUrl: { type: 'string' },
+    previewVideoUrl: nullableStringSchema,
+    previewVideoHasAudio: { type: 'boolean' },
+    defaultVoiceId: nullableStringSchema,
+    defaultVoiceProvider: nullableStringSchema,
+    creationsCount: { type: 'integer' },
+    favoritesCount: { type: 'integer' },
+    isFavorited: { type: 'boolean' },
+  },
+  required: ['id', 'characterId', 'slug', 'name', 'title', 'tagline', 'bio', 'previewImageUrl', 'previewVideoUrl', 'previewVideoHasAudio', 'creationsCount', 'favoritesCount', 'isFavorited'],
+} as const;
+
+const templateSchema = {
+  type: 'object',
+  description: 'Story/template metadata. previewImageUrl and previewVideoUrl can be used to show the template before project creation.',
+  properties: {
+    id: { type: 'string' },
+    title: { type: 'string' },
+    description: nullableStringSchema,
+    previewImageUrl: nullableStringSchema,
+    previewVideoUrl: nullableStringSchema,
+    weight: { type: 'number' },
+    isPublic: { type: 'boolean' },
+    createdAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time' },
+    customData: jsonSchema,
+  },
+  required: ['id', 'title', 'previewImageUrl', 'previewVideoUrl', 'isPublic'],
+} as const;
+
 export const userApiOpenApiSpec = {
   openapi: '3.1.0',
   info: {
@@ -247,6 +418,12 @@ export const userApiOpenApiSpec = {
       Error: (errorResponse.content['application/json'] as any).schema,
       ProjectCreate: projectCreateSchema,
       SettingsPatch: settingsPatchSchema,
+      LocalizedCatalogText: localizedCatalogTextSchema,
+      ImagePrankCatalog: imagePrankCatalogSchema,
+      ImagePrankItem: imagePrankItemSchema,
+      CharacterCatalog: characterCatalogSchema,
+      CharacterProfile: characterProfileSchema,
+      Template: templateSchema,
     },
   },
   paths: {
@@ -485,22 +662,48 @@ export const userApiOpenApiSpec = {
     '/templates': {
       get: operation({
         summary: 'List public and own templates',
+        description: 'Returns story/template metadata including previewImageUrl and previewVideoUrl for pre-creation previews.',
         tags: ['Catalog'],
         parameters: [
           { name: 'public', in: 'query', schema: { type: 'string', enum: ['1'] } },
           { name: 'mine', in: 'query', schema: { type: 'string', enum: ['1'] } },
         ],
+        responses: {
+          200: jsonResponse('Templates', { type: 'array', items: templateSchema }),
+        },
       }),
     },
     '/templates/{id}': {
       get: operation({
         summary: 'Get template',
+        description: 'Returns one story/template with preview media and prompt metadata if the template is public or owned by the authenticated user.',
         tags: ['Catalog'],
         parameters: [templateIdParam],
+        responses: {
+          200: jsonResponse('Template', templateSchema),
+        },
       }),
     },
     '/image-pranks': {
-      get: operation({ summary: 'List Image Prank catalog', tags: ['Catalog'] }),
+      get: operation({
+        summary: 'List Image Prank catalog',
+        description: 'Returns public Image Prank categories and items. Each item includes localized info, imageUrl, and previewImageUrl.',
+        tags: ['Catalog'],
+        responses: {
+          200: jsonResponse('Image Prank catalog', imagePrankCatalogSchema),
+        },
+      }),
+    },
+    '/image-pranks/{slug}': {
+      get: operation({
+        summary: 'Get Image Prank catalog item',
+        description: 'Returns one public Image Prank item by slug, including localized info, source image URL, and preview image URL.',
+        tags: ['Catalog'],
+        parameters: [imagePrankSlugParam],
+        responses: {
+          200: jsonResponse('Image Prank item', imagePrankItemSchema),
+        },
+      }),
     },
     '/groups': {
       post: idempotentWriteOperation({
@@ -510,13 +713,49 @@ export const userApiOpenApiSpec = {
       }),
     },
     '/characters': {
-      get: operation({ summary: 'List catalog and own characters', tags: ['Characters'] }),
+      get: operation({
+        summary: 'List catalog and own characters',
+        description: 'Returns catalog and user-owned characters with variation imageUrl values for project creation pickers.',
+        tags: ['Characters'],
+      }),
+    },
+    '/characters/catalog': {
+      get: operation({
+        summary: 'List public character catalog',
+        description: 'Returns public character categories and characters with slugs, previewImageUrl, previewVideoUrl, voice defaults, and viewer-specific favorite metrics.',
+        tags: ['Characters', 'Catalog'],
+        responses: {
+          200: jsonResponse('Character catalog', characterCatalogSchema),
+        },
+      }),
     },
     '/characters/{slug}': {
       get: operation({
         summary: 'Get catalog character profile',
+        description: 'Returns one public catalog character by slug, including profile info, preview image/video URLs, voice defaults, and viewer metrics.',
         tags: ['Characters'],
         parameters: [characterSlugParam],
+        responses: {
+          200: jsonResponse('Character profile', characterProfileSchema),
+        },
+      }),
+    },
+    '/characters/variations/{variationId}/preview-image': {
+      get: operation({
+        summary: 'Get catalog character variation preview image',
+        description: 'Redirects to a prepared catalog preview image for a public character variation. Private/user-owned variations are not exposed.',
+        tags: ['Characters', 'Media'],
+        parameters: [variationIdParam, previewHeightParam],
+        responses: {
+          307: {
+            description: 'Redirect to the prepared preview image URL.',
+            headers: {
+              Location: {
+                schema: { type: 'string' },
+              },
+            },
+          },
+        },
       }),
     },
     '/characters/{slug}/favorite': {

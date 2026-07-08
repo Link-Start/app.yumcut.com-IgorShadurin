@@ -32,7 +32,11 @@ import {
   parseReadApiListParams,
   noStoreInit,
 } from '@/server/admin/read-api';
-import { getCharacterCatalogProfileBySlug } from '@/server/character-catalog';
+import {
+  getCharacterCatalogProfileBySlug,
+  listMobileCharacterCatalog,
+} from '@/server/character-catalog';
+import { getPublicImagePrankItemBySlug } from '@/server/image-pranks';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -395,6 +399,10 @@ async function dispatchAuthed(req: NextRequest, auth: UserApiKeyAuthContext, par
     const route = await import('@/app/api/image-pranks/route');
     return route.GET();
   }
+  if (method === 'GET' && parts.length === 2 && parts[0] === 'image-pranks') {
+    const item = await getPublicImagePrankItemBySlug(parts[1]);
+    return item ? ok(item, noStoreInit()) : notFound('Image Prank item not found');
+  }
   if (pathKey(parts) === 'storage/upload-token' && method === 'POST') {
     const route = await import('@/app/api/storage/upload-token/route');
     return route.POST(req);
@@ -413,9 +421,17 @@ async function dispatchAuthed(req: NextRequest, auth: UserApiKeyAuthContext, par
     const route = await import('@/app/api/characters/route');
     return route.GET(req);
   }
+  if (method === 'GET' && pathKey(parts) === 'characters/catalog') {
+    const categories = await listMobileCharacterCatalog(auth.userId);
+    return ok({ categories }, noStoreInit());
+  }
   if (method === 'GET' && parts.length === 2 && parts[0] === 'characters') {
     const character = await getCharacterCatalogProfileBySlug(parts[1], { viewerUserId: auth.userId });
     return character ? ok(character, noStoreInit()) : notFound('Character not found');
+  }
+  if (method === 'GET' && parts.length === 4 && parts[0] === 'characters' && parts[1] === 'variations' && parts[3] === 'preview-image') {
+    const route = await import('@/app/api/characters/variations/[variationId]/preview-image/route');
+    return call(route.GET, req, { variationId: parts[2] });
   }
   if (parts.length === 3 && parts[0] === 'characters' && parts[2] === 'favorite') {
     const route = await import('@/app/api/characters/[slug]/favorite/route');

@@ -6,6 +6,8 @@ const runWithAuthenticatedApiUser = vi.hoisted(() => vi.fn((_auth: unknown, run:
 const normalizeUserApiIdempotencyKey = vi.hoisted(() => vi.fn((req: Request) => req.headers.get('idempotency-key')?.trim() || null));
 const runIdempotentUserApiOperation = vi.hoisted(() => vi.fn(async (input: any) => input.run({ id: 'op-1' })));
 const getCharacterCatalogProfileBySlug = vi.hoisted(() => vi.fn());
+const listMobileCharacterCatalog = vi.hoisted(() => vi.fn());
+const getPublicImagePrankItemBySlug = vi.hoisted(() => vi.fn());
 
 const handlers = vi.hoisted(() => {
   const make = (name: string) => vi.fn(async () => Response.json({ proxied: name }));
@@ -38,6 +40,7 @@ const handlers = vi.hoisted(() => {
     mediaGrantPost: make('media.grant.post'),
     groupsPost: make('groups.post'),
     charactersGet: make('characters.get'),
+    characterPreviewImageGet: make('characters.variations.preview-image.get'),
     favoritePost: make('characters.favorite.post'),
     favoriteDelete: make('characters.favorite.delete'),
     customUploadPost: make('characters.custom.upload.post'),
@@ -64,7 +67,11 @@ vi.mock('@/server/user-api/api-idempotency', () => ({
   runIdempotentUserApiOperation,
 }));
 vi.mock('@/server/api-user', () => ({ runWithAuthenticatedApiUser }));
-vi.mock('@/server/character-catalog', () => ({ getCharacterCatalogProfileBySlug }));
+vi.mock('@/server/character-catalog', () => ({
+  getCharacterCatalogProfileBySlug,
+  listMobileCharacterCatalog,
+}));
+vi.mock('@/server/image-pranks', () => ({ getPublicImagePrankItemBySlug }));
 
 vi.mock('@/app/api/mobile/settings/route', () => ({ GET: handlers.mobileSettingsGet, PATCH: handlers.mobileSettingsPatch }));
 vi.mock('@/app/api/projects/route', () => ({ POST: handlers.projectsPost }));
@@ -92,6 +99,7 @@ vi.mock('@/app/api/storage/upload-token/route', () => ({ POST: handlers.uploadTo
 vi.mock('@/app/api/media/grant/route', () => ({ POST: handlers.mediaGrantPost }));
 vi.mock('@/app/api/groups/route', () => ({ POST: handlers.groupsPost }));
 vi.mock('@/app/api/characters/route', () => ({ GET: handlers.charactersGet }));
+vi.mock('@/app/api/characters/variations/[variationId]/preview-image/route', () => ({ GET: handlers.characterPreviewImageGet }));
 vi.mock('@/app/api/characters/[slug]/favorite/route', () => ({ POST: handlers.favoritePost, DELETE: handlers.favoriteDelete }));
 vi.mock('@/app/api/characters/custom/upload/route', () => ({ POST: handlers.customUploadPost }));
 vi.mock('@/app/api/characters/custom/generate/route', () => ({ POST: handlers.customGeneratePost }));
@@ -162,6 +170,7 @@ const proxyCases: ProxyCase[] = [
   { method: 'POST', path: 'media/grant', handler: handlers.mediaGrantPost },
   { method: 'POST', path: 'groups', handler: handlers.groupsPost, idempotentAction: 'group.create' },
   { method: 'GET', path: 'characters', handler: handlers.charactersGet },
+  { method: 'GET', path: 'characters/variations/variation-1/preview-image', handler: handlers.characterPreviewImageGet, params: { variationId: 'variation-1' } },
   { method: 'POST', path: 'characters/kim-masters/favorite', handler: handlers.favoritePost, params: { slug: 'kim-masters' } },
   { method: 'DELETE', path: 'characters/kim-masters/favorite', handler: handlers.favoriteDelete, params: { slug: 'kim-masters' } },
   { method: 'POST', path: 'characters/custom/upload', handler: handlers.customUploadPost },
@@ -206,6 +215,20 @@ describe('user v1 API proxy routes', () => {
     vi.clearAllMocks();
     requireUserApiKey.mockResolvedValue({ context: authContext, error: null });
     getCharacterCatalogProfileBySlug.mockResolvedValue({ id: 'character-profile', slug: 'kim-masters' });
+    listMobileCharacterCatalog.mockResolvedValue([
+      {
+        id: 'funny',
+        title: { en: 'Funny', ru: 'Смешные' },
+        characters: [{ id: 'char-1', slug: 'kim-masters', previewImageUrl: '/api/characters/variations/variation-1/preview-image?h=896' }],
+      },
+    ]);
+    getPublicImagePrankItemBySlug.mockResolvedValue({
+      id: 'prank-1',
+      slug: 'giant-billboard',
+      title: { en: 'Giant billboard', ru: 'Огромный билборд' },
+      imageUrl: 'https://storage.test/prank.png',
+      previewImageUrl: 'https://storage.test/prank-preview.png',
+    });
   });
 
   for (const testCase of proxyCases) {
@@ -252,6 +275,49 @@ describe('user v1 API proxy routes', () => {
     expect(res.status).toBe(200);
     expect(getCharacterCatalogProfileBySlug).toHaveBeenCalledWith('kim-masters', { viewerUserId: 'user-1' });
     await expect(res.json()).resolves.toEqual({ id: 'character-profile', slug: 'kim-masters' });
+  });
+
+  it('returns the public character catalog with viewer-aware metrics and preview media', async () => {
+    const res = await callUserApi({ method: 'GET', path: 'characters/catalog' });
+
+    expect(res.status).toBe(200);
+    expect(requireUserApiKey).toHaveBeenCalledWith(expect.any(NextRequest), 'read');
+    expect(listMobileCharacterCatalog).toHaveBeenCalledWith('user-1');
+    await expect(res.json()).resolves.toMatchObject({
+      categories: [
+        {
+          id: 'funny',
+          characters: [
+            {
+              slug: 'kim-masters',
+              previewImageUrl: '/api/characters/variations/variation-1/preview-image?h=896',
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('returns a public Image Prank catalog item by slug with preview media', async () => {
+    const res = await callUserApi({ method: 'GET', path: 'image-pranks/giant-billboard' });
+
+    expect(res.status).toBe(200);
+    expect(requireUserApiKey).toHaveBeenCalledWith(expect.any(NextRequest), 'read');
+    expect(getPublicImagePrankItemBySlug).toHaveBeenCalledWith('giant-billboard');
+    await expect(res.json()).resolves.toMatchObject({
+      slug: 'giant-billboard',
+      imageUrl: 'https://storage.test/prank.png',
+      previewImageUrl: 'https://storage.test/prank-preview.png',
+    });
+  });
+
+  it('does not disclose non-public or missing Image Prank items by slug', async () => {
+    getPublicImagePrankItemBySlug.mockResolvedValueOnce(null);
+
+    const res = await callUserApi({ method: 'GET', path: 'image-pranks/private-prank' });
+
+    expect(res.status).toBe(404);
+    expect(getPublicImagePrankItemBySlug).toHaveBeenCalledWith('private-prank');
   });
 
   it('keeps billing, subscription, account deletion, and admin paths unavailable', async () => {

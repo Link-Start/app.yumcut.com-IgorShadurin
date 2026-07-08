@@ -37,6 +37,66 @@ describe('user API OpenAPI spec', () => {
     expect(paths.some((path) => path.startsWith('/admin'))).toBe(false);
   });
 
+  it('documents catalog preview and info reads for image pranks, characters, and story templates', () => {
+    expect(userApiOpenApiSpec.paths['/image-pranks'].get.responses[200]).toMatchObject({
+      description: 'Image Prank catalog',
+    });
+    expect(userApiOpenApiSpec.paths['/image-pranks/{slug}'].get.parameters).toContainEqual(expect.objectContaining({
+      name: 'slug',
+      in: 'path',
+    }));
+    expect(userApiOpenApiSpec.paths['/image-pranks/{slug}'].get.responses[200]).toMatchObject({
+      description: 'Image Prank item',
+      content: {
+        'application/json': {
+          schema: {
+            properties: {
+              previewImageUrl: expect.objectContaining({
+                description: 'Display-safe preview image URL.',
+              }),
+            },
+          },
+        },
+      },
+    });
+
+    expect(userApiOpenApiSpec.paths['/characters/catalog'].get.responses[200]).toMatchObject({
+      description: 'Character catalog',
+    });
+    expect(userApiOpenApiSpec.paths['/characters/{slug}'].get.responses[200]).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            properties: {
+              previewImageUrl: { type: 'string' },
+              previewVideoUrl: { type: ['string', 'null'] },
+            },
+          },
+        },
+      },
+    });
+    expect(userApiOpenApiSpec.paths['/characters/variations/{variationId}/preview-image'].get.parameters).toContainEqual(expect.objectContaining({
+      name: 'h',
+      in: 'query',
+      required: true,
+    }));
+    expect(userApiOpenApiSpec.paths['/characters/variations/{variationId}/preview-image'].get.responses).toHaveProperty('307');
+
+    expect(userApiOpenApiSpec.paths['/templates'].get.description).toContain('previewImageUrl');
+    expect(userApiOpenApiSpec.paths['/templates/{id}'].get.responses[200]).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            properties: {
+              previewImageUrl: { type: ['string', 'null'] },
+              previewVideoUrl: { type: ['string', 'null'] },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it('serves the OpenAPI JSON route without authentication', async () => {
     const res = openapiRoute.GET();
     expect(res.status).toBe(200);
