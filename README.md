@@ -20,6 +20,17 @@ Main use cases:
 - testing different hooks/styles quickly without rebuilding videos from scratch
 - agency-style batch production across multiple brands or clients
 
+## User API for Automation and AI Agents
+
+YumCut includes a bearer-key User API for automating project workflows from external tools, backend jobs, and AI agents.
+Users can create API keys in the app and use the API to manage their own projects end to end: quote token costs, create video or Image Prank projects, poll status, stop or cancel work, update settings, read catalog data, and fetch final media download URLs.
+
+- Interactive docs: [app.yumcut.com/api/user/v1/docs](https://app.yumcut.com/api/user/v1/docs)
+- OpenAPI schema: [app.yumcut.com/api/user/v1/openapi.json](https://app.yumcut.com/api/user/v1/openapi.json)
+- API key management: [app.yumcut.com/account/api](https://app.yumcut.com/account/api)
+
+The API uses the same account ownership checks, read/write key scopes, token balance rules, and project creation paths as the web app, so automation and AI agents can run production workflows without bypassing credits or user data boundaries.
+
 <table>
   <tr>
     <td align="center" valign="top">
