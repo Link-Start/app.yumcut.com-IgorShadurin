@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { withApiError } from '@/server/errors';
 import { ok, unauthorized, error } from '@/server/http';
-import { getAuthSession } from '@/server/auth';
 import { prisma } from '@/server/db';
 import { deriveTitleFromText } from '@/server/title';
 import { createGroupSchema } from '@/server/validators/groups';
@@ -9,11 +8,12 @@ import { notifyAdminsOfNewGroup } from '@/server/telegram';
 import { config } from '@/server/config';
 import { randomUUID } from 'crypto';
 import { getProjectCreationSettings } from '@/server/admin/project-creation';
+import { authenticateApiRequest } from '@/server/api-user';
 
 export const POST = withApiError(async function POST(req: NextRequest) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   const projectCreationSettings = await getProjectCreationSettings();
   if (!projectCreationSettings.enabled) {
     return error(
@@ -134,8 +134,8 @@ export const POST = withApiError(async function POST(req: NextRequest) {
   });
 
   // Notify admins (reuses new project toggle semantics)
-  const ownerName = (session.user as any)?.name ?? null;
-  const ownerEmail = session.user?.email ?? null;
+  const ownerName = auth.sessionUser?.name ?? null;
+  const ownerEmail = auth.sessionUser?.email ?? null;
   let groupUrl: string | null = null;
   const base = config.NEXTAUTH_URL?.trim();
   if (base) {

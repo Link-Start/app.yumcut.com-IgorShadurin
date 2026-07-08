@@ -1,4 +1,3 @@
-import { getAuthSession } from '@/server/auth';
 import { ok, unauthorized, notFound } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import {
@@ -7,6 +6,7 @@ import {
   getCharacterMetricsMap,
   unfavoriteCharacterForUser,
 } from '@/server/character-favorites';
+import { authenticateApiRequest } from '@/server/api-user';
 
 async function loadMetrics(userId: string, characterId: string) {
   const metrics = await getCharacterMetricsMap([characterId], userId);
@@ -18,12 +18,12 @@ async function loadMetrics(userId: string, characterId: string) {
 }
 
 export const POST = withApiError(async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  const session = await getAuthSession();
-  const userId = (session?.user as any)?.id as string | undefined;
-  if (!userId) return unauthorized();
+  const auth = await authenticateApiRequest(req as any);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
 
   const { slug } = await params;
   const character = await findPublicCharacterBySlug(slug);
@@ -37,12 +37,12 @@ export const POST = withApiError(async function POST(
 }, 'Failed to favorite character');
 
 export const DELETE = withApiError(async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  const session = await getAuthSession();
-  const userId = (session?.user as any)?.id as string | undefined;
-  if (!userId) return unauthorized();
+  const auth = await authenticateApiRequest(req as any);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
 
   const { slug } = await params;
   const character = await findPublicCharacterBySlug(slug);

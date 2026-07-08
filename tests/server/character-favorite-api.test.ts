@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const getAuthSession = vi.hoisted(() => vi.fn());
+const authenticateApiRequest = vi.hoisted(() => vi.fn());
 const favoriteCharacterForUser = vi.hoisted(() => vi.fn());
 const unfavoriteCharacterForUser = vi.hoisted(() => vi.fn());
 const findPublicCharacterBySlug = vi.hoisted(() => vi.fn());
 const getCharacterMetricsMap = vi.hoisted(() => vi.fn());
 
-vi.mock('@/server/auth', () => ({ getAuthSession }));
+vi.mock('@/server/api-user', () => ({ authenticateApiRequest }));
 vi.mock('@/server/character-favorites', () => ({
   favoriteCharacterForUser,
   unfavoriteCharacterForUser,
@@ -19,7 +19,7 @@ const route = await import('@/app/api/characters/[slug]/favorite/route');
 describe('web character favorite API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getAuthSession.mockResolvedValue({ user: { id: 'user-1' } });
+    authenticateApiRequest.mockResolvedValue({ userId: 'user-1', source: 'session' });
     findPublicCharacterBySlug.mockResolvedValue({ id: 'char-1', slug: 'kim-masters' });
     getCharacterMetricsMap.mockResolvedValue(new Map([
       ['char-1', { creationsCount: 4, favoritesCount: 6, isFavorited: true }],
@@ -27,7 +27,7 @@ describe('web character favorite API', () => {
   });
 
   it('requires authentication', async () => {
-    getAuthSession.mockResolvedValue(null);
+    authenticateApiRequest.mockResolvedValue(null);
     const res = await route.POST(new Request('http://localhost/api/characters/kim-masters/favorite', { method: 'POST' }), { params: Promise.resolve({ slug: 'kim-masters' }) });
     expect(res.status).toBe(401);
   });

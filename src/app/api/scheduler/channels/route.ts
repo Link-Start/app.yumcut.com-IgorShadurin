@@ -2,9 +2,9 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withApiError } from '@/server/errors';
 import { ok, unauthorized, forbidden, error } from '@/server/http';
-import { getAuthSession } from '@/server/auth';
 import { isPublishSchedulerEnabledForUser } from '@/server/features/publish-scheduler';
 import { createPublishChannel } from '@/server/publishing/channels';
+import { authenticateApiRequest } from '@/server/api-user';
 
 const connectSchema = z.object({
   provider: z.literal('youtube'),
@@ -18,9 +18,9 @@ const connectSchema = z.object({
 });
 
 export const POST = withApiError(async function POST(req: NextRequest) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   if (!isPublishSchedulerEnabledForUser({ id: userId })) {
     return forbidden('Scheduler is disabled');
   }

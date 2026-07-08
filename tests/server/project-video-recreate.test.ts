@@ -10,18 +10,18 @@ const prismaMock = {
   projectStatusHistory: { create: vi.fn() },
   $transaction: vi.fn(),
 };
+const authenticateApiRequest = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/db', () => ({ prisma: prismaMock }));
-vi.mock('@/server/auth', () => ({ getAuthSession: vi.fn() }));
+vi.mock('@/server/api-user', () => ({ authenticateApiRequest }));
 vi.mock('@/server/storage', () => ({ deleteStoredMedia: vi.fn() }));
 
-import { getAuthSession } from '@/server/auth';
 import { deleteStoredMedia } from '@/server/storage';
 
 describe('project video recreate api', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAuthSession).mockResolvedValue({ user: { id: 'user-1' } } as any);
+    authenticateApiRequest.mockResolvedValue({ userId: 'user-1', source: 'session' });
     prismaMock.project.findFirst.mockResolvedValue({
       id: 'project-1',
       userId: 'user-1',

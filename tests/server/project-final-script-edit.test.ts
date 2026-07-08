@@ -7,16 +7,15 @@ const prismaMock = {
   script: { upsert: vi.fn() },
   $transaction: vi.fn(),
 };
+const authenticateApiRequest = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/db', () => ({ prisma: prismaMock }));
-vi.mock('@/server/auth', () => ({ getAuthSession: vi.fn() }));
-
-import { getAuthSession } from '@/server/auth';
+vi.mock('@/server/api-user', () => ({ authenticateApiRequest }));
 
 describe('project final script edit api', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAuthSession).mockResolvedValue({ user: { id: 'user-1' } } as any);
+    authenticateApiRequest.mockResolvedValue({ userId: 'user-1', source: 'session' });
     prismaMock.project.findFirst.mockResolvedValue({
       id: 'project-1',
       userId: 'user-1',

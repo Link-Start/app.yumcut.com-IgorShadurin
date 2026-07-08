@@ -13,7 +13,7 @@ export interface AuthenticatedApiUser {
     isAdmin?: boolean;
     preferredLanguage?: string | null;
   };
-  source: 'session' | 'mobile' | 'admin-api';
+  source: 'session' | 'mobile' | 'admin-api' | 'user-api';
 }
 
 const authOverrideStorage = new AsyncLocalStorage<AuthenticatedApiUser>();

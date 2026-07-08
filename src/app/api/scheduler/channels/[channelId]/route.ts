@@ -1,15 +1,15 @@
 import { withApiError } from '@/server/errors';
 import { ok, unauthorized, forbidden, notFound } from '@/server/http';
-import { getAuthSession } from '@/server/auth';
 import { isPublishSchedulerEnabledForUser } from '@/server/features/publish-scheduler';
 import { deletePublishChannel } from '@/server/publishing/channels';
+import { authenticateApiRequest } from '@/server/api-user';
 
 type Params = { channelId: string };
 
-export const DELETE = withApiError(async function DELETE(_req: Request, { params }: { params: Promise<Params> }) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+export const DELETE = withApiError(async function DELETE(req: Request, { params }: { params: Promise<Params> }) {
+  const auth = await authenticateApiRequest(req as any);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   if (!isPublishSchedulerEnabledForUser({ id: userId })) {
     return forbidden('Scheduler is disabled');
   }

@@ -1,18 +1,18 @@
 import { NextRequest } from 'next/server';
-import { getAuthSession } from '@/server/auth';
 import { prisma } from '@/server/db';
 import { ok, unauthorized, error, notFound } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { z } from 'zod';
+import { authenticateApiRequest } from '@/server/api-user';
 
 const bodySchema = z.object({ title: z.string().min(1), description: z.string().optional(), prompt: z.string().optional() });
 
 type Params = { userCharacterId: string };
 
 export const POST = withApiError(async function POST(req: NextRequest, { params }: { params: Promise<Params> }) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   const { userCharacterId } = await params;
   const uc = await prisma.userCharacter.findFirst({ where: { id: userCharacterId, userId, deleted: false } });
   if (!uc) return notFound('User character not found');

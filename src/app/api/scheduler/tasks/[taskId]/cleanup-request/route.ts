@@ -1,19 +1,19 @@
 import { z } from 'zod';
 import { withApiError } from '@/server/errors';
 import { ok, unauthorized, forbidden, notFound, error } from '@/server/http';
-import { getAuthSession } from '@/server/auth';
 import { isPublishSchedulerEnabledForUser } from '@/server/features/publish-scheduler';
 import { prisma } from '@/server/db';
 import { requestPublishTaskCleanup } from '@/server/publishing/tasks';
+import { authenticateApiRequest } from '@/server/api-user';
 
 const schema = z.object({ reason: z.string().max(500).optional() });
 
 type Params = { taskId: string };
 
 export const POST = withApiError(async function POST(req: Request, { params }: { params: Promise<Params> }) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest(req as any);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   if (!isPublishSchedulerEnabledForUser({ id: userId })) {
     return forbidden('Scheduler is disabled');
   }

@@ -2,10 +2,10 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withApiError } from '@/server/errors';
 import { ok, forbidden, unauthorized, error } from '@/server/http';
-import { getAuthSession } from '@/server/auth';
 import { resolveMediaOwner } from '@/server/media-access';
 import { toStoredMediaPath, buildPublicMediaUrl } from '@/server/storage';
 import { issueSignedMediaDownloadGrant } from '@/lib/upload-signature';
+import { authenticateApiRequest } from '@/server/api-user';
 
 const bodySchema = z.object({
   path: z.string().min(1),
@@ -17,9 +17,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export const POST = withApiError(async function POST(req: NextRequest) {
-  const session = await getAuthSession();
-  const userId = (session?.user as any)?.id as string | undefined;
-  if (!userId) return unauthorized();
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
 
   const json = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(json);

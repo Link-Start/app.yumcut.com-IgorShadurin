@@ -1,18 +1,18 @@
-import { getAuthSession } from '@/server/auth';
 import { prisma } from '@/server/db';
 import { ok, unauthorized } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { getViewerFavoriteCreatedAtMap, sortByFavoriteRecencyFirst } from '@/server/character-favorites';
 import { normalizeMediaUrl } from '@/server/storage';
+import { authenticateApiRequest } from '@/server/api-user';
 
 function normalizeGlobalImagePath(imagePath: string | null | undefined) {
   return normalizeMediaUrl(imagePath);
 }
 
-export const GET = withApiError(async function GET() {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+export const GET = withApiError(async function GET(req: Request) {
+  const auth = await authenticateApiRequest(req as any);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
 
   const [globalChars, userChars] = await Promise.all([
     prisma.character.findMany({

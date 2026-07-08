@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server';
-import { getAuthSession } from '@/server/auth';
 import { ok, unauthorized } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { getTelegramAccount, disconnectTelegramForUser, isTelegramEnabled } from '@/server/telegram';
+import { authenticateApiRequest } from '@/server/api-user';
 
-export const GET = withApiError(async function GET() {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+export const GET = withApiError(async function GET(req: NextRequest) {
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   const account = await getTelegramAccount(userId);
   return ok({
     connected: !!account,
@@ -24,9 +24,9 @@ export const GET = withApiError(async function GET() {
 }, 'Failed to load Telegram account');
 
 export const DELETE = withApiError(async function DELETE(_req: NextRequest) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest(_req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   await disconnectTelegramForUser(userId);
   return ok({ ok: true });
 }, 'Failed to disconnect Telegram account');

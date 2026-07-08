@@ -8,7 +8,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, Di
 import { Separator } from '@/components/ui/separator';
 import { useTokenSummary } from '@/hooks/useTokenSummary';
 import { CONTACT_EMAIL } from '@/shared/constants/app';
-import { Activity, Loader2, LogOut, Mail, Shield, User } from 'lucide-react';
+import { Activity, KeyRound, Loader2, LogOut, Mail, Shield, User } from 'lucide-react';
 import { useAppLanguage } from '@/components/providers/AppLanguageProvider';
 import type { AppLanguageCode } from '@/shared/constants/app-language';
 
@@ -18,6 +18,7 @@ type AccountMenuCopy = {
   tokens: string;
   administrator: string;
   account: string;
+  apiKeys: string;
   tokenActivity: string;
   support: string;
   logOut: string;
@@ -34,6 +35,7 @@ const COPY: Record<AppLanguageCode, AccountMenuCopy> = {
     tokens: 'tokens',
     administrator: 'Administrator',
     account: 'Account',
+    apiKeys: 'API keys',
     tokenActivity: 'Token activity',
     support: 'Support',
     logOut: 'Log out',
@@ -48,6 +50,7 @@ const COPY: Record<AppLanguageCode, AccountMenuCopy> = {
     tokens: 'токенов',
     administrator: 'Администратор',
     account: 'Аккаунт',
+    apiKeys: 'API-ключи',
     tokenActivity: 'История токенов',
     support: 'Поддержка',
     logOut: 'Выйти',
@@ -88,7 +91,7 @@ export function AccountMenuContent() {
           </PopoverClose>
         ) : null}
         <PopoverClose asChild>
-          <Button asChild variant="ghost" className="w-full justify-start gap-2">
+          <Button asChild variant="ghost" className="w-full cursor-pointer justify-start gap-2">
             <Link href="/account" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               <span>{t.account}</span>
@@ -96,7 +99,15 @@ export function AccountMenuContent() {
           </Button>
         </PopoverClose>
         <PopoverClose asChild>
-          <Button asChild variant="ghost" className="w-full justify-start gap-2">
+          <Button asChild variant="ghost" className="w-full cursor-pointer justify-start gap-2">
+            <Link href="/account/api" className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4" />
+              <span>{t.apiKeys}</span>
+            </Link>
+          </Button>
+        </PopoverClose>
+        <PopoverClose asChild>
+          <Button asChild variant="ghost" className="w-full cursor-pointer justify-start gap-2">
             <Link href="/tokens/activity" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               <span>{t.tokenActivity}</span>

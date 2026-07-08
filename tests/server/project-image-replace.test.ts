@@ -8,9 +8,10 @@ const prismaMock = {
   imageAsset: { create: vi.fn(), delete: vi.fn() },
   $transaction: vi.fn(),
 };
+const authenticateApiRequest = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/db', () => ({ prisma: prismaMock }));
-vi.mock('@/server/auth', () => ({ getAuthSession: vi.fn() }));
+vi.mock('@/server/api-user', () => ({ authenticateApiRequest }));
 vi.mock('@/server/admin/image-editor', () => ({ getAdminImageEditorSettings: vi.fn() }));
 vi.mock('@/lib/upload-signature', () => ({
   verifySignedUploadGrant: vi.fn(),
@@ -22,7 +23,6 @@ vi.mock('@/server/storage', () => ({
   toStoredMediaPath: (value: string) => value,
 }));
 
-import { getAuthSession } from '@/server/auth';
 import { getAdminImageEditorSettings } from '@/server/admin/image-editor';
 import { verifySignedUploadGrant } from '@/lib/upload-signature';
 import { deleteStoredMedia } from '@/server/storage';
@@ -30,7 +30,7 @@ import { deleteStoredMedia } from '@/server/storage';
 describe('project image replace api', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAuthSession).mockResolvedValue({ user: { id: 'user-1' } } as any);
+    authenticateApiRequest.mockResolvedValue({ userId: 'user-1', source: 'session' });
     vi.mocked(getAdminImageEditorSettings).mockResolvedValue({ enabled: true });
     vi.mocked(verifySignedUploadGrant).mockReturnValue({
       userId: 'user-1',

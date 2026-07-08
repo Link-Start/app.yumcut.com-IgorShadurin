@@ -2,13 +2,13 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withApiError } from '@/server/errors';
 import { ok, unauthorized, forbidden, error } from '@/server/http';
-import { getAuthSession } from '@/server/auth';
 import { isPublishSchedulerEnabledForUser } from '@/server/features/publish-scheduler';
 import { prisma } from '@/server/db';
 import { ensureSchedulerPreferences } from '@/server/publishing/preferences';
 import { listPublishChannels, updateChannelLanguages } from '@/server/publishing/channels';
 import { LANGUAGES, LANGUAGE_ENUM } from '@/shared/constants/languages';
 import { SCHEDULER_CADENCE_OPTIONS, normalizeSchedulerTime, normalizeCadence } from '@/shared/constants/publish-scheduler';
+import { authenticateApiRequest } from '@/server/api-user';
 
 const timeOfDaySchema = z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/);
 const cadenceEnum = z.enum(SCHEDULER_CADENCE_OPTIONS.map((option) => option.value) as [string, ...string[]]);
@@ -49,9 +49,9 @@ async function buildSchedulerState(userId: string) {
 }
 
 export const GET = withApiError(async function GET() {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest();
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   if (!isPublishSchedulerEnabledForUser({ id: userId })) {
     return ok({ enabled: false });
   }
@@ -60,9 +60,9 @@ export const GET = withApiError(async function GET() {
 }, 'Failed to load scheduler settings');
 
 export const POST = withApiError(async function POST(req: NextRequest) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   if (!isPublishSchedulerEnabledForUser({ id: userId })) {
     return forbidden('Scheduler is disabled');
   }

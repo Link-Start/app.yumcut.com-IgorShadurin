@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { withApiError } from '@/server/errors';
-import { getAuthSession } from '@/server/auth';
 import { unauthorized, notFound, ok } from '@/server/http';
 import { prisma } from '@/server/db';
+import { authenticateApiRequest } from '@/server/api-user';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,9 +10,9 @@ export const dynamic = 'force-dynamic';
 type Params = { userCharacterId: string; variationId: string };
 
 export const DELETE = withApiError(async function DELETE(_req: NextRequest, { params }: { params: Promise<Params> }) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest(_req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   const { userCharacterId, variationId } = await params;
 
   const variation = await prisma.userCharacterVariation.findFirst({

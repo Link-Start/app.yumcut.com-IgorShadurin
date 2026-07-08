@@ -6,9 +6,10 @@ const prismaMock = {
   project: { findFirst: vi.fn() },
   projectTemplateImage: { findFirst: vi.fn() },
 };
+const authenticateApiRequest = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/db', () => ({ prisma: prismaMock }));
-vi.mock('@/server/auth', () => ({ getAuthSession: vi.fn() }));
+vi.mock('@/server/api-user', () => ({ authenticateApiRequest }));
 vi.mock('@/server/tokens', () => ({
   grantTokens: vi.fn(),
   spendTokens: vi.fn(),
@@ -30,7 +31,6 @@ vi.mock('@/server/config', () => ({
   config: { RUNWARE_IMAGE_EDITOR_API_KEY: 'rw_test_key' },
 }));
 
-import { getAuthSession } from '@/server/auth';
 import { getAdminImageEditorSettings } from '@/server/admin/image-editor';
 import { grantTokens, spendTokens } from '@/server/tokens';
 
@@ -38,7 +38,7 @@ describe('image regeneration api', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn());
-    vi.mocked(getAuthSession).mockResolvedValue({ user: { id: 'user-1' } } as any);
+    authenticateApiRequest.mockResolvedValue({ userId: 'user-1', source: 'session' });
     vi.mocked(getAdminImageEditorSettings).mockResolvedValue({ enabled: true });
     prismaMock.project.findFirst.mockResolvedValue({
       id: 'project-1',

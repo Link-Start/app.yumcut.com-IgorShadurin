@@ -57,6 +57,7 @@ model User {
   favoriteCharacters                      UserFavoriteCharacter[]
   attribution                             UserAttribution?
   projectCreationAttempts                 ProjectCreationAttempt[]
+  userApiKeys                             UserApiKey[]
   createdAdminApiKeys                     AdminApiKey[]             @relation("AdminApiKeysCreated")
   revokedAdminApiKeys                     AdminApiKey[]             @relation("AdminApiKeysRevoked")
   inboundFeedbacks                        InboundFeedback[]
@@ -836,6 +837,40 @@ model AdminApiOperation {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   key            AdminApiKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
+
+  @@unique([keyId, idempotencyKey])
+  @@index([action, createdAt])
+}
+
+model UserApiKey {
+  id                String             @id @default(uuid()) @db.Char(36)
+  userId            String             @db.Char(36)
+  name              String             @db.VarChar(120)
+  tokenHash         String             @unique @db.Char(64)
+  tokenPrefix       String             @db.VarChar(16)
+  scopes            Json?
+  createdAt         DateTime           @default(now())
+  revokedAt         DateTime?
+  lastUsedAt        DateTime?
+  lastUsedIp        String?            @db.VarChar(64)
+  lastUsedUserAgent String?            @db.VarChar(512)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  operations        UserApiOperation[]
+
+  @@index([userId, createdAt])
+  @@index([revokedAt])
+}
+
+model UserApiOperation {
+  id             String     @id @default(uuid()) @db.Char(36)
+  keyId          String     @db.Char(36)
+  idempotencyKey String     @db.VarChar(191)
+  action         String     @db.VarChar(64)
+  bodyHash       String     @db.Char(64)
+  result         Json?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  key            UserApiKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
 
   @@unique([keyId, idempotencyKey])
   @@index([action, createdAt])

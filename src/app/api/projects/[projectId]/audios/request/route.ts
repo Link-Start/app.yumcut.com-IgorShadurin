@@ -1,16 +1,16 @@
 import { NextRequest } from 'next/server';
-import { getAuthSession } from '@/server/auth';
 import { prisma } from '@/server/db';
 import { ok, unauthorized, notFound, error } from '@/server/http';
 import { withApiError } from '@/server/errors';
 import { textRequestSchema } from '@/server/validators/projects';
+import { authenticateApiRequest } from '@/server/api-user';
 
 type Params = { projectId: string };
 
 export const POST = withApiError(async function POST(req: NextRequest, { params }: { params: Promise<Params> }) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   const { projectId } = await params;
   // Keep validation for legacy clients, but ignore the payload.
   try {

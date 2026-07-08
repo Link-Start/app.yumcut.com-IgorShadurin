@@ -2,13 +2,13 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/server/db';
 import { withApiError } from '@/server/errors';
 import { ok, notFound } from '@/server/http';
-import { getAuthSession } from '@/server/auth';
+import { authenticateApiRequest } from '@/server/api-user';
 
-export const GET = withApiError(async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withApiError(async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await getAuthSession();
-  const userId = (session?.user as any)?.id as string | undefined;
-  const isAdmin = !!(session?.user as any)?.isAdmin;
+  const auth = await authenticateApiRequest(req);
+  const userId = auth?.userId;
+  const isAdmin = !!auth?.sessionUser?.isAdmin;
 
   const tpl = await prisma.template.findUnique({
     where: { id },

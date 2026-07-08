@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withApiError } from '@/server/errors';
 import { ok, unauthorized, forbidden, notFound, error } from '@/server/http';
-import { getAuthSession } from '@/server/auth';
 import { isPublishSchedulerEnabledForUser } from '@/server/features/publish-scheduler';
 import { prisma } from '@/server/db';
 import { ensureSchedulerPreferences } from '@/server/publishing/preferences';
@@ -12,6 +11,7 @@ import { listPublishChannels } from '@/server/publishing/channels';
 import { normalizeMediaUrl } from '@/server/storage';
 import { LANGUAGE_ENUM, LANGUAGES, type TargetLanguageCode } from '@/shared/constants/languages';
 import { getCadenceDays } from '@/shared/constants/publish-scheduler';
+import { authenticateApiRequest } from '@/server/api-user';
 
 const scheduleSchema = z.object({
   languages: z
@@ -44,9 +44,9 @@ function formatDefaultTitle(publishAt: Date) {
 }
 
 export const POST = withApiError(async function POST(req: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
-  const session = await getAuthSession();
-  if (!session?.user || !(session.user as any).id) return unauthorized();
-  const userId = (session.user as any).id as string;
+  const auth = await authenticateApiRequest(req);
+  if (!auth) return unauthorized();
+  const userId = auth.userId;
   if (!isPublishSchedulerEnabledForUser({ id: userId })) {
     return forbidden('Scheduler is disabled');
   }

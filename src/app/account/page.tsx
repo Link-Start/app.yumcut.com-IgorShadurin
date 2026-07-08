@@ -12,6 +12,8 @@ import { AccountOverviewCard, AccountTokensCard } from '@/components/account/acc
 import { SubscriptionPlansCard } from '@/components/account/subscription-plans-card';
 import { getWebSubscriptionStatus } from '@/server/stripe/subscriptions';
 import { ProjectEmailNotificationCard } from '@/components/account/project-email-notification-card';
+import { UserApiKeysCard } from '@/components/account/user-api-keys-card';
+import { listUserApiKeys } from '@/server/user-api/api-keys';
 
 type SessionUser = {
   id?: string;
@@ -69,7 +71,10 @@ export default async function AccountPage() {
       }
     : null;
   const preferredLanguage = normalizeAppLanguage(user.preferredLanguage);
-  const subscriptionStatus = await getWebSubscriptionStatus(user.id);
+  const [subscriptionStatus, apiKeys] = await Promise.all([
+    getWebSubscriptionStatus(user.id),
+    listUserApiKeys(user.id),
+  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -84,6 +89,7 @@ export default async function AccountPage() {
       <SubscriptionPlansCard initialStatus={subscriptionStatus} />
       <AccountTokensCard balance={balance} />
       <ProjectEmailNotificationCard />
+      <UserApiKeysCard initialKeys={apiKeys} />
 
       <TelegramIntegrationCard
         telegramEnabled={telegramEnabled}
