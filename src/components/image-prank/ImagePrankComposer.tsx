@@ -15,6 +15,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { TOKEN_COSTS } from '@/shared/constants/token-costs';
 import {
+  IMAGE_PRANK_PROMPT_PREFILL_PARAM,
+  normalizeImagePrankPromptPrefill,
+} from '@/components/image-prank/image-prank-prefill';
+import {
   DEFAULT_IMAGE_PRANK_GENERATION_MODEL,
   IMAGE_PRANK_SELECTABLE_MODEL_OPTIONS,
   normalizeSelectableImagePrankGenerationModel,
@@ -479,8 +483,9 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
   const storageBaseUrl = useMemo(resolveStorageBaseUrl, []);
   const reuseProjectId = searchParams.get('reuseProjectId')?.trim() || null;
   const requestedModel = toSelectableModelOverride(normalizeSelectableImagePrankGenerationModel(searchParams.get('model')));
+  const promptPrefill = normalizeImagePrankPromptPrefill(searchParams.get(IMAGE_PRANK_PROMPT_PREFILL_PARAM));
   const [selectedModel, setSelectedModel] = useState<ImagePrankSelectableModel | null>(requestedModel);
-  const [prompt, setPrompt] = useState(copy.twoImageDefaultPrompt);
+  const [prompt, setPrompt] = useState(() => promptPrefill ?? copy.twoImageDefaultPrompt);
   const [oneImageMode, setOneImageMode] = useState(false);
   const [prankFile, setPrankFile] = useState<File | null>(null);
   const [targetFile, setTargetFile] = useState<File | null>(null);
@@ -525,9 +530,9 @@ export function ImagePrankComposer({ item }: { item?: ImagePrankCatalogItemDTO |
         entry.twoImageDefaultPrompt,
         entry.oneImageDefaultPrompt,
       ]);
-      return current.trim() === '' || defaults.includes(current) ? defaultPrompt : current;
+      return current.trim() === '' || defaults.includes(current) ? promptPrefill ?? defaultPrompt : current;
     });
-  }, [defaultPrompt]);
+  }, [defaultPrompt, promptPrefill]);
 
   useEffect(() => {
     if (!reuseProjectId) return;
