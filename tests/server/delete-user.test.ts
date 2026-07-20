@@ -21,6 +21,46 @@ const revokeAppleTokens = vi.fn();
 const cancelStripeSubscriptionForAccountDeletion = vi.fn();
 const removeUserFromResendContactsInBackground = vi.fn();
 
+function createTransactionMock() {
+  return {
+    publishTask: { deleteMany: vi.fn() },
+    projectCharacterSelection: { deleteMany: vi.fn() },
+    script: { deleteMany: vi.fn() },
+    scriptRequest: { deleteMany: vi.fn() },
+    audioRequest: { deleteMany: vi.fn() },
+    audioCandidate: { deleteMany: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn() },
+    projectTemplateImage: { deleteMany: vi.fn() },
+    imageAsset: { deleteMany: vi.fn() },
+    videoAsset: { deleteMany: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
+    projectLanguageProgress: { deleteMany: vi.fn(), upsert: vi.fn() },
+    projectStatusHistory: { deleteMany: vi.fn(), create: vi.fn() },
+    job: { deleteMany: vi.fn() },
+    project: { updateMany: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
+    projectGroupCharacterSelection: { deleteMany: vi.fn() },
+    projectGroup: { deleteMany: vi.fn() },
+    userCharacterImageTask: { deleteMany: vi.fn() },
+    userCharacterVariation: { deleteMany: vi.fn() },
+    userCharacter: { deleteMany: vi.fn() },
+    publishChannelLanguage: { deleteMany: vi.fn() },
+    publishChannelOAuthState: { deleteMany: vi.fn() },
+    publishChannel: { deleteMany: vi.fn() },
+    template: { deleteMany: vi.fn() },
+    templateArtStyle: { deleteMany: vi.fn() },
+    templateVoiceStyle: { deleteMany: vi.fn() },
+    templateMusic: { deleteMany: vi.fn() },
+    plannedEmail: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    tokenTransaction: { deleteMany: vi.fn() },
+    subscriptionPurchase: { deleteMany: vi.fn() },
+    telegramLinkToken: { deleteMany: vi.fn() },
+    telegramAccount: { deleteMany: vi.fn() },
+    mobileSession: { deleteMany: vi.fn() },
+    session: { deleteMany: vi.fn() },
+    account: { deleteMany: vi.fn() },
+    userSettings: { deleteMany: vi.fn() },
+    user: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+  };
+}
+
 vi.mock('@/server/db', () => ({ prisma: prismaMock }));
 vi.mock('@/server/storage', () => ({ deleteStoredMedia }));
 vi.mock('@/server/telegram', () => ({ notifyAdminsOfAccountDeletion }));
@@ -55,43 +95,7 @@ beforeEach(() => {
 
 describe('deleteUserAccount', () => {
   it('removes project template image metadata during deletion', async () => {
-    const tx = {
-      publishTask: { deleteMany: vi.fn() },
-      projectCharacterSelection: { deleteMany: vi.fn() },
-      script: { deleteMany: vi.fn() },
-      scriptRequest: { deleteMany: vi.fn() },
-      audioRequest: { deleteMany: vi.fn() },
-      audioCandidate: { deleteMany: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn() },
-      projectTemplateImage: { deleteMany: vi.fn() },
-      imageAsset: { deleteMany: vi.fn() },
-      videoAsset: { deleteMany: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
-      projectLanguageProgress: { deleteMany: vi.fn(), upsert: vi.fn() },
-      projectStatusHistory: { deleteMany: vi.fn(), create: vi.fn() },
-      job: { deleteMany: vi.fn() },
-      project: { updateMany: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
-      projectGroupCharacterSelection: { deleteMany: vi.fn() },
-      projectGroup: { deleteMany: vi.fn() },
-      userCharacterImageTask: { deleteMany: vi.fn() },
-      userCharacterVariation: { deleteMany: vi.fn() },
-      userCharacter: { deleteMany: vi.fn() },
-      publishChannelLanguage: { deleteMany: vi.fn() },
-      publishChannelOAuthState: { deleteMany: vi.fn() },
-      publishChannel: { deleteMany: vi.fn() },
-      template: { deleteMany: vi.fn() },
-      templateArtStyle: { deleteMany: vi.fn() },
-      templateVoiceStyle: { deleteMany: vi.fn() },
-      templateMusic: { deleteMany: vi.fn() },
-      plannedEmail: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
-      tokenTransaction: { deleteMany: vi.fn() },
-      subscriptionPurchase: { deleteMany: vi.fn() },
-      telegramLinkToken: { deleteMany: vi.fn() },
-      telegramAccount: { deleteMany: vi.fn() },
-      mobileSession: { deleteMany: vi.fn() },
-      session: { deleteMany: vi.fn() },
-      account: { deleteMany: vi.fn() },
-      userSettings: { deleteMany: vi.fn() },
-      user: { update: vi.fn() },
-    };
+    const tx = createTransactionMock();
     prismaMock.$transaction.mockImplementation(async (callback: any) => callback(tx));
 
     await deleteUserAccount({ userId: 'user-1', source: 'web' });
@@ -108,43 +112,7 @@ describe('deleteUserAccount', () => {
     prismaMock.imageAsset.findMany.mockResolvedValue([
       { path: 'image/2024/01/uploaded.jpg', publicUrl: 'https://cdn.test/image/2024/01/uploaded.jpg' },
     ]);
-    prismaMock.$transaction.mockImplementation(async (callback: any) => callback({
-      publishTask: { deleteMany: vi.fn() },
-      projectCharacterSelection: { deleteMany: vi.fn() },
-      script: { deleteMany: vi.fn() },
-      scriptRequest: { deleteMany: vi.fn() },
-      audioRequest: { deleteMany: vi.fn() },
-      audioCandidate: { deleteMany: vi.fn() },
-      projectTemplateImage: { deleteMany: vi.fn() },
-      imageAsset: { deleteMany: vi.fn() },
-      videoAsset: { deleteMany: vi.fn() },
-      projectLanguageProgress: { deleteMany: vi.fn() },
-      projectStatusHistory: { deleteMany: vi.fn() },
-      job: { deleteMany: vi.fn() },
-      project: { updateMany: vi.fn() },
-      projectGroupCharacterSelection: { deleteMany: vi.fn() },
-      projectGroup: { deleteMany: vi.fn() },
-      userCharacterImageTask: { deleteMany: vi.fn() },
-      userCharacterVariation: { deleteMany: vi.fn() },
-      userCharacter: { deleteMany: vi.fn() },
-      publishChannelLanguage: { deleteMany: vi.fn() },
-      publishChannelOAuthState: { deleteMany: vi.fn() },
-      publishChannel: { deleteMany: vi.fn() },
-      template: { deleteMany: vi.fn() },
-      templateArtStyle: { deleteMany: vi.fn() },
-      templateVoiceStyle: { deleteMany: vi.fn() },
-      templateMusic: { deleteMany: vi.fn() },
-      plannedEmail: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
-      tokenTransaction: { deleteMany: vi.fn() },
-      subscriptionPurchase: { deleteMany: vi.fn() },
-      telegramLinkToken: { deleteMany: vi.fn() },
-      telegramAccount: { deleteMany: vi.fn() },
-      mobileSession: { deleteMany: vi.fn() },
-      session: { deleteMany: vi.fn() },
-      account: { deleteMany: vi.fn() },
-      userSettings: { deleteMany: vi.fn() },
-      user: { update: vi.fn() },
-    }));
+    prismaMock.$transaction.mockImplementation(async (callback: any) => callback(createTransactionMock()));
 
     await deleteUserAccount({ userId: 'user-1', source: 'web' });
 
@@ -173,5 +141,30 @@ describe('deleteUserAccount', () => {
 
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
     expect(deleteStoredMedia).not.toHaveBeenCalled();
+  });
+
+  it('deletes and notifies only once when concurrent requests observe an active account', async () => {
+    let accountDeleted = false;
+    const transactions = [createTransactionMock(), createTransactionMock()];
+    for (const tx of transactions) {
+      tx.user.updateMany.mockImplementation(async () => {
+        if (accountDeleted) return { count: 0 };
+        accountDeleted = true;
+        return { count: 1 };
+      });
+    }
+    prismaMock.$transaction
+      .mockImplementationOnce(async (callback: any) => callback(transactions[0]))
+      .mockImplementationOnce(async (callback: any) => callback(transactions[1]));
+
+    const results = await Promise.all([
+      deleteUserAccount({ userId: 'user-1', source: 'mobile', reason: 'mobile_settings_user_requested' }),
+      deleteUserAccount({ userId: 'user-1', source: 'mobile', reason: 'mobile_settings_user_requested' }),
+    ]);
+
+    expect(results.map((result) => result.alreadyDeleted).sort()).toEqual([false, true]);
+    expect(notifyAdminsOfAccountDeletion).toHaveBeenCalledTimes(1);
+    expect(transactions[0].project.updateMany).toHaveBeenCalledTimes(1);
+    expect(transactions[1].project.updateMany).not.toHaveBeenCalled();
   });
 });

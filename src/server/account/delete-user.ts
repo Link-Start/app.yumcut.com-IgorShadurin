@@ -81,7 +81,23 @@ export async function deleteUserAccount(options: DeleteUserAccountOptions): Prom
     }
   }
 
-  await prisma.$transaction(async (tx) => {
+  const deletedAccount = await prisma.$transaction(async (tx) => {
+    const claim = await tx.user.updateMany({
+      where: { id: userId, deleted: false },
+      data: {
+        deleted: true,
+        deletedAt: now,
+        deletionSource: normalizedSource,
+        deletionReason: normalizedReason,
+        tokenBalance: 0,
+        name: null,
+        image: null,
+      },
+    });
+    if (claim.count === 0) {
+      return false;
+    }
+
     await tx.publishTask.deleteMany({ where: { userId } });
     await tx.projectCharacterSelection.deleteMany({ where: { project: { userId } } });
     await tx.script.deleteMany({ where: { project: { userId } } });
@@ -140,19 +156,12 @@ export async function deleteUserAccount(options: DeleteUserAccountOptions): Prom
     await tx.account.deleteMany({ where: { userId } });
     await tx.userSettings.deleteMany({ where: { userId } });
 
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        deleted: true,
-        deletedAt: now,
-        deletionSource: normalizedSource,
-        deletionReason: normalizedReason,
-        tokenBalance: 0,
-        name: null,
-        image: null,
-      },
-    });
+    return true;
   });
+
+  if (!deletedAccount) {
+    return { alreadyDeleted: true };
+  }
 
   notifyAdminsOfAccountDeletion({
     userId,
